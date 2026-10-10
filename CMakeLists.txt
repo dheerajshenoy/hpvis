@@ -41,14 +41,17 @@ add_executable(${PROJECT_NAME}
     src/hpixview.cpp
     src/view.cpp
     src/openglwidget.cpp
-    src/TabBar.cpp
-    src/TabWidget.cpp
+    src/tabbar.cpp
+    src/tabwidget.cpp
+    src/sidepanel.cpp
+
     include/view.hpp
     include/hpixview.hpp
     include/openglwidget.hpp
     include/argparse.hpp
-    include/TabWidget.hpp
-    include/TabBar.hpp)
+    include/tabwidget.hpp
+    include/tabbar.hpp
+    include/sidepanel.hpp)
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES

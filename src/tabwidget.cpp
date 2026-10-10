@@ -1,4 +1,4 @@
-#include "TabWidget.hpp"
+#include "tabwidget.hpp"
 
 #include <QVBoxLayout>
 

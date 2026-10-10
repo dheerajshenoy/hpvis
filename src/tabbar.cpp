@@ -1,4 +1,4 @@
-#include "TabBar.hpp"
+#include "tabbar.hpp"
 
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>

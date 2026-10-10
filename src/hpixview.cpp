@@ -1,5 +1,7 @@
 #include "hpixview.hpp"
 
+#include "pixelordering.hpp"
+#include "sidepanel.hpp"
 #include "view.hpp"
 
 #include <QApplication>
@@ -39,10 +41,29 @@ HpixView::initUI()
     widget->setLayout(layout);
 
     m_tabWidget = new TabWidget();
+    m_sidePanel = new SidePanel();
+
     initMenubar();
 
     layout->addWidget(m_tabWidget);
     setCentralWidget(widget);
+
+    this->addDockWidget(Qt::LeftDockWidgetArea, m_sidePanel);
+
+    initConnections();
+}
+
+void
+HpixView::initConnections()
+{
+    connect(m_sidePanel, &SidePanel::pixelOrderingChanged, this,
+            &HpixView::onPixelOrderingChanged);
+
+    connect(m_tabWidget, &TabWidget::currentChanged, this,
+            &HpixView::onTabChanged);
+
+    connect(m_tabWidget, &TabWidget::tabCloseRequested, this,
+            &HpixView::onTabCloseRequested);
 }
 
 void
@@ -97,4 +118,45 @@ HpixView::OpenFile(const QString &filePath)
     view->loadMap(resolvedPath.toStdString());
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_tabWidget->addTab(view, QFileInfo(resolvedPath).fileName());
+}
+
+void
+HpixView::updateSidePanelStateFromView(const View *view)
+{
+    if (!view)
+        return;
+
+    m_sidePanel->setPixelOrdering(view->pixelOrdering());
+}
+
+void
+HpixView::onPixelOrderingChanged(PixelOrdering ordering)
+{
+    if (!m_view)
+        return;
+
+    m_view->setPixelOrdering(ordering);
+}
+
+void
+HpixView::onTabChanged(int index)
+{
+    if (index < 0 || index >= m_tabWidget->count())
+        return;
+
+    QWidget *widget = m_tabWidget->widget(index);
+    m_view          = qobject_cast<View *>(widget);
+
+    updateSidePanelStateFromView(m_view);
+}
+
+void
+HpixView::onTabCloseRequested(int index)
+{
+    if (index < 0 || index >= m_tabWidget->count())
+        return;
+
+    QWidget *widget = m_tabWidget->widget(index);
+    m_tabWidget->removeTab(index);
+    delete widget;
 }

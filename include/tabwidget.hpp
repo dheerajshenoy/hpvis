@@ -1,6 +1,6 @@
 #pragma once
 
-#include "TabBar.hpp"
+#include "tabbar.hpp"
 
 #include <QContextMenuEvent>
 #include <QFontDatabase>

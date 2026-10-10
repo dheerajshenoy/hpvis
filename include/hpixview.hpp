@@ -1,10 +1,12 @@
 #pragma once
 
-#include "TabWidget.hpp"
 #include "argparse.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
+#include "sidepanel.hpp"
+#include "tabwidget.hpp"
+#include "view.hpp"
 
 #include <QMainWindow>
 #include <QTabWidget>
@@ -21,13 +23,23 @@ public:
 private:
     void parseArgs(const argparse::ArgumentParser &parser);
     void initUI();
+    void initConnections();
     void initMenubar();
     void initCFITSIO();
+    void updateSidePanelStateFromView(const View *view);
+
+private slots:
+    void onPixelOrderingChanged(PixelOrdering ordering);
+    void onTabChanged(int index);
+    void onTabCloseRequested(int index);
 
 private:
     QMenu *m_fileMenu = nullptr;
     QMenu *m_editMenu = nullptr;
     QMenu *m_viewMenu = nullptr;
 
+    View *m_view = nullptr;
+
     TabWidget *m_tabWidget = nullptr;
+    SidePanel *m_sidePanel = nullptr;
 };

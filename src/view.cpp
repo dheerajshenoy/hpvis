@@ -1,7 +1,10 @@
 #include "view.hpp"
 
+#include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
+
+#include <QMessageBox>
 
 View::View(QWidget *parent) : QWidget(parent)
 {
@@ -26,8 +29,20 @@ View::loadMap(const std::string &filename)
         read_Healpix_map_from_fits(filename, m_healpix_map, 1, 2);
         m_glWidget->setMap(m_healpix_map);
     }
+    catch (const PlanckError &e)
+    {
+        QMessageBox::critical(this, "Error",
+                              QString("Failed to load map: %1").arg(e.what()));
+    }
     catch (const std::exception &e)
     {
-        std::cerr << "Error loading FITS map: " << e.what() << std::endl;
+        QMessageBox::critical(this, "Error",
+                              QString("Failed to load map: %1").arg(e.what()));
     }
+}
+
+void
+View::setPixelOrdering(PixelOrdering ordering)
+{
+    m_glWidget->setPixelOrdering(ordering);
 }

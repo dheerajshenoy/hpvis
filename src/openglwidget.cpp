@@ -5,10 +5,10 @@
 #include <QFile>
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <iostream>
-#include <vector>
+#include <limits>
 #include <qcoreapplication.h>
+#include <vector>
 
 OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent) {}
 
@@ -101,6 +101,8 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("npix", (float)m_npix);
     m_shaderProgram.setUniformValue("vmin", m_vmin);
     m_shaderProgram.setUniformValue("vmax", m_vmax);
+    m_shaderProgram.setUniformValue("pixel_ordering",
+                                    static_cast<int>(m_pixelOrdering));
 
     m_vao.bind();
     glDrawArrays(GL_TRIANGLES, 0, 6);
