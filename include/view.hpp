@@ -81,6 +81,11 @@ public:
         m_glWidget->setColormapInvert(invert);
     }
 
+    inline void setBackgroundColor(const QColor &color)
+    {
+        m_glWidget->setBackgroundColor(color);
+    }
+
     void loadMap(const std::string &filename);
 
 private:

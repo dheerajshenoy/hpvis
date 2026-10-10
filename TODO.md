@@ -68,8 +68,8 @@ Group into collapsible sections (QGroupBox / toolbox).
 
 ### Display
 - [x] Colormap combo (viridis, plasma, coolwarm, Planck, grayscale) + reverse checkbox
-- [ ] Min/max spinboxes, Auto button, percentile presets (100/99/95%)
-- [ ] Scale combo (linear, log, asinh, histogram-equalized)
+- [x] Min/max spinboxes, Auto button, percentile presets (100/99/95%)
+- [x] Scale combo (linear, log, asinh, histogram-equalized)
 - [ ] Bad pixel (`UNSEEN`) color picker
 - [ ] Background color picker (outside the ellipse)
 

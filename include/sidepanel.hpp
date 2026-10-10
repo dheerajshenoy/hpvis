@@ -6,6 +6,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDockWidget>
+#include <QLabel>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
@@ -34,17 +35,15 @@ public:
         return static_cast<Colormap>(m_colormapCombo->currentIndex());
     }
 
-    void setPixelOrdering(PixelOrdering ordering);
-
-    void setColormapScale(ColormapScale scale);
-
     inline void setColormapReverse(bool reverse)
     {
         QSignalBlocker blocker(m_reverseColormapCheck);
         m_reverseColormapCheck->setChecked(reverse);
     }
 
-    // Update the min/max spinboxes without emitting change signals
+    void setBackgroundColor(uint32_t color);
+    void setPixelOrdering(PixelOrdering ordering);
+    void setColormapScale(ColormapScale scale);
     void setColormapRange(double min, double max);
 
 signals:
@@ -55,10 +54,12 @@ signals:
     void colormapScaleChanged(ColormapScale scale);
     void colormapRangeResetRequested();
     void colormapReverseChanged(bool state);
+    void backgroundColorChanged(uint32_t color);
 
 private:
     void setupUI();
     void setupConnections();
+    void onBackgroundColorButtonClicked();
     QWidget *pixelOrderingWidget();
     QWidget *colormapWidget();
 
@@ -70,4 +71,6 @@ private:
     QDoubleSpinBox *m_colormapMaxSpin = nullptr;
     QComboBox *m_colormapScaleCombo   = nullptr;
     QPushButton *m_colormapResetBtn   = nullptr;
+    QPushButton *m_bgColorButton      = nullptr;
+    QColor m_bgColor                  = QColor(10, 10, 15);
 };

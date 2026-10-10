@@ -2,8 +2,10 @@
 
 #include "collapsiblesection.hpp"
 
+#include <QColorDialog>
 #include <QFormLayout>
 #include <QScrollArea>
+#include <qpushbutton.h>
 
 SidePanel::SidePanel(QWidget *parent) : QDockWidget(parent)
 {
@@ -41,6 +43,9 @@ SidePanel::setupConnections()
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });
+
+    connect(m_bgColorButton, &QPushButton::clicked, this,
+            &SidePanel::onBackgroundColorButtonClicked);
 
     connect(m_pixOrdCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
@@ -114,6 +119,13 @@ SidePanel::pixelOrderingWidget()
     QWidget *widget     = new QWidget();
     QFormLayout *layout = new QFormLayout(widget);
 
+    m_bgColorButton = new QPushButton("");
+    m_bgColorButton->setFixedSize(50, 20);
+    m_bgColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(0x0A0A0F, 6, 16, QChar('0')));
+
+    layout->addRow("Background Color:", m_bgColorButton);
+
     widget->setLayout(layout);
     m_pixOrdCombo = new QComboBox();
     m_pixOrdCombo->addItem("Nested");
@@ -168,4 +180,27 @@ SidePanel::colormapWidget()
 
     widget->setLayout(layout);
     return widget;
+}
+
+void
+SidePanel::setBackgroundColor(uint32_t color)
+{
+    m_bgColor = QColor::fromRgb(color & 0xFFFFFF);
+    m_bgColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(color, 6, 16, QChar('0')));
+}
+
+void
+SidePanel::onBackgroundColorButtonClicked()
+{
+
+    QColor color = QColorDialog::getColor(
+        QColor(m_bgColor), this,
+        "Select Background Color");
+    if (color.isValid())
+    {
+        auto bgcolor = color.rgb() & 0xFFFFFF;
+        setBackgroundColor(bgcolor);
+        emit backgroundColorChanged(bgcolor);
+    }
 }

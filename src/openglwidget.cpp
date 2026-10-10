@@ -4,6 +4,7 @@
 #include "shaderloader.hpp"
 
 #include <QFile>
+#include <QVector3D>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -111,6 +112,9 @@ OpenGLWidget::paintGL()
                                     static_cast<int>(m_colormapScale));
     m_shaderProgram.setUniformValue("pixel_ordering",
                                     static_cast<int>(m_pixelOrdering));
+    m_shaderProgram.setUniformValue(
+        "bg_color", QVector3D(m_bgColor.redF(), m_bgColor.greenF(),
+                              m_bgColor.blueF()));
     m_shaderProgram.setUniformValue("invert_colormap",
                                     m_invertColormap ? 1 : 0);
 

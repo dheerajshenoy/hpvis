@@ -92,6 +92,12 @@ public:
         update();
     }
 
+    inline void setBackgroundColor(const QColor &color)
+    {
+        m_bgColor = color;
+        update();
+    }
+
     void setMap(const Healpix_Map<float> &map);
 
 protected:
@@ -116,6 +122,7 @@ private:
     float m_dataMax               = 1.0f;
     bool m_hasPendingMap          = false;
     bool m_invertColormap         = false;
+    QColor m_bgColor              = QColor(10, 10, 15);
     Healpix_Map<float> m_pendingMap;
     QOpenGLVertexArrayObject m_vao;
     QOpenGLBuffer m_vbo{QOpenGLBuffer::VertexBuffer}; // VBO wrapper

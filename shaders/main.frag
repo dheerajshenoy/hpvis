@@ -12,7 +12,7 @@ out vec4 FragColor;
 void main() {
     float colat, phi;
     if (!inverseMollweide(TexCoord, colat, phi)) {
-        FragColor = vec4(0.04, 0.04, 0.06, 1.0); // background outside
+        FragColor = vec4(bg_color, 1.0); // background outside
         return;
     }
 

@@ -59,6 +59,9 @@ HpixView::initConnections()
     connect(m_sidePanel, &SidePanel::pixelOrderingChanged, this,
             &HpixView::onPixelOrderingChanged);
 
+    connect(m_sidePanel, &SidePanel::backgroundColorChanged, this,
+            &HpixView::onBackgroundColorChanged);
+
     connect(m_sidePanel, &SidePanel::colormapChanged, this,
             &HpixView::onColormapChanged);
 
@@ -230,4 +233,11 @@ HpixView::onColormapRangeResetRequested()
         m_sidePanel->setColormapRange(m_view->colormapMin(),
                                       m_view->colormapMax());
     }
+}
+
+void
+HpixView::onBackgroundColorChanged(const QColor &color)
+{
+    if (m_view)
+        m_view->setBackgroundColor(color);
 }
