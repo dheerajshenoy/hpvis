@@ -1,6 +1,7 @@
 #include "openglwidget.hpp"
 
 #include "healpix_map.h"
+#include "shaderloader.hpp"
 
 #include <QFile>
 #include <algorithm>
@@ -40,33 +41,19 @@ OpenGLWidget::initializeGL()
 
     setupGeometry();
 
-    // 1. Simple Vertex Shader source
-    const char *vertexShaderSrc = "#version 330 core\n"
-                                  "layout (location = 0) in vec2 aPos;\n"
-                                  "layout (location = 1) in vec2 aTexCoord;\n"
-                                  "out vec2 TexCoord;\n"
-                                  "void main() {\n"
-                                  "   gl_Position = vec4(aPos, 0.0, 1.0);\n"
-                                  "   TexCoord = aTexCoord;\n"
-                                  "}\n";
-
-    // 3. Compile and link the shader program
-    m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Vertex,
-                                            vertexShaderSrc);
-
-    // Load Fragment Shader from file
-    // (Adjust path depending on where you place mollweide.frag)
-    QFile fragFile(QCoreApplication::applicationDirPath() + "/../"
-                   + "shaders/mollweide.frag");
-    if (!fragFile.open(QIODevice::ReadOnly | QIODevice::Text))
-    {
-        std::cerr << "[Error] Failed to open mollweide.frag!" << std::endl;
+    const QString vertSrc = loadShaderSource(":/shaders/vertex.vert");
+    const QString fragSrc = loadShaderSource(":/shaders/main.frag");
+    if (vertSrc.isEmpty() || fragSrc.isEmpty())
         return;
-    }
-    QString fragSource = fragFile.readAll();
 
-    m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Fragment,
-                                            fragSource);
+    if (!m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Vertex,
+                                                 vertSrc))
+        std::cerr << "[Vertex shader error]\n"
+                  << m_shaderProgram.log().toStdString() << std::endl;
+    if (!m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Fragment,
+                                                 fragSrc))
+        std::cerr << "[Fragment shader error]\n"
+                  << m_shaderProgram.log().toStdString() << std::endl;
     if (!m_shaderProgram.link())
         std::cerr << "[Shader error] " << m_shaderProgram.log().toStdString()
                   << std::endl;
@@ -101,6 +88,7 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("npix", (float)m_npix);
     m_shaderProgram.setUniformValue("vmin", m_vmin);
     m_shaderProgram.setUniformValue("vmax", m_vmax);
+    m_shaderProgram.setUniformValue("colormap", static_cast<int>(m_colormap));
     m_shaderProgram.setUniformValue("pixel_ordering",
                                     static_cast<int>(m_pixelOrdering));
 

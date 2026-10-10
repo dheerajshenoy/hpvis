@@ -46,3 +46,9 @@ View::setPixelOrdering(PixelOrdering ordering)
 {
     m_glWidget->setPixelOrdering(ordering);
 }
+
+void
+View::setColormap(Colormap colormap)
+{
+    m_glWidget->setColormap(colormap);
+}

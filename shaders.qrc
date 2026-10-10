@@ -1,0 +1,11 @@
+<RCC>
+    <qresource prefix="/">
+        <file>shaders/vertex.vert</file>
+        <file>shaders/main.frag</file>
+        <file>shaders/common.glsl</file>
+        <file>shaders/colormaps.glsl</file>
+        <file>shaders/healpix_ring.glsl</file>
+        <file>shaders/healpix_nest.glsl</file>
+        <file>shaders/projections.glsl</file>
+    </qresource>
+</RCC>

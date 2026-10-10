@@ -44,6 +44,9 @@ add_executable(${PROJECT_NAME}
     src/tabbar.cpp
     src/tabwidget.cpp
     src/sidepanel.cpp
+    src/collapsiblesection.cpp
+    src/shaderloader.cpp
+    shaders.qrc
 
     include/view.hpp
     include/hpixview.hpp
@@ -51,7 +54,9 @@ add_executable(${PROJECT_NAME}
     include/argparse.hpp
     include/tabwidget.hpp
     include/tabbar.hpp
-    include/sidepanel.hpp)
+    include/sidepanel.hpp
+    include/collapsiblesection.hpp
+    include/shaderloader.hpp)
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "colormap.hpp"
 #include "pixelordering.hpp"
 
 #include <QOpenGLBuffer>
@@ -27,6 +28,16 @@ public:
         update();
     }
 
+    Colormap colormap() const
+    {
+        return m_colormap;
+    }
+    void setColormap(Colormap colormap)
+    {
+        m_colormap = colormap;
+        update();
+    }
+
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -38,6 +49,7 @@ private:
 
 private:
     PixelOrdering m_pixelOrdering = PixelOrdering::RING;
+    Colormap m_colormap           = Colormap::VIRIDIS;
     long m_nside                  = 0;
     long m_npix                   = 0;
     GLuint m_mapTexture           = 0;

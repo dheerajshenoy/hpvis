@@ -6,13 +6,13 @@
 - [x] Fix east/west orientation (longitude increasing to the left, healpy style)
 - [ ] Integer uniforms / 2D index math for nside > 1024 (float precision)
 - [ ] Check shader compile errors (`addShaderFromSourceCode` return values) and show them in a dialog
-- [ ] Embed shaders as Qt resources instead of loading from `applicationDirPath()/../shaders`
+- [x] Embed shaders as Qt resources instead of loading from `applicationDirPath()/../shaders`
 - [ ] Smooth/bilinear interpolation option
 - [ ] Mask bad pixels (`UNSEEN`) with a distinct color
 
 ## Color scale
-- [ ] Colormap selection (viridis, plasma, coolwarm, planck, grayscale)
-- [ ] User-adjustable min/max (spinboxes + sliders)
+- [x] Colormap selection (viridis, plasma, coolwarm, planck, grayscale)
+- [x] User-adjustable min/max (spinboxes + sliders)
 - [ ] Percentile clipping (1%/99%) and auto-range button
 - [ ] Scaling modes: linear, log, asinh, histogram-equalized
 - [ ] Colorbar widget with tick labels

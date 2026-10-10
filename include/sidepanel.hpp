@@ -1,10 +1,12 @@
 #pragma once
 
+#include "colormap.hpp"
 #include "pixelordering.hpp"
 
 #include <QComboBox>
 #include <QDockWidget>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 class SidePanel : public QDockWidget
@@ -13,7 +15,7 @@ class SidePanel : public QDockWidget
 
 public:
     explicit SidePanel(QWidget *parent = nullptr);
-    void setPixelOrdering(PixelOrdering ordering);
+
     inline PixelOrdering pixelOrdering()
     {
         return m_pixOrdCombo->currentIndex() == (int)PixelOrdering::NESTED
@@ -21,13 +23,35 @@ public:
                    : PixelOrdering::RING;
     }
 
+    inline void setColormap(Colormap colormap)
+    {
+        m_colormapCombo->setCurrentIndex(static_cast<int>(colormap));
+    }
+
+    inline Colormap colormap()
+    {
+        return static_cast<Colormap>(m_colormapCombo->currentIndex());
+    }
+
+    void setPixelOrdering(PixelOrdering ordering);
+
 signals:
     void pixelOrderingChanged(PixelOrdering ordering);
+    void colormapChanged(Colormap colormap);
+    void colormapMinChanged(double min);
+    void colormapMaxChanged(double max);
+    void colormapScaleChanged(ColormapScale scale);
 
 private:
     void setupUI();
     void setupConnections();
+    QWidget *pixelOrderingWidget();
+    QWidget *colormapWidget();
 
 private:
-    QComboBox *m_pixOrdCombo = nullptr;
+    QComboBox *m_pixOrdCombo          = nullptr;
+    QComboBox *m_colormapCombo        = nullptr;
+    QDoubleSpinBox *m_colormapMinSpin = nullptr;
+    QDoubleSpinBox *m_colormapMaxSpin = nullptr;
+    QComboBox *m_colormapScaleCombo   = nullptr;
 };

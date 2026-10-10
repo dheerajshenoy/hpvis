@@ -59,6 +59,13 @@ HpixView::initConnections()
     connect(m_sidePanel, &SidePanel::pixelOrderingChanged, this,
             &HpixView::onPixelOrderingChanged);
 
+    connect(m_sidePanel, &SidePanel::colormapChanged, this,
+            [this](Colormap colormap)
+    {
+        if (m_view)
+            m_view->setColormap(colormap);
+    });
+
     connect(m_tabWidget, &TabWidget::currentChanged, this,
             &HpixView::onTabChanged);
 
@@ -127,6 +134,10 @@ HpixView::updateSidePanelStateFromView(const View *view)
         return;
 
     m_sidePanel->setPixelOrdering(view->pixelOrdering());
+
+    // setColormap emits colormapChanged only on change; block to avoid a loop
+    QSignalBlocker blocker(m_sidePanel);
+    m_sidePanel->setColormap(view->colormap());
 }
 
 void

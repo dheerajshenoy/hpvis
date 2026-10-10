@@ -2,6 +2,7 @@
 
 #include "healpix_map.h"
 #include "openglwidget.hpp"
+#include "colormap.hpp"
 #include "pixelordering.hpp"
 
 #include <QVBoxLayout>
@@ -20,6 +21,11 @@ public:
         return m_glWidget->pixelOrdering();
     }
 
+    inline Colormap colormap() const
+    {
+        return m_glWidget->colormap();
+    }
+    void setColormap(Colormap colormap);
     void loadMap(const std::string &filename);
     void setPixelOrdering(PixelOrdering ordering);
 
