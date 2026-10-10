@@ -18,6 +18,8 @@ First development release.
   `healpix_nest`, `projections`, `scale`, `masks`), assembled with an
   `#include` loader, and embedded in the binary as Qt resources.
 - Shader compile and link errors are printed to the console.
+- The map uploads to the GPU without an intermediate CPU copy, and happens
+  when a file is opened rather than the first time its tab is shown.
 
 ### Color
 - 15 colormaps: grayscale, inferno, magma, plasma, viridis, cubehelix, jet,
@@ -34,6 +36,9 @@ First development release.
 - Mouse wheel zoom, left-drag pan, double-click to reset the view.
 - Touchpad support: pinch to zoom, two-finger scroll to pan, Ctrl+scroll to
   zoom, smart-zoom gesture to reset.
+- Optional minimap (View > Minimap) in the bottom-right corner, shown only
+  while zoomed in. A red box marks the visible region; click or drag inside
+  it to recenter the view.
 - The OpenGL viewport accounts for the display scale factor, so the anchor
   point stays under the cursor on scaled (HiDPI) screens.
 
@@ -54,12 +59,20 @@ First development release.
 - The implicit color range ignores masked pixels while masks are enabled.
 - Loading a map of a different size drops the loaded masks.
 
+### Color bar
+- Optional color bar ("Show Color Bar") with tick marks and labels. The tick
+  count adapts to the width, and labels use a compact or scientific format.
+
 ### Interface
 - Tabbed interface: open several maps at once, each with its own view and
   settings.
 - Side panel with collapsible sections (Pixel Ordering, Color, Overlays) in a
   scroll area.
 - Panel controls follow the current tab when you switch tabs.
+- "Map Info" section (nside, npix, average, RMS). The statistics are computed
+  once on load, so switching tabs with large maps stays fast.
+- Sky fraction (f_sky) shown for the enabled masks.
+- View menu toggles for the side panel and the minimap.
 - Full-width status bar showing the file name, file size, zoom level, and the
   cursor's longitude/latitude, pixel index and pixel value.
 - Open files from the File menu, or from the command line (`Hpixview
