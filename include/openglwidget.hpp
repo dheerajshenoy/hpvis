@@ -10,6 +10,8 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
 #include <healpix_map.h>
+#include <array>
+#include <cstdint>
 #include <vector>
 
 class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
@@ -191,7 +193,8 @@ private:
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
     void recomputeDataRange();
-    void rebuildCombinedMask();
+    void applyMaskChange(bool texturesChanged);
+    int maskBits() const;
     void setupGeometry();
 
 private:
@@ -221,14 +224,13 @@ private:
     {
         QString name;
         QString path;
-        std::vector<float> data; // 1 = keep, 0 = masked
+        std::vector<uint8_t> data; // 0..255, 255 = keep, 0 = masked
         bool enabled = true;
     };
     std::vector<MaskEntry> m_masks;
-    std::vector<float> m_maskData; // product of the enabled masks
-    bool m_maskActive  = false;    // at least one mask enabled
-    GLuint m_maskTexture = 0;
-    bool m_maskDirty     = false;
+    static constexpr int kMaxMasks = 16; // 4 textures x 4 channels
+    std::array<GLuint, 4> m_maskTextures{};
+    bool m_maskDirty = false; // mask textures need re-uploading
     int m_maskMode       = 0;
     float m_maskOpacity  = 0.8f;
 };

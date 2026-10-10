@@ -39,11 +39,12 @@ OpenGLWidget::~OpenGLWidget()
         m_mapTexture = 0;
         doneCurrent();
     }
-    if (m_maskTexture)
+    if (m_maskTextures[0] || m_maskTextures[1] || m_maskTextures[2]
+        || m_maskTextures[3])
     {
         makeCurrent();
-        glDeleteTextures(1, &m_maskTexture);
-        m_maskTexture = 0;
+        glDeleteTextures(int(m_maskTextures.size()), m_maskTextures.data());
+        m_maskTextures.fill(0);
         doneCurrent();
     }
 }
@@ -52,8 +53,11 @@ void
 OpenGLWidget::recomputeDataRange()
 {
     // Range of valid pixels (ignoring non-finite, HEALPix UNSEEN, masked)
-    const bool useMask
-        = m_maskActive && m_maskData.size() == size_t(m_pendingMap.Npix());
+    std::vector<const uint8_t *> active;
+    for (const MaskEntry &m : m_masks)
+        if (m.enabled && m.data.size() == size_t(m_pendingMap.Npix()))
+            active.push_back(m.data.data());
+
     m_dataMin         = std::numeric_limits<float>::max();
     m_dataMax         = std::numeric_limits<float>::lowest();
     const float *data = m_pendingMap.Map().begin();
@@ -62,8 +66,14 @@ OpenGLWidget::recomputeDataRange()
         float v = data[i];
         if (!std::isfinite(v) || v < -1e30f)
             continue;
-        if (useMask && m_maskData[i] < 0.5f)
-            continue;
+        if (!active.empty())
+        {
+            float keep = 1.0f; // same product the shader computes
+            for (const uint8_t *m : active)
+                keep *= m[i] * (1.0f / 255.0f);
+            if (keep < 0.5f)
+                continue;
+        }
         m_dataMin = std::min(m_dataMin, v);
         m_dataMax = std::max(m_dataMax, v);
     }
@@ -74,8 +84,18 @@ OpenGLWidget::recomputeDataRange()
 void
 OpenGLWidget::setMap(const Healpix_Map<float> &map)
 {
+    // Masks only make sense for the resolution they were loaded for
+    const bool sizeChanged = map.Npix() != m_pendingMap.Npix();
+
     m_pendingMap    = map;
     m_hasPendingMap = true;
+
+    if (sizeChanged && !m_masks.empty())
+    {
+        m_masks.clear();
+        m_maskDirty = true;
+        emit masksChanged();
+    }
 
     recomputeDataRange();
     m_vmin = m_dataMin;
@@ -143,12 +163,17 @@ OpenGLWidget::paintGL()
     glBindTexture(GL_TEXTURE_2D, m_mapTexture);
     m_shaderProgram.setUniformValue("mapTexture", 0);
 
-    const bool useMask = m_maskActive && m_maskTexture != 0;
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, useMask ? m_maskTexture : 0);
+    // Mask textures on units 1..4; their samplers are only read for masks
+    // whose bit is set in mask_bits
+    for (int g = 0; g < 4; ++g)
+    {
+        glActiveTexture(GL_TEXTURE1 + g);
+        glBindTexture(GL_TEXTURE_2D, m_maskTextures[g]);
+        m_shaderProgram.setUniformValue(
+            QByteArray("maskTex" + QByteArray::number(g)).constData(), 1 + g);
+    }
     glActiveTexture(GL_TEXTURE0);
-    m_shaderProgram.setUniformValue("maskTexture", 1);
-    m_shaderProgram.setUniformValue("use_mask", useMask ? 1 : 0);
+    m_shaderProgram.setUniformValue("mask_bits", maskBits());
     m_shaderProgram.setUniformValue("mask_mode", m_maskMode);
     m_shaderProgram.setUniformValue("mask_opacity", m_maskOpacity);
 
@@ -191,6 +216,13 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
     int added = 0;
     for (const QString &file : files)
     {
+        if (maskCount() >= kMaxMasks)
+        {
+            QMessageBox::warning(
+                this, "Mask",
+                QString("At most %1 masks can be loaded.").arg(kMaxMasks));
+            break;
+        }
         const QString path = QFileInfo(file).absoluteFilePath();
         const bool dup     = std::any_of(m_masks.begin(), m_masks.end(),
                                          [&](const MaskEntry &m)
@@ -225,7 +257,8 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
             {
                 // NaN / UNSEEN count as masked; clamp weights to [0, 1]
                 float v = (std::isfinite(d[i]) && d[i] > -1e30f) ? d[i] : 0.0f;
-                entry.data[i] = std::clamp(v, 0.0f, 1.0f);
+                entry.data[i] = static_cast<uint8_t>(
+                    std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
             }
             m_masks.push_back(std::move(entry));
             ++added;
@@ -245,7 +278,7 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
     }
 
     if (added)
-        rebuildCombinedMask();
+        applyMaskChange(true);
     return added;
 }
 
@@ -255,14 +288,14 @@ OpenGLWidget::removeMask(int index)
     if (index < 0 || index >= maskCount())
         return;
     m_masks.erase(m_masks.begin() + index);
-    rebuildCombinedMask();
+    applyMaskChange(true);
 }
 
 void
 OpenGLWidget::clearMasks()
 {
     m_masks.clear();
-    rebuildCombinedMask();
+    applyMaskChange(true);
 }
 
 void
@@ -271,29 +304,28 @@ OpenGLWidget::setMaskEnabled(int index, bool enabled)
     if (index < 0 || index >= maskCount() || m_masks[index].enabled == enabled)
         return;
     m_masks[index].enabled = enabled;
-    rebuildCombinedMask();
+    applyMaskChange(false); // only the enabled bits change: no re-upload
 }
 
-// Combines the enabled masks (product) and refreshes everything that depends
-// on them: the GPU texture, the implicit colormap range and the UI list.
-void
-OpenGLWidget::rebuildCombinedMask()
+int
+OpenGLWidget::maskBits() const
 {
-    m_maskData.clear();
-    for (const MaskEntry &m : m_masks)
-    {
-        if (!m.enabled)
-            continue;
-        if (m_maskData.empty())
-            m_maskData = m.data;
-        else
-            for (size_t i = 0; i < m_maskData.size(); ++i)
-                m_maskData[i] *= m.data[i];
-    }
-    m_maskActive = !m_maskData.empty();
-    m_maskDirty  = true;
+    int bits = 0;
+    for (size_t i = 0; i < m_masks.size(); ++i)
+        if (m_masks[i].enabled)
+            bits |= 1 << i;
+    return bits;
+}
 
-    // The implicit range excludes masked pixels only while a mask is active
+// Refreshes everything that depends on the mask list: the GPU textures (only
+// if masks were added/removed), the implicit colormap range and the UI list.
+void
+OpenGLWidget::applyMaskChange(bool texturesChanged)
+{
+    if (texturesChanged)
+        m_maskDirty = true;
+
+    // The implicit range excludes masked pixels only while a mask is enabled
     recomputeDataRange();
     m_vmin = m_dataMin;
     m_vmax = m_dataMax;
@@ -303,35 +335,40 @@ OpenGLWidget::rebuildCombinedMask()
     update();
 }
 
+// Packs the masks 4 per RGBA8 texture (mask i -> texture i/4, channel i%4)
 void
 OpenGLWidget::uploadMaskToGPU()
 {
     makeCurrent();
-    if (m_maskTexture)
-    {
-        glDeleteTextures(1, &m_maskTexture);
-        m_maskTexture = 0;
-    }
+    glDeleteTextures(int(m_maskTextures.size()), m_maskTextures.data());
+    m_maskTextures.fill(0);
     m_maskDirty = false;
-    if (m_maskData.empty())
-        return;
 
-    // Same 4096-wide packing as the map, 8 bits per pixel
-    const int W = 4096;
-    const int H = int((m_maskData.size() + W - 1) / W);
-    std::vector<unsigned char> buf(size_t(W) * H, 0);
-    for (size_t i = 0; i < m_maskData.size(); ++i)
-        buf[i] = static_cast<unsigned char>(m_maskData[i] * 255.0f + 0.5f);
+    const size_t npix = size_t(m_npix);
+    const int W       = 4096;
+    const int H       = int((npix + W - 1) / W);
 
-    glGenTextures(1, &m_maskTexture);
-    glBindTexture(GL_TEXTURE_2D, m_maskTexture);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, W, H, 0, GL_RED, GL_UNSIGNED_BYTE,
-                 buf.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    for (size_t g = 0; g * 4 < m_masks.size(); ++g)
+    {
+        // Unused channels stay 255 (keep)
+        std::vector<uint8_t> buf(size_t(W) * H * 4, 255);
+        for (size_t c = 0; c < 4 && g * 4 + c < m_masks.size(); ++c)
+        {
+            const std::vector<uint8_t> &d = m_masks[g * 4 + c].data;
+            for (size_t i = 0; i < d.size(); ++i)
+                buf[i * 4 + c] = d[i];
+        }
+
+        glGenTextures(1, &m_maskTextures[g]);
+        glBindTexture(GL_TEXTURE_2D, m_maskTextures[g]);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, buf.data());
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
