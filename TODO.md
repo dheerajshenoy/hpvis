@@ -1,9 +1,9 @@
 # TODO
 
 ## Rendering
-- [ ] Verify HEALPix RING lookup against `Healpix_Map::ang2pix` (spot-check values)
-- [ ] NESTED ordering support (convert on load or add `ang2pix_nest` in shader)
-- [ ] Fix east/west orientation (longitude increasing to the left, healpy style)
+- [x] Verify HEALPix RING lookup against `Healpix_Map::ang2pix` (spot-check values)
+- [x] NESTED ordering support (convert on load or add `ang2pix_nest` in shader)
+- [x] Fix east/west orientation (longitude increasing to the left, healpy style)
 - [ ] Integer uniforms / 2D index math for nside > 1024 (float precision)
 - [ ] Check shader compile errors (`addShaderFromSourceCode` return values) and show them in a dialog
 - [ ] Embed shaders as Qt resources instead of loading from `applicationDirPath()/../shaders`
@@ -62,3 +62,35 @@
 - [ ] Unit tests for projection and index math
 - [ ] CI build (CMake + Qt6 + cfitsio + healpix_cxx)
 - [ ] macOS fallback path (OpenGL 4.1 core profile check)
+
+## Side panel
+Group into collapsible sections (QGroupBox / toolbox).
+
+### Display
+- [ ] Colormap combo (viridis, plasma, coolwarm, Planck, grayscale) + reverse checkbox
+- [ ] Min/max spinboxes, Auto button, percentile presets (100/99/95%)
+- [ ] Scale combo (linear, log, asinh, histogram-equalized)
+- [ ] Bad pixel (`UNSEEN`) color picker
+- [ ] Background color picker (outside the ellipse)
+
+### Projection & view
+- [ ] Projection combo (Mollweide, Hammer, Gnomonic, Orthographic)
+- [ ] View center lon/lat spinboxes and rotation slider
+- [ ] Coordinate system combo (Galactic, Equatorial, Ecliptic)
+- [ ] Flip longitude toggle
+- [ ] Reset view button
+
+### Data
+- [ ] Column/field selector (TT, QQ, UU, ...)
+- [ ] Read-only map info: nside, npix, ordering, coord system, min/max/mean/std
+- [ ] Default pixel ordering from FITS header (`ORDERING`) instead of manual choice
+- [ ] Smoothing FWHM spinbox
+
+### Overlays
+- [ ] Graticule checkbox + spacing spinbox
+- [ ] Colorbar toggle
+- [ ] Load mask file + opacity slider
+
+### Cursor & export
+- [ ] Cursor readout box (lon/lat, pixel index, value)
+- [ ] Save image button with resolution choice
