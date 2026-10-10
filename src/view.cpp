@@ -8,6 +8,11 @@ View::View(QWidget *parent) : QWidget(parent)
     m_layout   = new QVBoxLayout(this);
     m_glWidget = new OpenGLWidget(this);
     m_layout->addWidget(m_glWidget);
+
+    m_layout->setContentsMargins(0, 0, 0, 0);
+    m_glWidget->setContentsMargins(0, 0, 0, 0);
+    this->setContentsMargins(0, 0, 0, 0);
+
     setLayout(m_layout);
 }
 

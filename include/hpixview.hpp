@@ -1,5 +1,6 @@
 #pragma once
 
+#include "TabWidget.hpp"
 #include "argparse.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
@@ -28,5 +29,5 @@ private:
     QMenu *m_editMenu = nullptr;
     QMenu *m_viewMenu = nullptr;
 
-    QTabWidget *m_tabWidget = nullptr;
+    TabWidget *m_tabWidget = nullptr;
 };

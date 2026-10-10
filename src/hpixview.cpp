@@ -38,7 +38,7 @@ HpixView::initUI()
     QWidget *widget     = new QWidget();
     widget->setLayout(layout);
 
-    m_tabWidget = new QTabWidget();
+    m_tabWidget = new TabWidget();
     initMenubar();
 
     layout->addWidget(m_tabWidget);
@@ -95,5 +95,6 @@ HpixView::OpenFile(const QString &filePath)
     View *view = new View();
 
     view->loadMap(resolvedPath.toStdString());
+    m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_tabWidget->addTab(view, QFileInfo(resolvedPath).fileName());
 }
