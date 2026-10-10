@@ -39,9 +39,11 @@ include_directories(${PROJECT_NAME} PRIVATE
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/hpixview.cpp
-    src/OpenGLWidget.cpp
+    src/view.cpp
+    src/openglwidget.cpp
+    include/view.hpp
     include/hpixview.hpp
-    include/OpenGLWidget.hpp)
+    include/openglwidget.hpp)
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES

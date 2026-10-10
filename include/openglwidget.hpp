@@ -10,8 +10,8 @@ class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
 
 public:
     explicit OpenGLWidget(QWidget *parent = nullptr);
-
-    template <typename T> void setMap(const Healpix_Map<T> &map);
+    ~OpenGLWidget();
+    void setMap(const Healpix_Map<float> &map);
 
 protected:
     void initializeGL() override;
@@ -19,7 +19,8 @@ protected:
     void paintGL() override;
 
 private:
-    long m_nside        = 0;
-    long m_npix         = 0;
-    GLuint m_mapTexture = 0;
+    long m_nside            = 0;
+    long m_npix             = 0;
+    GLuint m_mapTexture     = 0;
+    const float *m_map_data = nullptr;
 };

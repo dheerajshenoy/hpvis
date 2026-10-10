@@ -1,10 +1,11 @@
 #pragma once
 
-#include "OpenGLWidget.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
+#include "openglwidget.hpp"
 
 #include <QMainWindow>
+#include <QTabWidget>
 
 class HpixView : public QMainWindow
 {
@@ -12,13 +13,17 @@ class HpixView : public QMainWindow
 public:
     explicit HpixView(int argc, char *argv[], QWidget *parent = nullptr);
 
-    void OpenFile(const QString &filePath);
+    void OpenFile(const QString &filePath = QString());
 
 private:
     void initUI();
+    void initMenubar();
     void initCFITSIO();
 
 private:
-    OpenGLWidget *m_glWidget = nullptr;
-    uint32_t m_nside         = 0;
+    QMenu *m_fileMenu = nullptr;
+    QMenu *m_editMenu = nullptr;
+    QMenu *m_viewMenu = nullptr;
+
+    QTabWidget *m_tabWidget = nullptr;
 };

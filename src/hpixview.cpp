@@ -1,9 +1,14 @@
 #include "hpixview.hpp"
 
+#include "view.hpp"
+
+#include <QApplication>
 #include <QDir>
+#include <QFileDialog>
 #include <QGraphicsView>
+#include <QMenuBar>
+#include <QMessageBox>
 #include <QVBoxLayout>
-#include <alm_healpix_tools.h>
 
 HpixView::HpixView(int argc, char *argv[], QWidget *parent)
     : QMainWindow(parent)
@@ -12,9 +17,7 @@ HpixView::HpixView(int argc, char *argv[], QWidget *parent)
     (void)argv;
 
     initUI();
-
     OpenFile("~/Gits/PhD/codes/cmb_40GHz_64_s0_d0.fits");
-
     this->show();
 }
 
@@ -22,28 +25,65 @@ void
 HpixView::initUI()
 {
     QVBoxLayout *layout = new QVBoxLayout();
-
-    m_glWidget = new OpenGLWidget();
-
-    layout->addWidget(m_glWidget);
-
-    QWidget *widget = new QWidget();
+    QWidget *widget     = new QWidget();
     widget->setLayout(layout);
 
+    m_tabWidget = new QTabWidget();
+    initMenubar();
+
+    layout->addWidget(m_tabWidget);
     setCentralWidget(widget);
+}
+
+void
+HpixView::initMenubar()
+{
+    QMenuBar *menuBar = new QMenuBar(this);
+    setMenuBar(menuBar);
+
+    m_fileMenu = menuBar->addMenu("&File");
+
+    m_fileMenu->addAction("&Open", this, [this]() { OpenFile(); });
+    m_fileMenu->addAction("&Exit", this, &HpixView::close);
+
+    m_editMenu = menuBar->addMenu("&Edit");
+
+    m_viewMenu = menuBar->addMenu("&View");
+
+    auto helpMenu = menuBar->addMenu("&Help");
+
+    helpMenu->addAction("&About", this, []()
+    {
+        QMessageBox::about(nullptr, "About HpixView",
+                           "HpixView is a simple viewer for HEALPix maps.");
+    });
 }
 
 void
 HpixView::OpenFile(const QString &filePath)
 {
-    // Replace ~ with the user's home directory
-    QString resolvedPath = filePath;
-    if (filePath.startsWith("~"))
+    QString resolvedPath;
+    if (filePath.isEmpty())
     {
-        resolvedPath = QDir::homePath() + filePath.mid(1);
+        auto files = QFileDialog::getOpenFileNames(
+            this, "Open FITS File", QDir::homePath(),
+            "FITS Files (*.fits *.fit *.fts);;All Files (*)");
+
+        for (const auto &file : files)
+        {
+            OpenFile(file);
+        }
+
+        return; // Exit the function after processing selected files
     }
+    else
+        resolvedPath = filePath;
 
-    Healpix_Map<float> map;
+    if (filePath.startsWith("~"))
+        resolvedPath = QDir::homePath() + filePath.mid(1);
 
-    read_Healpix_map_from_fits(resolvedPath.toStdString(), map, 1, 2);
+    View *view = new View();
+
+    view->loadMap(resolvedPath.toStdString());
+    m_tabWidget->addTab(view, QFileInfo(resolvedPath).fileName());
 }
