@@ -50,8 +50,7 @@ StatusBar::showMessage(const QString &message, int timeout)
 void
 StatusBar::setZoom(float zoom)
 {
-    m_zoomLabel->setText(
-        QString("Zoom: %1%").arg(qRound(zoom * 100)));
+    m_zoomLabel->setText(QString("Zoom: %1%").arg(qRound(zoom * 100)));
 }
 
 void
@@ -74,9 +73,9 @@ StatusBar::setCursorData(QPointF lonLat, double value, qlonglong index)
                                   .arg(lonLat.x(), 0, 'f', 2)
                                   .arg(lonLat.y(), 0, 'f', 2));
     m_pixelIndexLabel->setText(QString("Pixel: %1").arg(index));
-    m_pixelValueLabel->setText(
-        std::isfinite(value) ? QString("Value: %1").arg(value, 0, 'g', 6)
-                             : QString("Value: UNSEEN"));
+    m_pixelValueLabel->setText(std::isfinite(value)
+                                   ? QString("Value: %1").arg(value, 0, 'g', 6)
+                                   : QString("Value: UNSEEN"));
 }
 
 void

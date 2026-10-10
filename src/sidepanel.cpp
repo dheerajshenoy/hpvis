@@ -5,10 +5,10 @@
 #include <QColorDialog>
 #include <QFileDialog>
 #include <QFormLayout>
-#include <QSlider>
-#include <QToolButton>
 #include <QHBoxLayout>
 #include <QScrollArea>
+#include <QSlider>
+#include <QToolButton>
 #include <qpushbutton.h>
 
 SidePanel::SidePanel(QWidget *parent) : QDockWidget(parent)
@@ -78,15 +78,17 @@ SidePanel::setupConnections()
 
     connect(m_maskOverlayButton, &QPushButton::clicked, this,
             &SidePanel::onLoadMaskButtonClicked);
+
     connect(m_clearMaskButton, &QPushButton::clicked, this,
             &SidePanel::maskClearRequested);
+
     connect(m_maskModeCombo, &QComboBox::currentIndexChanged, this,
             [this](int mode)
     {
-        m_maskOpacitySlider->setEnabled(m_clearMaskButton->isEnabled()
-                                        && mode == 1);
+        updateDimRowVisibility();
         emit maskModeChanged(mode);
     });
+
     connect(m_maskOpacitySlider, &QSlider::valueChanged, this,
             [this](int v) { emit maskOpacityChanged(v / 100.0f); });
 
@@ -155,6 +157,7 @@ SidePanel::overlaysWidget()
 {
     QWidget *widget     = new QWidget();
     QFormLayout *layout = new QFormLayout(widget);
+    m_overlaysLayout    = layout;
 
     m_maskOverlayButton = new QPushButton("Add Mask...");
     m_clearMaskButton   = new QPushButton("Clear");
@@ -183,6 +186,8 @@ SidePanel::overlaysWidget()
 
     setMasks({}, {}, {}, {}, 0, 0.8f);
 
+    m_fskyLabel = new QLabel();
+    layout->addRow("Sky fraction", m_fskyLabel);
     widget->setLayout(layout);
     return widget;
 }
@@ -293,8 +298,8 @@ SidePanel::onUnseenColorButtonClicked()
 
 void
 SidePanel::setMasks(const QStringList &names, const QStringList &paths,
-                     const QList<bool> &enabled, const QList<bool> &inverted,
-                     int mode, float opacity)
+                    const QList<bool> &enabled, const QList<bool> &inverted,
+                    int mode, float opacity)
 {
     // Drop the old rows
     while (QLayoutItem *item = m_maskListLayout->takeAt(0))
@@ -347,7 +352,17 @@ SidePanel::setMasks(const QStringList &names, const QStringList &paths,
 
     m_clearMaskButton->setEnabled(any);
     m_maskModeCombo->setEnabled(any);
-    m_maskOpacitySlider->setEnabled(any && mode == 1);
+    m_maskOpacitySlider->setEnabled(any);
+    updateDimRowVisibility();
+}
+
+// The strength slider (and its label) only applies to the "Dim" mode
+void
+SidePanel::updateDimRowVisibility()
+{
+    constexpr int kDimMode = 1;
+    m_overlaysLayout->setRowVisible(m_maskOpacitySlider,
+                                    m_maskModeCombo->currentIndex() == kDimMode);
 }
 
 void

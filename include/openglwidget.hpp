@@ -9,9 +9,9 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
-#include <healpix_map.h>
 #include <array>
 #include <cstdint>
+#include <healpix_map.h>
 #include <vector>
 
 class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
@@ -27,23 +27,14 @@ public:
         return m_pixelOrdering;
     }
 
-    inline void setPixelOrdering(PixelOrdering ordering)
-    {
-        m_pixelOrdering = ordering;
-        emitCursorData();
-        update();
-    }
+    void setPixelOrdering(PixelOrdering ordering);
 
     inline Colormap colormap() const
     {
         return m_colormap;
     }
 
-    inline void setColormap(Colormap colormap)
-    {
-        m_colormap = colormap;
-        update();
-    }
+    void setColormap(Colormap colormap);
 
     inline float colormapMin() const
     {
@@ -56,30 +47,10 @@ public:
     }
 
     // Restore the colormap range to the min/max of the loaded map
-    inline void resetColormapRange()
-    {
-        m_vmin = m_dataMin;
-        m_vmax = m_dataMax;
-        update();
-    }
-
-    inline void setColormapMin(double min)
-    {
-        m_vmin = static_cast<float>(min);
-        update();
-    }
-
-    inline void setColormapMax(double max)
-    {
-        m_vmax = static_cast<float>(max);
-        update();
-    }
-
-    inline void setColormapScale(ColormapScale scale)
-    {
-        m_colormapScale = scale;
-        update();
-    }
+    void resetColormapRange();
+    void setColormapMin(double min);
+    void setColormapMax(double max);
+    void setColormapScale(ColormapScale scale);
 
     inline ColormapScale colormapScale() const
     {
@@ -91,28 +62,15 @@ public:
         return m_invertColormap;
     }
 
-    inline void setColormapInvert(bool invert)
-    {
-        m_invertColormap = invert;
-        update();
-    }
+    void setColormapInvert(bool invert);
 
     inline QColor backgroundColor() const
     {
         return m_bgColor;
     }
 
-    inline void setBackgroundColor(const QColor &color)
-    {
-        m_bgColor = color;
-        update();
-    }
-
-    inline void setUnseenColor(const QColor &color)
-    {
-        m_unseenColor = color;
-        update();
-    }
+    void setBackgroundColor(const QColor &color);
+    void setUnseenColor(const QColor &color);
 
     inline QColor unseenColor() const
     {
@@ -124,6 +82,11 @@ public:
         return m_camera->zoom;
     }
 
+    inline float fsky() const
+    {
+        return m_fsky;
+    }
+
     // Adds mask maps to the list (each must match the map's nside; files
     // already in the list are skipped). Returns the number added.
     int addMaskFiles(const QStringList &files);
@@ -132,44 +95,45 @@ public:
     void setMaskEnabled(int index, bool enabled);
     void setMaskInverted(int index, bool inverted);
 
-    int maskCount() const
+    void calculateFSky();
+
+    inline int maskCount() const
     {
         return static_cast<int>(m_masks.size());
     }
-    QString maskName(int index) const
+
+    inline QString maskName(int index) const
     {
         return m_masks[index].name;
     }
-    QString maskPath(int index) const
+
+    inline QString maskPath(int index) const
     {
         return m_masks[index].path;
     }
-    bool maskEnabled(int index) const
+
+    inline bool maskEnabled(int index) const
     {
         return m_masks[index].enabled;
     }
-    bool maskInverted(int index) const
+
+    inline bool maskInverted(int index) const
     {
         return m_masks[index].inverted;
     }
-    int maskMode() const
+
+    inline int maskMode() const
     {
         return m_maskMode;
     }
-    float maskOpacity() const
+
+    inline float maskOpacity() const
     {
         return m_maskOpacity;
     }
-    void setMaskMode(int mode)
-    {
-        m_maskMode = mode;
-        update();
-    }
-    void setMaskOpacity(float opacity)
-    {
-        m_maskOpacity = opacity;
-        update();
-    }
+
+    void setMaskMode(int mode);
+    void setMaskOpacity(float opacity);
     void setMap(const Healpix_Map<float> &map);
 
 protected:
@@ -225,6 +189,7 @@ private:
     bool m_isPanning    = false;
     QPoint m_lastMousePos;
     QPointF m_cursorPos; // last pointer position in widget coords
+
     struct MaskEntry
     {
         QString name;
@@ -233,10 +198,12 @@ private:
         bool enabled  = true;
         bool inverted = false;
     };
+
     std::vector<MaskEntry> m_masks;
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels
     std::array<GLuint, 4> m_maskTextures{};
-    bool m_maskDirty = false; // mask textures need re-uploading
-    int m_maskMode       = 0;
-    float m_maskOpacity  = 0.8f;
+    bool m_maskDirty    = false; // mask textures need re-uploading
+    int m_maskMode      = 0;
+    float m_maskOpacity = 0.8f;
+    float m_fsky        = 1.0f; // fraction of sky that is visible
 };

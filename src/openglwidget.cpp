@@ -1,24 +1,24 @@
 #include "openglwidget.hpp"
 
-#include "healpix_map.h"
-#include "healpix_cxx/healpix_map_fitsio.h"
-#include "shaderloader.hpp"
 #include "healpix_cxx/error_handling.h"
+#include "healpix_cxx/healpix_map_fitsio.h"
+#include "healpix_map.h"
+#include "shaderloader.hpp"
 
 #include <QEnterEvent>
-#include <healpix_base.h>
-#include <pointing.h>
 #include <QFile>
-#include <QMessageBox>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QVector3D>
 #include <QWheelEvent>
 #include <algorithm>
 #include <cmath>
+#include <healpix_base.h>
 #include <iostream>
 #include <limits>
+#include <pointing.h>
 #include <qcoreapplication.h>
 #include <vector>
 
@@ -49,24 +49,110 @@ OpenGLWidget::~OpenGLWidget()
     }
 }
 
+// TODO: Make this async so that the UI doesn't freeze when loading large maps
+void
+OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
+{
+    m_pixelOrdering = ordering;
+    emitCursorData();
+    update();
+}
+
+void
+OpenGLWidget::setColormap(Colormap colormap)
+{
+    m_colormap = colormap;
+    update();
+}
+
+void
+OpenGLWidget::resetColormapRange()
+{
+    m_vmin = m_dataMin;
+    m_vmax = m_dataMax;
+    update();
+}
+
+void
+OpenGLWidget::setColormapMin(double min)
+{
+    m_vmin = static_cast<float>(min);
+    update();
+}
+
+void
+OpenGLWidget::setColormapMax(double max)
+{
+    m_vmax = static_cast<float>(max);
+    update();
+}
+
+void
+OpenGLWidget::setColormapScale(ColormapScale scale)
+{
+    m_colormapScale = scale;
+    update();
+}
+
+void
+OpenGLWidget::setColormapInvert(bool invert)
+{
+    m_invertColormap = invert;
+    update();
+}
+
+void
+OpenGLWidget::setBackgroundColor(const QColor &color)
+{
+    m_bgColor = color;
+    update();
+}
+
+void
+OpenGLWidget::setUnseenColor(const QColor &color)
+{
+    m_unseenColor = color;
+    update();
+}
+
+void
+OpenGLWidget::setMaskMode(int mode)
+{
+    m_maskMode = mode;
+    update();
+}
+
+void
+OpenGLWidget::setMaskOpacity(float opacity)
+{
+    m_maskOpacity = opacity;
+    update();
+}
+
 void
 OpenGLWidget::recomputeDataRange()
 {
+    long totalPixels = m_pendingMap.Npix();
+    long validPixels = 0;
+
     // Range of valid pixels (ignoring non-finite, HEALPix UNSEEN, masked)
     struct Active
     {
         const uint8_t *data;
         bool inverted;
     };
+
     std::vector<Active> active;
+
     for (const MaskEntry &m : m_masks)
-        if (m.enabled && m.data.size() == size_t(m_pendingMap.Npix()))
+        if (m.enabled && m.data.size() == size_t(totalPixels))
             active.push_back({m.data.data(), m.inverted});
 
-    m_dataMin         = std::numeric_limits<float>::max();
-    m_dataMax         = std::numeric_limits<float>::lowest();
+    m_dataMin = std::numeric_limits<float>::max();
+    m_dataMax = std::numeric_limits<float>::lowest();
+
     const float *data = m_pendingMap.Map().begin();
-    for (long i = 0; i < m_pendingMap.Npix(); ++i)
+    for (long i = 0; i < totalPixels; ++i)
     {
         float v = data[i];
         if (!std::isfinite(v) || v < -1e30f)
@@ -82,11 +168,29 @@ OpenGLWidget::recomputeDataRange()
             if (keep < 0.5f)
                 continue;
         }
+
+        // This pixel survived all cuts; count it toward f_sky
+        validPixels++;
+
         m_dataMin = std::min(m_dataMin, v);
         m_dataMax = std::max(m_dataMax, v);
     }
-    if (m_dataMin >= m_dataMax)
+
+    if (totalPixels > 0)
+        m_fsky = float(validPixels) / float(totalPixels);
+    else
+        m_fsky = 0.0f;
+
+    // Handle edge case where no valid pixels were found
+    if (m_dataMin > m_dataMax)
+    {
+        m_dataMin = 0.0f;
+        m_dataMax = 1.0f;
+    }
+    else if (m_dataMin >= m_dataMax)
+    {
         m_dataMax = m_dataMin + 1.0f;
+    }
 }
 
 void
@@ -233,9 +337,9 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
             break;
         }
         const QString path = QFileInfo(file).absoluteFilePath();
-        const bool dup     = std::any_of(m_masks.begin(), m_masks.end(),
-                                         [&](const MaskEntry &m)
-        { return m.path == path; });
+        const bool dup
+            = std::any_of(m_masks.begin(), m_masks.end(),
+                          [&](const MaskEntry &m) { return m.path == path; });
         if (dup)
             continue;
 
@@ -274,15 +378,15 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
         }
         catch (const PlanckError &e)
         {
-            QMessageBox::critical(this, "Mask",
-                                  QString("Failed to load %1: %2")
-                                      .arg(file, QString(e.what())));
+            QMessageBox::critical(
+                this, "Mask",
+                QString("Failed to load %1: %2").arg(file, QString(e.what())));
         }
         catch (const std::exception &e)
         {
-            QMessageBox::critical(this, "Mask",
-                                  QString("Failed to load %1: %2")
-                                      .arg(file, QString(e.what())));
+            QMessageBox::critical(
+                this, "Mask",
+                QString("Failed to load %1: %2").arg(file, QString(e.what())));
         }
     }
 
@@ -477,8 +581,8 @@ static bool
 inverseMollweide(QVector2D uv, double &colat, double &phi)
 {
     const double x_range = 2.82842712, y_range = 1.41421356;
-    const double x       = -(uv.x() - 0.5) * 2.0 * x_range;
-    const double y       = (uv.y() - 0.5) * 2.0 * y_range;
+    const double x = -(uv.x() - 0.5) * 2.0 * x_range;
+    const double y = (uv.y() - 0.5) * 2.0 * y_range;
     if ((x * x / 8.0) + (y * y / 2.0) > 1.0)
         return false;
 
@@ -502,8 +606,8 @@ void
 OpenGLWidget::emitCursorData()
 {
     // Same mapping as the fragment shader: NDC -> camera -> projection
-    const QVector2D p = toNdc(m_cursorPos) / m_camera->zoom
-                        + m_camera->panOffset;
+    const QVector2D p
+        = toNdc(m_cursorPos) / m_camera->zoom + m_camera->panOffset;
     double colat, phi;
     if (m_nside <= 0 || m_pendingMap.Npix() == 0
         || !inverseMollweide(p * 0.5f + QVector2D(0.5f, 0.5f), colat, phi))
@@ -512,10 +616,9 @@ OpenGLWidget::emitCursorData()
         return;
     }
 
-    const Healpix_Base base(static_cast<int>(m_nside),
-                            m_pixelOrdering == PixelOrdering::NESTED ? NEST
-                                                                     : RING,
-                            SET_NSIDE);
+    const Healpix_Base base(
+        static_cast<int>(m_nside),
+        m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING, SET_NSIDE);
     const qlonglong idx = base.ang2pix(pointing(colat, phi));
     float v             = m_pendingMap.Map()[idx];
     if (v < -1.0e30f || !std::isfinite(v))
@@ -645,4 +748,10 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
                               -2.0f * delta.y() / float(height())));
     emitCursorData();
     update();
+}
+
+void
+OpenGLWidget::calculateFSky()
+{
+    // f_sky = (number of valid unmasked pixels) / (total number of pixels)
 }

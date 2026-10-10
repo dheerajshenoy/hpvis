@@ -6,6 +6,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDockWidget>
+#include <QFormLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QSlider>
@@ -40,6 +41,16 @@ public:
     {
         QSignalBlocker blocker(m_reverseColormapCheck);
         m_reverseColormapCheck->setChecked(reverse);
+    }
+
+    inline float fsky() const
+    {
+        return m_fskyLabel->text().toFloat();
+    }
+
+    void setFSky(float fsky)
+    {
+        m_fskyLabel->setText(QString::number(fsky, 'f', 6));
     }
 
     void setBackgroundColor(uint32_t color);
@@ -77,12 +88,16 @@ private:
     void onBackgroundColorButtonClicked();
     void onUnseenColorButtonClicked();
     void onLoadMaskButtonClicked();
+    void updateDimRowVisibility();
     QWidget *pixelOrderingWidget();
     QWidget *colormapWidget();
     QWidget *overlaysWidget();
 
 private:
-    QComboBox *m_pixOrdCombo          = nullptr;
+    // Pixel ordering controls
+    QComboBox *m_pixOrdCombo = nullptr;
+
+    // Color & Colormap controls
     QComboBox *m_colormapCombo        = nullptr;
     QCheckBox *m_reverseColormapCheck = nullptr;
     QDoubleSpinBox *m_colormapMinSpin = nullptr;
@@ -93,10 +108,17 @@ private:
     QPushButton *m_unseenColorButton  = nullptr;
     QColor m_bgColor                  = QColor(0, 0, 0);
     QColor m_unseenColor              = QColor(0, 0, 0);
-    QPushButton *m_maskOverlayButton  = nullptr;
-    QWidget *m_maskListWidget         = nullptr;
-    QVBoxLayout *m_maskListLayout     = nullptr;
-    QPushButton *m_clearMaskButton    = nullptr;
-    QComboBox *m_maskModeCombo        = nullptr;
-    QSlider *m_maskOpacitySlider      = nullptr;
+
+    // Mask overlay controls
+    QPushButton *m_maskOverlayButton = nullptr;
+    QWidget *m_maskListWidget        = nullptr;
+    QVBoxLayout *m_maskListLayout    = nullptr;
+    QPushButton *m_clearMaskButton   = nullptr;
+    QComboBox *m_maskModeCombo       = nullptr;
+    QSlider *m_maskOpacitySlider     = nullptr;
+    QFormLayout *m_overlaysLayout    = nullptr;
+    QLabel *m_fskyLabel              = nullptr;
+
+    // FITS Header info
+    // TODO: Add a widget to display FITS header information
 };

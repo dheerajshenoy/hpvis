@@ -73,35 +73,42 @@ HpixView::initConnections()
 
     connect(m_sidePanel, &SidePanel::maskFilesSelected, this,
             &HpixView::onMaskFilesSelected);
+
     connect(m_sidePanel, &SidePanel::maskClearRequested, this,
             &HpixView::onMaskCleared);
+
     connect(m_sidePanel, &SidePanel::maskToggled, this,
             [this](int index, bool enabled)
     {
         if (m_view)
-            m_view->setMaskEnabled(index, enabled);
+            m_view->glWidget()->setMaskEnabled(index, enabled);
     });
+
     connect(m_sidePanel, &SidePanel::maskInvertToggled, this,
             [this](int index, bool inverted)
     {
         if (m_view)
-            m_view->setMaskInverted(index, inverted);
+            m_view->glWidget()->setMaskInverted(index, inverted);
     });
-    connect(m_sidePanel, &SidePanel::maskRemoveRequested, this, [this](int index)
+
+    connect(m_sidePanel, &SidePanel::maskRemoveRequested, this,
+            [this](int index)
     {
         if (m_view)
-            m_view->removeMask(index);
+            m_view->glWidget()->removeMask(index);
     });
+
     connect(m_sidePanel, &SidePanel::maskModeChanged, this, [this](int mode)
     {
         if (m_view)
-            m_view->setMaskMode(mode);
+            m_view->glWidget()->setMaskMode(mode);
     });
+
     connect(m_sidePanel, &SidePanel::maskOpacityChanged, this,
             [this](float opacity)
     {
         if (m_view)
-            m_view->setMaskOpacity(opacity);
+            m_view->glWidget()->setMaskOpacity(opacity);
     });
 
     connect(m_sidePanel, &SidePanel::backgroundColorChanged, this,
@@ -219,17 +226,17 @@ HpixView::updateSidePanelStateFromView(const View *view)
     if (!view)
         return;
 
-    m_sidePanel->setPixelOrdering(view->pixelOrdering());
-    m_sidePanel->setColormapRange(view->colormapMin(), view->colormapMax());
+    m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
+    m_sidePanel->setColormapRange(view->glWidget()->colormapMin(), view->glWidget()->colormapMax());
     updateMaskListFromView(view);
-    m_sidePanel->setColormapScale(view->colormapScale());
-    m_sidePanel->setColormapReverse(view->colormapInvert());
-    m_sidePanel->setBackgroundColor(view->backgroundColor().rgb() & 0xFFFFFF);
-    m_sidePanel->setUnseenColor(view->unseenColor().rgb() & 0xFFFFFF);
+    m_sidePanel->setColormapScale(view->glWidget()->colormapScale());
+    m_sidePanel->setColormapReverse(view->glWidget()->colormapInvert());
+    m_sidePanel->setBackgroundColor(view->glWidget()->backgroundColor().rgb() & 0xFFFFFF);
+    m_sidePanel->setUnseenColor(view->glWidget()->unseenColor().rgb() & 0xFFFFFF);
 
     // setColormap emits colormapChanged only on change; block to avoid a loop
     QSignalBlocker blocker(m_sidePanel);
-    m_sidePanel->setColormap(view->colormap());
+    m_sidePanel->setColormap(view->glWidget()->colormap());
 }
 
 void
@@ -238,7 +245,7 @@ HpixView::onPixelOrderingChanged(PixelOrdering ordering)
     if (!m_view)
         return;
 
-    m_view->setPixelOrdering(ordering);
+    m_view->glWidget()->setPixelOrdering(ordering);
 }
 
 void
@@ -259,15 +266,17 @@ HpixView::updateMaskListFromView(const View *view)
 {
     QStringList names, paths;
     QList<bool> enabled, inverted;
-    for (int i = 0; i < view->maskCount(); ++i)
+    for (int i = 0; i < view->glWidget()->maskCount(); ++i)
     {
-        names << view->maskName(i);
-        paths << view->maskPath(i);
-        enabled << view->maskEnabled(i);
-        inverted << view->maskInverted(i);
+        names << view->glWidget()->maskName(i);
+        paths << view->glWidget()->maskPath(i);
+        enabled << view->glWidget()->maskEnabled(i);
+        inverted << view->glWidget()->maskInverted(i);
     }
-    m_sidePanel->setMasks(names, paths, enabled, inverted, view->maskMode(),
-                          view->maskOpacity());
+
+    m_sidePanel->setFSky(view->glWidget()->fsky());
+    m_sidePanel->setMasks(names, paths, enabled, inverted, view->glWidget()->maskMode(),
+                          view->glWidget()->maskOpacity());
 }
 
 void
@@ -279,7 +288,7 @@ HpixView::updateStatusBarFromView(const View *view)
     const QFileInfo info(view->filePath());
     m_statusBar->setFilename(info.fileName());
     m_statusBar->setFilesize(QLocale().formattedDataSize(info.size()));
-    m_statusBar->setZoom(view->zoom());
+    m_statusBar->setZoom(view->glWidget()->zoom());
     m_statusBar->setCursorData(QPointF(), std::nan(""), -1); // clear stale
 }
 
@@ -298,35 +307,35 @@ void
 HpixView::onColormapChanged(Colormap colormap)
 {
     if (m_view)
-        m_view->setColormap(colormap);
+        m_view->glWidget()->setColormap(colormap);
 }
 
 void
 HpixView::onColormapMaxChanged(double max)
 {
     if (m_view)
-        m_view->setColormapMax(max);
+        m_view->glWidget()->setColormapMax(max);
 }
 
 void
 HpixView::onColormapMinChanged(double min)
 {
     if (m_view)
-        m_view->setColormapMin(min);
+        m_view->glWidget()->setColormapMin(min);
 }
 
 void
 HpixView::onColormapInvertChanged(bool reversed)
 {
     if (m_view)
-        m_view->setColormapInvert(reversed);
+        m_view->glWidget()->setColormapInvert(reversed);
 }
 
 void
 HpixView::onColormapScaleChanged(ColormapScale scale)
 {
     if (m_view)
-        m_view->setColormapScale(scale);
+        m_view->glWidget()->setColormapScale(scale);
 }
 
 void
@@ -334,9 +343,9 @@ HpixView::onColormapRangeResetRequested()
 {
     if (m_view)
     {
-        m_view->resetColormapRange();
-        m_sidePanel->setColormapRange(m_view->colormapMin(),
-                                      m_view->colormapMax());
+        m_view->glWidget()->resetColormapRange();
+        m_sidePanel->setColormapRange(m_view->glWidget()->colormapMin(),
+                                      m_view->glWidget()->colormapMax());
     }
 }
 
@@ -344,26 +353,26 @@ void
 HpixView::onBackgroundColorChanged(const QColor &color)
 {
     if (m_view)
-        m_view->setBackgroundColor(color);
+        m_view->glWidget()->setBackgroundColor(color);
 }
 
 void
 HpixView::onUnseenColorChanged(const QColor &color)
 {
     if (m_view)
-        m_view->setUnseenColor(color);
+        m_view->glWidget()->setUnseenColor(color);
 }
 
 void
 HpixView::onMaskFilesSelected(const QStringList &files)
 {
     if (m_view)
-        m_view->addMaskFiles(files);
+        m_view->glWidget()->addMaskFiles(files);
 }
 
 void
 HpixView::onMaskCleared()
 {
     if (m_view)
-        m_view->clearMasks();
+        m_view->glWidget()->clearMasks();
 }
