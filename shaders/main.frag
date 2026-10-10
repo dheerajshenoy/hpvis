@@ -16,14 +16,13 @@ void main() {
         return;
     }
 
-    float pixIdx = (pixel_ordering == 0) ? ang2pix_ring(nside, colat, phi)
-                                         : ang2pix_nest(nside, colat, phi);
+    int pixIdx = (pixel_ordering == 0) ? ang2pix_ring(nside, colat, phi)
+                                       : ang2pix_nest(nside, colat, phi);
 
-    // The map is packed into a 2D texture (1D textures are size-limited)
-    float W = 4096.0;
-    float H = ceil(npix / W);
-    vec2 uv = vec2((mod(pixIdx, W) + 0.5) / W, (floor(pixIdx / W) + 0.5) / H);
-    float mapVal = texture(mapTexture, uv).r;
+    // The map is packed into a 2D texture (1D textures are size-limited).
+    // Integer math + texelFetch keeps indices exact for large nside.
+    const int W = 4096;
+    float mapVal = texelFetch(mapTexture, ivec2(pixIdx % W, pixIdx / W), 0).r;
     float t = applyScale(mapVal);
     FragColor = vec4(applyColormap(t, colormap), 1.0);
 }

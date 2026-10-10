@@ -31,8 +31,8 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
     m_hasPendingMap = true;
 
     // Data range (ignoring non-finite and HEALPix UNSEEN pixels)
-    m_dataMin = std::numeric_limits<float>::max();
-    m_dataMax = std::numeric_limits<float>::lowest();
+    m_dataMin         = std::numeric_limits<float>::max();
+    m_dataMax         = std::numeric_limits<float>::lowest();
     const float *data = map.Map().begin();
     for (long i = 0; i < map.Npix(); ++i)
     {
@@ -102,8 +102,8 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("mapTexture", 0);
 
     // 2. Pass map metadata uniforms to the shader
-    m_shaderProgram.setUniformValue("nside", (float)m_nside);
-    m_shaderProgram.setUniformValue("npix", (float)m_npix);
+    m_shaderProgram.setUniformValue("nside", static_cast<int>(m_nside));
+    m_shaderProgram.setUniformValue("npix", static_cast<int>(m_npix));
     m_shaderProgram.setUniformValue("vmin", m_vmin);
     m_shaderProgram.setUniformValue("vmax", m_vmax);
     m_shaderProgram.setUniformValue("colormap", static_cast<int>(m_colormap));

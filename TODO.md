@@ -14,7 +14,7 @@
 - [x] Colormap selection (viridis, plasma, coolwarm, planck, grayscale)
 - [x] User-adjustable min/max (spinboxes + sliders)
 - [ ] Percentile clipping (1%/99%) and auto-range button
-- [ ] Scaling modes: linear, log, asinh, histogram-equalized
+- [x] Scaling modes: linear, log, asinh, histogram-equalized
 - [ ] Colorbar widget with tick labels
 
 ## Projections & navigation

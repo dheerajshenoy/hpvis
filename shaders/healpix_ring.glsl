@@ -1,5 +1,5 @@
-float ang2pix_ring(float nside_val, float theta, float phi) {
-    int ns = int(nside_val + 0.5);
+int ang2pix_ring(int ns, float theta, float phi) {
+    float nside_val = float(ns);
     float z = cos(theta);
     float za = abs(z);
     float tt = mod(phi, 2.0 * PI) / (0.5 * PI); // [0,4)
@@ -29,5 +29,5 @@ float ang2pix_ring(float nside_val, float theta, float phi) {
         if (z > 0.0) pix = 2 * ir * (ir - 1) + ip;
         else         pix = npix_i - 2 * ir * (ir + 1) + ip;
     }
-    return float(clamp(pix, 0, npix_i - 1));
+    return clamp(pix, 0, npix_i - 1);
 }

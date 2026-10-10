@@ -1,6 +1,6 @@
 uniform sampler2D mapTexture;
-uniform float nside;
-uniform float npix;
+uniform int nside;
+uniform int npix;
 uniform float vmin;
 uniform float vmax;
 uniform int pixel_ordering;
