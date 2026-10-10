@@ -112,6 +112,9 @@ public:
 
     void setZoom(float zoom);
 
+    double mapAverage() const { return m_mapAverage; }
+    double mapRms() const { return m_mapRms; }
+
     inline float fsky() const
     {
         return m_fsky;
@@ -219,6 +222,8 @@ private:
     float m_dataMin               = 0.0f;
     float m_dataMax               = 1.0f;
     bool m_hasPendingMap          = false;
+    double m_mapAverage           = 0.0;
+    double m_mapRms               = 0.0;
     bool m_invertColormap         = false;
     QColor m_bgColor              = QColor(10, 10, 15);
     QColor m_unseenColor          = QColor(0, 0, 0);

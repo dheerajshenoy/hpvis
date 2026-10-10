@@ -252,11 +252,17 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
     m_vmin = m_dataMin;
     m_vmax = m_dataMax;
 
+    // Full passes over the map: do them once here, not on every tab switch
+    m_mapAverage = m_pendingMap.average();
+    m_mapRms     = m_pendingMap.rms();
+
     // With a live context, upload now rather than on the next paint
     if (isValid())
     {
         uploadMapToGPU(m_pendingMap);
         m_hasPendingMap = false;
+        emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(), m_mapAverage,
+                       m_mapRms);
     }
 
     update();
@@ -314,8 +320,8 @@ OpenGLWidget::paintGL()
         uploadMapToGPU(m_pendingMap);
         m_hasPendingMap = false;
 
-        emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(),
-                       m_pendingMap.average(), m_pendingMap.rms());
+        emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(), m_mapAverage,
+                       m_mapRms);
     }
 
     if (m_maskDirty)

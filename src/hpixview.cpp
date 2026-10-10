@@ -256,7 +256,7 @@ HpixView::OpenFile(const QString &filePath)
         m_tabWidget->addTab(view, filename);
         // Show it now so the GPU upload happens at open time, not on the
         // first tab switch
-        m_tabWidget->setCurrentWidget(view);
+        m_tabWidget->setCurrentIndex(m_tabWidget->indexOf(view));
         initViewConnections(view);
     }
 }
@@ -300,8 +300,8 @@ HpixView::updateSidePanelStateFromView(const View *view)
         return;
 
     auto *map = view->glWidget()->healpixMap();
-    m_sidePanel->setMapInfo(map->Nside(), map->Npix(), map->average(),
-                            map->rms());
+    m_sidePanel->setMapInfo(map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
+                            view->glWidget()->mapRms());
     m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
     m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),
