@@ -914,3 +914,12 @@ OpenGLWidget::exportImage(const QString &filePath, const ExportOptions &options)
             QString("Failed to save image to %1").arg(filePath));
     }
 }
+
+void
+OpenGLWidget::resetView()
+{
+    m_camera->reset();
+    emit zoomChanged(m_camera->zoom);
+    emitCursorData();
+    update();
+}

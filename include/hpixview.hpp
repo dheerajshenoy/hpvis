@@ -31,6 +31,7 @@ private:
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
     void updateSidePanelStateFromView(const View *view);
+    void populateRecentFilesMenu();
 
 private slots:
     void onPixelOrderingChanged(PixelOrdering ordering);
@@ -52,15 +53,18 @@ private slots:
 private:
     QMenu *m_editMenu = nullptr;
 
-    QMenu *m_fileMenu               = nullptr;
-    QAction *m_fileOpenAction       = nullptr;
-    QAction *m_fileOpenRecentAction = nullptr;
-    QAction *m_fileExportAction     = nullptr;
-    QAction *m_fileCloseTabAction   = nullptr;
+    QMenu *m_fileMenu             = nullptr;
+    QAction *m_fileOpenAction     = nullptr;
+    QMenu *m_fileOpenRecentMenu   = nullptr;
+    QAction *m_fileExportAction   = nullptr;
+    QAction *m_fileCloseTabAction = nullptr;
 
     QMenu *m_viewMenu              = nullptr;
     QAction *m_viewMinimapAction   = nullptr;
     QAction *m_viewSidePanelAction = nullptr;
+    QAction *m_viewResetViewAction = nullptr;
+
+    QMenu *m_toolsMenu = nullptr;
 
     View *m_view           = nullptr;
     TabWidget *m_tabWidget = nullptr;

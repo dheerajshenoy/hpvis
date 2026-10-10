@@ -63,6 +63,7 @@ HpixView::initUI()
     statusBar()->addWidget(m_statusBar, 1);
 
     initConnections();
+    populateRecentFilesMenu();
 }
 
 void
@@ -158,11 +159,11 @@ HpixView::initMenubar()
 
     m_fileOpenAction
         = m_fileMenu->addAction("&Open", this, [this]() { OpenFile(); });
+    m_fileOpenAction->setShortcut(QKeySequence("Ctrl+O"));
 
-    m_fileOpenRecentAction = m_fileMenu->addMenu("&Open Recent")
-                                 ->menuAction()
-                                 ->menu()
-                                 ->addAction("No recent files");
+    m_fileOpenRecentMenu = m_fileMenu->addMenu("&Open Recent");
+    m_fileOpenRecentMenu->menuAction()->setShortcut(
+        QKeySequence("Ctrl+Shift+O"));
 
     m_fileExportAction = m_fileMenu->addAction(
         "&Export", this, &HpixView::onExportActionTriggered);
@@ -173,6 +174,7 @@ HpixView::initMenubar()
         if (index >= 0)
             onTabCloseRequested(index);
     });
+    m_fileCloseTabAction->setShortcut(QKeySequence("Ctrl+W"));
 
     m_fileMenu->addAction("&Exit", this, &HpixView::close);
 
@@ -188,6 +190,14 @@ HpixView::initMenubar()
     m_viewSidePanelAction = m_sidePanel->toggleViewAction();
     m_viewSidePanelAction->setText("&Side Panel");
     m_viewMenu->addAction(m_viewSidePanelAction);
+
+    m_viewResetViewAction = m_viewMenu->addAction("&Reset View", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->resetView();
+    });
+
+    m_toolsMenu = menuBar->addMenu("&Tools");
 
     auto helpMenu = menuBar->addMenu("&Help");
 
@@ -443,4 +453,10 @@ HpixView::onExportActionTriggered()
     {
         m_view->glWidget()->exportImage(filePath);
     }
+}
+
+void
+HpixView::populateRecentFilesMenu()
+{
+    // TODO: Implement recent files functionality
 }

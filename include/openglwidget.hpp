@@ -156,6 +156,7 @@ public:
 
     void exportImage(const QString &filePath,
                      const ExportOptions &options = {});
+    void resetView();
 
 protected:
     void initializeGL() override;
