@@ -25,8 +25,10 @@ private:
     void parseArgs(const argparse::ArgumentParser &parser);
     void initUI();
     void initConnections();
+    void initViewConnections(const View *view);
     void initMenubar();
     void initCFITSIO();
+    void updateStatusBarFromView(const View *view);
     void updateSidePanelStateFromView(const View *view);
 
 private slots:

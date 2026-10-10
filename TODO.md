@@ -23,7 +23,7 @@
 - [ ] Coordinate system conversion (Galactic / Equatorial / Ecliptic)
 
 ## Interaction
-- [ ] Cursor readout: lon/lat, pixel index, value (status bar)
+- [x] Cursor readout: lon/lat, pixel index, value (status bar)
 - [ ] Pixel picking via CPU `ang2pix` on mouse click
 - [ ] Measure angular distance between two points
 - [ ] Region selection with stats (mean, std, min, max)

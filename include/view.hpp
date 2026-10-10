@@ -101,8 +101,26 @@ public:
         m_glWidget->setUnseenColor(color);
     }
 
-    void loadMap(const std::string &filename);
+    bool loadMap(const std::string &filename);
+
+    const QString &filePath() const
+    {
+        return m_filePath;
+    }
+    float zoom() const
+    {
+        return m_glWidget->zoom();
+    }
+
+private:
+    void initConnections();
+
+signals:
+    // lonLat in degrees; value is NaN and index -1 when off the map
+    void cursorPosChanged(QPointF lonLat, double value, qlonglong index);
+    void zoomChanged(float zoom);
 
 private:
     OpenGLWidget *m_glWidget = nullptr;
+    QString m_filePath;
 };

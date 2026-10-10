@@ -27,6 +27,7 @@ public:
     inline void setPixelOrdering(PixelOrdering ordering)
     {
         m_pixelOrdering = ordering;
+        emitCursorData();
         update();
     }
 
@@ -115,6 +116,11 @@ public:
         return m_unseenColor;
     }
 
+    float zoom() const
+    {
+        return m_camera->zoom;
+    }
+
     void setMap(const Healpix_Map<float> &map);
 
 protected:
@@ -129,8 +135,14 @@ protected:
     void enterEvent(QEnterEvent *e) override;
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
+signals:
+    void zoomChanged(float zoom);
+    // lonLat in degrees; value is NaN and index -1 when off the map
+    void cursorPosChanged(QPointF lonLat, double value, qlonglong index);
+
 private:
     QVector2D toNdc(const QPointF &pos) const;
+    void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void setupGeometry();
 

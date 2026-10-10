@@ -17,11 +17,12 @@ View::View(QWidget *parent) : QWidget(parent)
     this->setContentsMargins(0, 0, 0, 0);
 
     setLayout(layout);
+    initConnections();
 }
 
 View::~View() {}
 
-void
+bool
 View::loadMap(const std::string &filename)
 {
     try
@@ -30,6 +31,8 @@ View::loadMap(const std::string &filename)
 
         read_Healpix_map_from_fits(filename, healpix_map, 1, 2);
         m_glWidget->setMap(healpix_map);
+        m_filePath = QString::fromStdString(filename);
+        return true;
     }
     catch (const PlanckError &e)
     {
@@ -41,4 +44,14 @@ View::loadMap(const std::string &filename)
         QMessageBox::critical(this, "Error",
                               QString("Failed to load map: %1").arg(e.what()));
     }
+
+    return false;
+}
+
+void
+View::initConnections()
+{
+    connect(m_glWidget, &OpenGLWidget::zoomChanged, this, &View::zoomChanged);
+    connect(m_glWidget, &OpenGLWidget::cursorPosChanged, this,
+            &View::cursorPosChanged);
 }

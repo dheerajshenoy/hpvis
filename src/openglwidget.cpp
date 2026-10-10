@@ -4,9 +4,11 @@
 #include "shaderloader.hpp"
 
 #include <QEnterEvent>
+#include <healpix_base.h>
+#include <pointing.h>
 #include <QFile>
-#include <QNativeGestureEvent>
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
 #include <QVector3D>
 #include <QWheelEvent>
 #include <algorithm>
@@ -21,6 +23,7 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
     m_camera = new MapCamera();
     setMouseTracking(true);
     m_cursorPos = QPointF(width() / 2.0, height() / 2.0);
+    emitCursorData();
 }
 
 OpenGLWidget::~OpenGLWidget()
@@ -223,6 +226,61 @@ OpenGLWidget::setupGeometry()
     m_vao.release();
 }
 
+// CPU copy of inverseMollweide() in shaders/projections.glsl
+static bool
+inverseMollweide(QVector2D uv, double &colat, double &phi)
+{
+    const double x_range = 2.82842712, y_range = 1.41421356;
+    const double x       = -(uv.x() - 0.5) * 2.0 * x_range;
+    const double y       = (uv.y() - 0.5) * 2.0 * y_range;
+    if ((x * x / 8.0) + (y * y / 2.0) > 1.0)
+        return false;
+
+    const double theta_aux = std::asin(std::clamp(y / 1.41421356, -1.0, 1.0));
+    const double lat       = std::asin(std::clamp(
+        (2.0 * theta_aux + std::sin(2.0 * theta_aux)) / M_PI, -1.0, 1.0));
+    const double cosTheta  = std::cos(theta_aux);
+    double lon             = 0.0;
+    if (std::abs(cosTheta) > 0.0001)
+        lon = (M_PI * x) / (2.82842712 * cosTheta);
+    lon = std::fmod(lon, 2.0 * M_PI);
+    if (lon < 0.0)
+        lon += 2.0 * M_PI;
+
+    colat = M_PI / 2.0 - lat;
+    phi   = lon;
+    return true;
+}
+
+void
+OpenGLWidget::emitCursorData()
+{
+    // Same mapping as the fragment shader: NDC -> camera -> projection
+    const QVector2D p = toNdc(m_cursorPos) / m_camera->zoom
+                        + m_camera->panOffset;
+    double colat, phi;
+    if (m_nside <= 0 || m_pendingMap.Npix() == 0
+        || !inverseMollweide(p * 0.5f + QVector2D(0.5f, 0.5f), colat, phi))
+    {
+        emit cursorPosChanged(QPointF(), std::nan(""), -1);
+        return;
+    }
+
+    const Healpix_Base base(static_cast<int>(m_nside),
+                            m_pixelOrdering == PixelOrdering::NESTED ? NEST
+                                                                     : RING,
+                            SET_NSIDE);
+    const qlonglong idx = base.ang2pix(pointing(colat, phi));
+    float v             = m_pendingMap.Map()[idx];
+    if (v < -1.0e30f || !std::isfinite(v))
+        v = std::nanf("");
+
+    double lon = phi * 180.0 / M_PI;
+    if (lon > 180.0)
+        lon -= 360.0;
+    emit cursorPosChanged(QPointF(lon, 90.0 - colat * 180.0 / M_PI), v, idx);
+}
+
 QVector2D
 OpenGLWidget::toNdc(const QPointF &pos) const
 {
@@ -240,12 +298,15 @@ OpenGLWidget::event(QEvent *e)
         if (g->gestureType() == Qt::ZoomNativeGesture)
         {
             m_camera->zoomAt(1.0f + float(g->value()), toNdc(m_cursorPos));
+            emit zoomChanged(m_camera->zoom);
+            emitCursorData();
             update();
             return true;
         }
         if (g->gestureType() == Qt::SmartZoomNativeGesture)
         {
             m_camera->reset();
+            emit zoomChanged(m_camera->zoom);
             update();
             return true;
         }
@@ -263,16 +324,19 @@ OpenGLWidget::wheelEvent(QWheelEvent *e)
     {
         m_camera->panBy(QVector2D(2.0f * px.x() / float(width()),
                                   -2.0f * px.y() / float(height())));
+        emitCursorData();
         update();
         e->accept();
         return;
     }
 
     // Mouse wheel, or pinch reported as Ctrl+wheel: zoom about the cursor
-    const double steps = (px.isNull() ? e->angleDelta().y() / 120.0
-                                      : px.y() / 50.0);
+    const double steps
+        = (px.isNull() ? e->angleDelta().y() / 120.0 : px.y() / 50.0);
     m_camera->zoomAt(float(std::pow(1.15, steps)), toNdc(e->position()));
+    emit zoomChanged(m_camera->zoom);
     m_cursorPos = e->position();
+    emitCursorData();
     update();
     e->accept();
 }
@@ -304,6 +368,8 @@ OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
     if (e->button() == Qt::LeftButton)
     {
         m_camera->reset();
+        emit zoomChanged(m_camera->zoom);
+        emitCursorData();
         update();
     }
 }
@@ -312,6 +378,7 @@ void
 OpenGLWidget::enterEvent(QEnterEvent *e)
 {
     m_cursorPos = e->position();
+    emitCursorData();
     QOpenGLWidget::enterEvent(e);
 }
 
@@ -320,12 +387,16 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 {
     m_cursorPos = e->position();
     if (!m_isPanning)
+    {
+        emitCursorData();
         return;
+    }
 
     const QPoint delta = e->pos() - m_lastMousePos;
     m_lastMousePos     = e->pos();
 
     m_camera->panBy(QVector2D(2.0f * delta.x() / float(width()),
                               -2.0f * delta.y() / float(height())));
+    emitCursorData();
     update();
 }

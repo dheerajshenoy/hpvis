@@ -122,20 +122,6 @@ SidePanel::pixelOrderingWidget()
     QWidget *widget     = new QWidget();
     QFormLayout *layout = new QFormLayout(widget);
 
-    m_bgColorButton = new QPushButton("");
-    m_bgColorButton->setFixedSize(50, 20);
-    m_bgColorButton->setStyleSheet(
-        QString("background-color: #%1;").arg(0x0A0A0F, 6, 16, QChar('0')));
-
-    layout->addRow("Background Color:", m_bgColorButton);
-
-    m_unseenColorButton = new QPushButton("");
-    m_unseenColorButton->setFixedSize(50, 20);
-    m_unseenColorButton->setStyleSheet(
-        QString("background-color: #%1;").arg(0x000000, 6, 16, QChar('0')));
-
-    layout->addRow("Unseen Color:", m_unseenColorButton);
-
     widget->setLayout(layout);
     m_pixOrdCombo = new QComboBox();
     m_pixOrdCombo->addItem("Nested");
@@ -151,6 +137,20 @@ SidePanel::colormapWidget()
     QWidget *widget     = new QWidget();
     QFormLayout *layout = new QFormLayout(widget);
 
+    m_bgColorButton = new QPushButton("");
+    m_bgColorButton->setFixedHeight(20);
+    m_bgColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(0x0A0A0F, 6, 16, QChar('0')));
+
+    layout->addRow("Background Color:", m_bgColorButton);
+
+    m_unseenColorButton = new QPushButton("");
+    m_unseenColorButton->setFixedHeight(20);
+    m_unseenColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(0x000000, 6, 16, QChar('0')));
+
+    layout->addRow("Unseen Color:", m_unseenColorButton);
+
     widget->setLayout(layout);
 
     m_colormapCombo = new QComboBox();
@@ -164,7 +164,7 @@ SidePanel::colormapWidget()
     m_colormapCombo->setCurrentIndex(static_cast<int>(Colormap::VIRIDIS));
     layout->addRow("Colormap", m_colormapCombo);
 
-    m_reverseColormapCheck = new QCheckBox("Reverse Colormap");
+    m_reverseColormapCheck = new QCheckBox("Reverse");
     layout->addRow(m_reverseColormapCheck);
 
     m_colormapMinSpin = new QDoubleSpinBox();
@@ -175,15 +175,15 @@ SidePanel::colormapWidget()
     m_colormapMaxSpin->setRange(-1e9, 1e9);
     m_colormapMaxSpin->setDecimals(6);
 
-    layout->addRow("Colormap Min", m_colormapMinSpin);
-    layout->addRow("Colormap Max", m_colormapMaxSpin);
+    layout->addRow("Min", m_colormapMinSpin);
+    layout->addRow("Max", m_colormapMaxSpin);
 
     m_colormapScaleCombo = new QComboBox();
 
     m_colormapScaleCombo->addItem("Linear");
     m_colormapScaleCombo->addItem("Logarithmic");
 
-    layout->addRow("Colormap Scale", m_colormapScaleCombo);
+    layout->addRow("Scale", m_colormapScaleCombo);
 
     m_colormapResetBtn = new QPushButton("Reset Range");
     layout->addRow(m_colormapResetBtn);

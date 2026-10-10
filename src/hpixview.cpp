@@ -7,11 +7,14 @@
 #include <QApplication>
 #include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QLocale>
 #include <QGraphicsView>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QVBoxLayout>
+#include <cmath>
 
 HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
@@ -42,6 +45,7 @@ HpixView::initUI()
     widget->setLayout(layout);
 
     m_tabWidget = new TabWidget();
+    m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_sidePanel = new SidePanel();
     m_statusBar = new StatusBar();
 
@@ -147,9 +151,20 @@ HpixView::OpenFile(const QString &filePath)
 
     View *view = new View();
 
-    view->loadMap(resolvedPath.toStdString());
-    m_tabWidget->setContentsMargins(0, 0, 0, 0);
-    m_tabWidget->addTab(view, QFileInfo(resolvedPath).fileName());
+    if (view->loadMap(resolvedPath.toStdString()))
+    {
+        auto filename = QFileInfo(resolvedPath).fileName();
+        m_tabWidget->addTab(view, filename);
+        initViewConnections(view);
+    }
+}
+
+void
+HpixView::initViewConnections(const View *view)
+{
+    connect(view, &View::cursorPosChanged, m_statusBar,
+            &StatusBar::setCursorData);
+    connect(view, &View::zoomChanged, m_statusBar, &StatusBar::setZoom);
 }
 
 void
@@ -189,6 +204,20 @@ HpixView::onTabChanged(int index)
     m_view          = qobject_cast<View *>(widget);
 
     updateSidePanelStateFromView(m_view);
+    updateStatusBarFromView(m_view);
+}
+
+void
+HpixView::updateStatusBarFromView(const View *view)
+{
+    if (!view)
+        return;
+
+    const QFileInfo info(view->filePath());
+    m_statusBar->setFilename(info.fileName());
+    m_statusBar->setFilesize(QLocale().formattedDataSize(info.size()));
+    m_statusBar->setZoom(view->zoom());
+    m_statusBar->setCursorData(QPointF(), std::nan(""), -1); // clear stale
 }
 
 void
