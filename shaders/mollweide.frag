@@ -99,7 +99,8 @@ void main() {
     float x_range = 2.82842712; // 2 * sqrt(2)
     float y_range = 1.41421356; // sqrt(2)
 
-    float x = (TexCoord.x - 0.5) * 2.0 * x_range;
+    // Longitude increases to the left (healpy/astronomical convention)
+    float x = -(TexCoord.x - 0.5) * 2.0 * x_range;
     float y = (TexCoord.y - 0.5) * 2.0 * y_range;
 
     // 2. Check ellipse boundary
