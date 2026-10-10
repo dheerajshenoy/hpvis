@@ -30,6 +30,7 @@
 
 ## Overlays
 - [x] Mask overlay
+- [ ] Graticule checkbox + spacing spinbox
 - [ ] Graticule (lon/lat grid) with labels
 - [ ] Markers / catalog overlay (load from CSV)
 - [ ] Text annotations
@@ -84,12 +85,3 @@ Group into collapsible sections (QGroupBox / toolbox).
 - [ ] Read-only map info: nside, npix, ordering, coord system, min/max/mean/std
 - [ ] Default pixel ordering from FITS header (`ORDERING`) instead of manual choice
 - [ ] Smoothing FWHM spinbox
-
-### Overlays
-- [ ] Graticule checkbox + spacing spinbox
-- [ ] Colorbar toggle
-- [ ] Load mask file + opacity slider
-
-### Cursor & export
-- [ ] Cursor readout box (lon/lat, pixel index, value)
-- [ ] Save image button with resolution choice
