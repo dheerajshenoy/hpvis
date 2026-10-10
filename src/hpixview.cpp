@@ -10,15 +10,25 @@
 #include <QMessageBox>
 #include <QVBoxLayout>
 
-HpixView::HpixView(int argc, char *argv[], QWidget *parent)
+HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
 {
-    (void)argc;
-    (void)argv;
-
     initUI();
-    OpenFile("~/Gits/PhD/codes/cmb_40GHz_64_s0_d0.fits");
+    parseArgs(parser);
     this->show();
+}
+
+void
+HpixView::parseArgs(const argparse::ArgumentParser &parser)
+{
+    if (parser.is_used("files"))
+    {
+        auto files = parser.get<std::vector<std::string>>("files");
+        for (const auto &file : files)
+        {
+            OpenFile(QString::fromStdString(file));
+        }
+    }
 }
 
 void

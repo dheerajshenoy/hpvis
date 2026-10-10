@@ -43,7 +43,8 @@ add_executable(${PROJECT_NAME}
     src/openglwidget.cpp
     include/view.hpp
     include/hpixview.hpp
-    include/openglwidget.hpp)
+    include/openglwidget.hpp
+    include/argparse.hpp)
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -58,7 +59,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    HPIXVIEW_VERSION="${PROJECT_VERSION}"
+    PROJECT_NAME="${PROJECT_NAME}"
+    PROJECT_VERSION="${PROJECT_VERSION}"
 )
 
 # Extra optimization flags on top of the build-type defaults.

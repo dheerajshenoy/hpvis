@@ -1,66 +1,51 @@
 #version 330 core
+in vec2 TexCoord;
 out vec4 FragColor;
-in vec2 TexCoord; // [0, 1] range
 
-uniform sampler2D u_mapTexture;
-uniform long u_nside;
-uniform long u_npix;
+uniform sampler2D mapTexture;
+uniform float nside;
+uniform float npix;
+uniform float vmin;
+uniform float vmax;
 
 #define PI 3.14159265358979323846
 
-// Function to compute HEALPix RING pixel index from celestial coordinates (theta, phi)
-int ang2pix_ring(float theta, float phi) {
-    float nside_f = float(u_nside);
+float ang2pix_ring(float nside_val, float theta, float phi) {
+    int ns = int(nside_val + 0.5);
     float z = cos(theta);
     float za = abs(z);
-
-    float 2d_fact = 3.0 * nside_f * nside_f;
+    float tt = mod(phi, 2.0 * PI) / (0.5 * PI); // [0,4)
+    int npix_i = 12 * ns * ns;
+    int ncap = 2 * ns * (ns - 1);
     int pix;
 
-    if (za > (2.0 / 3.0)) { // --- Polar Caps ---
-        float temp = nside_f * sqrt(3.0 * (1.0 - za));
-        int jp = int(floor(nside_f * (1.0 - sqrt(3.0 * (1.0 - za))))); // ring index
-        int j = int(floor(temp));
-
-        // Safety clamps
-        j = clamp(j, 0, int(u_nside) - 1);
-
-        float fa = (phi / (0.5 * PI)); // phi in [0, 2pi] mapped to sectors
-        // Additional polar cap sector geometry math...
-        // (Standard HEALPix analytical formula branch)
-
-        if (z > 0.0) {
-            int ring = int(floor(nside_f * sqrt(3.0 * (1.0 - z))));
-            float cf = phi / (0.5 * PI);
-            int jp = int(floor(nside_f * (1.0 - sqrt(3.0 * (1.0 - z)))));
-            // North cap formulation
-            pix = 2 * ring * (ring + 1); // simplified tracking
-        } else {
-            // South cap formulation
-            int ring = int(floor(nside_f * sqrt(3.0 * (1.0 - za))));
-            pix = u_npix - 2 * ring * (ring + 1);
-        }
-    } else { // --- Equatorial Belt ---
-        float temp = nside_f * (0.5 + z);
-        int jp = int(floor(nside_f * (0.5 + z)));
-        int j = int(floor(nside_f * (0.75 - z))); // ring index
-
-        float s = mod(phi, 2.0 * PI) / (0.5 * PI);
-        int ip = int(floor(nside_f * (0.5 + z + 0.75))); // placeholder sector
-
-        // Base equatorial index computation
-        int ring_idx = int(floor(nside_f * (0.75 - z)));
-        float dphi = phi - (floor(phi / (0.5 * PI)) * 0.5 * PI);
-
-        // Final ring formula mapping for equatorial belt
-        pix = int(2 * nside_f * (nside_f + 1) + (ring_idx - int(u_nside)) * 4 * nside_f);
+    if (za <= 2.0 / 3.0) { // equatorial belt
+        float temp1 = nside_val * (0.5 + tt);
+        float temp2 = nside_val * z * 0.75;
+        int jp = int(temp1 - temp2);
+        int jm = int(temp1 + temp2);
+        int ir = ns + 1 + jp - jm;
+        int kshift = 1 - (ir & 1);
+        int ip = (jp + jm - ns + kshift + 1) / 2;
+        ip = ip % (4 * ns);
+        if (ip < 0) ip += 4 * ns;
+        pix = ncap + (ir - 1) * 4 * ns + ip;
+    } else { // polar caps
+        float tp = tt - floor(tt);
+        float tmp = nside_val * sqrt(3.0 * (1.0 - za));
+        int jp = int(tp * tmp);
+        int jm = int((1.0 - tp) * tmp);
+        int ir = jp + jm + 1;
+        int ip = int(tt * float(ir));
+        ip = ip % (4 * ir);
+        if (z > 0.0) pix = 2 * ir * (ir - 1) + ip;
+        else         pix = npix_i - 2 * ir * (ir + 1) + ip;
     }
-
-    return clamp(pix, 0, u_npix - 1);
+    return float(clamp(pix, 0, npix_i - 1));
 }
 
 void main() {
-    // 1. Map texture coordinates to Mollweide plane coordinates (x, y)
+    // 1. Scale UV coordinates to Mollweide plane dimensions
     float x_range = 2.82842712; // 2 * sqrt(2)
     float y_range = 1.41421356; // sqrt(2)
 
@@ -69,29 +54,36 @@ void main() {
 
     // 2. Check ellipse boundary
     if ((x*x / 8.0) + (y*y / 2.0) > 1.0) {
-        FragColor = vec4(0.05, 0.05, 0.07, 1.0); // Outside canvas background
+        FragColor = vec4(0.04, 0.04, 0.06, 1.0); // Background outside
         return;
     }
 
-    // 3. Newton-Raphson iteration for Mollweide authalic angle theta
-    float theta_aux = y;
-    for (int i = 0; i < 6; ++i) {
-        theta_aux -= (2.0 * theta_aux + sin(2.0 * theta_aux) - PI * y / y_range) / (2.0 + 2.0 * cos(2.0 * theta_aux));
+    // 3. Inverse Mollweide Projection -> spherical coords (lat, lon)
+    float sinTheta = clamp(y / 1.41421356, -1.0, 1.0);
+    float theta_aux = asin(sinTheta);
+    float lat = asin(clamp((2.0 * theta_aux + sin(2.0 * theta_aux)) / PI, -1.0, 1.0));
+
+    float cosTheta = cos(theta_aux);
+    float lon = 0.0;
+    if (abs(cosTheta) > 0.0001) {
+        lon = (PI * x) / (2.82842712 * cosTheta);
     }
-    theta_aux = clamp(theta_aux, -PI/2.0, PI/2.0);
+    lon = mod(lon, 2.0 * PI);
+    if (lon < 0.0) lon += 2.0 * PI;
 
-    // 4. Extract sky coordinates
-    float theta_sky = asin(clamp(2.0 * theta_aux / PI, -1.0, 1.0));
-    theta_sky = PI / 2.0 - theta_sky; // Colatitude [0, pi]
+    // Convert latitude/longitude to HEALPix colatitude (theta) and azimuth (phi)
+    float colat = PI / 2.0 - lat;
+    float phi = lon;
 
-    float phi_sky = x / (2.0 * sqrt(2.0) * cos(theta_aux));
-    phi_sky = mod(phi_sky * PI + PI, 2.0 * PI); // Longitude [0, 2pi]
+    // 4. Look up pixel index using HEALPix RING scheme
+    float pixIdx = ang2pix_ring(nside, colat, phi);
 
-    // 5. Get pixel index and fetch from 1D texture buffer
-    int pix_idx = ang2pix_ring(theta_sky, phi_sky);
-    float val = texelFetch(u_mapTexture, pix_idx).r;
-
-    // 6. Simple stretch / colormap hook (e.g., grayscale or mock scaling)
-    float normalized_val = clamp((val + 0.001) / 0.005, 0.0, 1.0);
-    FragColor = vec4(vec3(normalized_val), 1.0);
+    float W = 4096.0;
+    float H = ceil(npix / W);
+    vec2 uv = vec2((mod(pixIdx, W) + 0.5) / W, (floor(pixIdx / W) + 0.5) / H);
+    float mapVal = texture(mapTexture, uv).r;
+    float t = clamp((mapVal - vmin) / (vmax - vmin), 0.0, 1.0);
+    vec3 c = t < 0.5 ? mix(vec3(0.0, 0.0, 1.0), vec3(1.0), t * 2.0)
+                     : mix(vec3(1.0), vec3(1.0, 0.0, 0.0), (t - 0.5) * 2.0);
+    FragColor = vec4(c, 1.0);
 }
