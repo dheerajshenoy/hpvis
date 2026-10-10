@@ -40,15 +40,3 @@ View::loadMap(const std::string &filename)
                               QString("Failed to load map: %1").arg(e.what()));
     }
 }
-
-void
-View::setPixelOrdering(PixelOrdering ordering)
-{
-    m_glWidget->setPixelOrdering(ordering);
-}
-
-void
-View::setColormap(Colormap colormap)
-{
-    m_glWidget->setColormap(colormap);
-}

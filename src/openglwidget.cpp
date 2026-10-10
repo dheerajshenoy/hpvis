@@ -29,6 +29,24 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
 {
     m_pendingMap    = map;
     m_hasPendingMap = true;
+
+    // Data range (ignoring non-finite and HEALPix UNSEEN pixels)
+    m_dataMin = std::numeric_limits<float>::max();
+    m_dataMax = std::numeric_limits<float>::lowest();
+    const float *data = map.Map().begin();
+    for (long i = 0; i < map.Npix(); ++i)
+    {
+        float v = data[i];
+        if (!std::isfinite(v) || v < -1e30f)
+            continue;
+        m_dataMin = std::min(m_dataMin, v);
+        m_dataMax = std::max(m_dataMax, v);
+    }
+    if (m_dataMin >= m_dataMax)
+        m_dataMax = m_dataMin + 1.0f;
+    m_vmin = m_dataMin;
+    m_vmax = m_dataMax;
+
     update();
 }
 
@@ -89,6 +107,8 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("vmin", m_vmin);
     m_shaderProgram.setUniformValue("vmax", m_vmax);
     m_shaderProgram.setUniformValue("colormap", static_cast<int>(m_colormap));
+    m_shaderProgram.setUniformValue("colormap_scale",
+                                    static_cast<int>(m_colormapScale));
     m_shaderProgram.setUniformValue("pixel_ordering",
                                     static_cast<int>(m_pixelOrdering));
 
@@ -112,19 +132,6 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
     {
         return;
     }
-
-    m_vmin = std::numeric_limits<float>::max();
-    m_vmax = std::numeric_limits<float>::lowest();
-    for (long i = 0; i < m_npix; ++i)
-    {
-        float v = mapDataPtr[i];
-        if (!std::isfinite(v) || v < -1e30f)
-            continue;
-        m_vmin = std::min(m_vmin, v);
-        m_vmax = std::max(m_vmax, v);
-    }
-    if (m_vmin >= m_vmax)
-        m_vmax = m_vmin + 1.0f;
 
     makeCurrent();
 

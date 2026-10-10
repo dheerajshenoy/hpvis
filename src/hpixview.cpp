@@ -60,11 +60,30 @@ HpixView::initConnections()
             &HpixView::onPixelOrderingChanged);
 
     connect(m_sidePanel, &SidePanel::colormapChanged, this,
-            [this](Colormap colormap)
+            &HpixView::onColormapChanged);
+
+    connect(m_sidePanel, &SidePanel::colormapRangeResetRequested, this,
+            [this]()
+    {
+        if (!m_view)
+            return;
+        m_view->resetColormapRange();
+        m_sidePanel->setColormapRange(m_view->colormapMin(),
+                                      m_view->colormapMax());
+    });
+
+    connect(m_sidePanel, &SidePanel::colormapScaleChanged, this,
+            [this](ColormapScale scale)
     {
         if (m_view)
-            m_view->setColormap(colormap);
+            m_view->setColormapScale(scale);
     });
+
+    connect(m_sidePanel, &SidePanel::colormapMaxChanged, this,
+            &HpixView::onColormapMaxChanged);
+
+    connect(m_sidePanel, &SidePanel::colormapMinChanged, this,
+            &HpixView::onColormapMinChanged);
 
     connect(m_tabWidget, &TabWidget::currentChanged, this,
             &HpixView::onTabChanged);
@@ -134,6 +153,8 @@ HpixView::updateSidePanelStateFromView(const View *view)
         return;
 
     m_sidePanel->setPixelOrdering(view->pixelOrdering());
+    m_sidePanel->setColormapRange(view->colormapMin(), view->colormapMax());
+    m_sidePanel->setColormapScale(view->colormapScale());
 
     // setColormap emits colormapChanged only on change; block to avoid a loop
     QSignalBlocker blocker(m_sidePanel);
@@ -170,4 +191,31 @@ HpixView::onTabCloseRequested(int index)
     QWidget *widget = m_tabWidget->widget(index);
     m_tabWidget->removeTab(index);
     delete widget;
+}
+
+void
+HpixView::onColormapChanged(Colormap colormap)
+{
+    if (!m_view)
+        return;
+
+    m_view->setColormap(colormap);
+}
+
+void
+HpixView::onColormapMaxChanged(double max)
+{
+    if (!m_view)
+        return;
+
+    m_view->setColormapMax(max);
+}
+
+void
+HpixView::onColormapMinChanged(double min)
+{
+    if (!m_view)
+        return;
+
+    m_view->setColormapMin(min);
 }

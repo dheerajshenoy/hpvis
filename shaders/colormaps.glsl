@@ -115,6 +115,14 @@ vec3 sampleWinter(float t) {
     return vec3(0.0, t, 1.0 - 0.5 * t);
 }
 
+// Rainbow (matplotlib "rainbow": purple -> blue -> green -> yellow -> red)
+vec3 sampleRainbow(float t) {
+    t = clamp(t, 0.0, 1.0);
+    return clamp(vec3(abs(2.0 * t - 0.5),
+                      sin(t * 3.14159265),
+                      cos(t * 1.57079633)), 0.0, 1.0);
+}
+
 // Master Switch Dispatcher
 vec3 applyColormap(float t, int type) {
     switch(type) {
@@ -132,6 +140,7 @@ vec3 applyColormap(float t, int type) {
         case 11: return sampleSummer(t);
         case 12: return sampleAutumn(t);
         case 13: return sampleWinter(t);
+        case 14: return sampleRainbow(t);
         default: return sampleGrayscale(t);
     }
 }

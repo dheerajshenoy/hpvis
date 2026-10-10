@@ -35,12 +35,18 @@ public:
 
     void setPixelOrdering(PixelOrdering ordering);
 
+    void setColormapScale(ColormapScale scale);
+
+    // Update the min/max spinboxes without emitting change signals
+    void setColormapRange(double min, double max);
+
 signals:
     void pixelOrderingChanged(PixelOrdering ordering);
     void colormapChanged(Colormap colormap);
     void colormapMinChanged(double min);
     void colormapMaxChanged(double max);
     void colormapScaleChanged(ColormapScale scale);
+    void colormapRangeResetRequested();
 
 private:
     void setupUI();
@@ -54,4 +60,5 @@ private:
     QDoubleSpinBox *m_colormapMinSpin = nullptr;
     QDoubleSpinBox *m_colormapMaxSpin = nullptr;
     QComboBox *m_colormapScaleCombo   = nullptr;
+    QPushButton *m_colormapResetBtn   = nullptr;
 };

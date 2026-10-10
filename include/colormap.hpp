@@ -15,7 +15,8 @@ enum class Colormap
     SPRING    = 10,
     SUMMER    = 11,
     AUTUMN    = 12,
-    WINTER    = 13
+    WINTER    = 13,
+    RAINBOW   = 14
 };
 
 enum class ColormapScale

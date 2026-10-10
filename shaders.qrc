@@ -7,5 +7,6 @@
         <file>shaders/healpix_ring.glsl</file>
         <file>shaders/healpix_nest.glsl</file>
         <file>shaders/projections.glsl</file>
+        <file>shaders/scale.glsl</file>
     </qresource>
 </RCC>

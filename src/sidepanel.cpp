@@ -63,6 +63,9 @@ SidePanel::setupConnections()
             QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &SidePanel::colormapMaxChanged);
 
+    connect(m_colormapResetBtn, &QPushButton::clicked, this,
+            &SidePanel::colormapRangeResetRequested);
+
     connect(m_colormapScaleCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     {
@@ -84,6 +87,22 @@ SidePanel::setPixelOrdering(PixelOrdering ordering)
         m_pixOrdCombo->setCurrentIndex(0);
     else if (ordering == PixelOrdering::RING)
         m_pixOrdCombo->setCurrentIndex(1);
+}
+
+void
+SidePanel::setColormapScale(ColormapScale scale)
+{
+    QSignalBlocker blocker(m_colormapScaleCombo);
+    m_colormapScaleCombo->setCurrentIndex(static_cast<int>(scale));
+}
+
+void
+SidePanel::setColormapRange(double min, double max)
+{
+    QSignalBlocker minBlock(m_colormapMinSpin);
+    QSignalBlocker maxBlock(m_colormapMaxSpin);
+    m_colormapMinSpin->setValue(min);
+    m_colormapMaxSpin->setValue(max);
 }
 
 QWidget *
@@ -114,17 +133,19 @@ SidePanel::colormapWidget()
     const QStringList colormaps
         = {"Grayscale", "Inferno", "Magma",  "Plasma", "Viridis",
            "Cubehelix", "Jet",     "HSV",    "Hot",    "Cool",
-           "Spring",    "Summer",  "Autumn", "Winter"};
+           "Spring",    "Summer",  "Autumn", "Winter",  "Rainbow"};
 
     m_colormapCombo->addItems(colormaps);
     m_colormapCombo->setCurrentIndex(static_cast<int>(Colormap::VIRIDIS));
     layout->addRow("Colormap", m_colormapCombo);
 
     m_colormapMinSpin = new QDoubleSpinBox();
-    m_colormapMinSpin->setRange(-1000000.0, 1000000.0);
+    m_colormapMinSpin->setRange(-1e9, 1e9);
+    m_colormapMinSpin->setDecimals(6);
 
     m_colormapMaxSpin = new QDoubleSpinBox();
-    m_colormapMaxSpin->setRange(-1000000.0, 1000000.0);
+    m_colormapMaxSpin->setRange(-1e9, 1e9);
+    m_colormapMaxSpin->setDecimals(6);
 
     layout->addRow("Colormap Min", m_colormapMinSpin);
     layout->addRow("Colormap Max", m_colormapMaxSpin);
@@ -135,6 +156,9 @@ SidePanel::colormapWidget()
     m_colormapScaleCombo->addItem("Logarithmic");
 
     layout->addRow("Colormap Scale", m_colormapScaleCombo);
+
+    m_colormapResetBtn = new QPushButton("Reset Range");
+    layout->addRow(m_colormapResetBtn);
 
     widget->setLayout(layout);
     return widget;

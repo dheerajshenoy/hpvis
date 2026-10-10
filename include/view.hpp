@@ -1,8 +1,8 @@
 #pragma once
 
+#include "colormap.hpp"
 #include "healpix_map.h"
 #include "openglwidget.hpp"
-#include "colormap.hpp"
 #include "pixelordering.hpp"
 
 #include <QVBoxLayout>
@@ -25,9 +25,53 @@ public:
     {
         return m_glWidget->colormap();
     }
-    void setColormap(Colormap colormap);
+
+    inline void setPixelOrdering(PixelOrdering ordering)
+    {
+        m_glWidget->setPixelOrdering(ordering);
+    }
+
+    inline void setColormap(Colormap colormap)
+    {
+        m_glWidget->setColormap(colormap);
+    }
+
+    inline float colormapMin() const
+    {
+        return m_glWidget->colormapMin();
+    }
+
+    inline float colormapMax() const
+    {
+        return m_glWidget->colormapMax();
+    }
+
+    inline void resetColormapRange()
+    {
+        m_glWidget->resetColormapRange();
+    }
+
+    inline void setColormapMin(double min)
+    {
+        m_glWidget->setColormapMin(min);
+    }
+
+    inline void setColormapMax(double max)
+    {
+        m_glWidget->setColormapMax(max);
+    }
+
+    inline ColormapScale colormapScale() const
+    {
+        return m_glWidget->colormapScale();
+    }
+
+    inline void setColormapScale(ColormapScale scale)
+    {
+        m_glWidget->setColormapScale(scale);
+    }
+
     void loadMap(const std::string &filename);
-    void setPixelOrdering(PixelOrdering ordering);
 
 private:
     QVBoxLayout *m_layout    = nullptr;

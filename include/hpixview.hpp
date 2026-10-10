@@ -32,6 +32,9 @@ private slots:
     void onPixelOrderingChanged(PixelOrdering ordering);
     void onTabChanged(int index);
     void onTabCloseRequested(int index);
+    void onColormapChanged(Colormap colormap);
+    void onColormapMaxChanged(double max);
+    void onColormapMinChanged(double min);
 
 private:
     QMenu *m_fileMenu = nullptr;

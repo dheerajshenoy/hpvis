@@ -7,6 +7,7 @@ out vec4 FragColor;
 #include "healpix_ring.glsl"
 #include "healpix_nest.glsl"
 #include "projections.glsl"
+#include "scale.glsl"
 
 void main() {
     float colat, phi;
@@ -23,6 +24,6 @@ void main() {
     float H = ceil(npix / W);
     vec2 uv = vec2((mod(pixIdx, W) + 0.5) / W, (floor(pixIdx / W) + 0.5) / H);
     float mapVal = texture(mapTexture, uv).r;
-    float t = clamp((mapVal - vmin) / (vmax - vmin), 0.0, 1.0);
+    float t = applyScale(mapVal);
     FragColor = vec4(applyColormap(t, colormap), 1.0);
 }

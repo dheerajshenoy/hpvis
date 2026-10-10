@@ -18,24 +18,67 @@ public:
     explicit OpenGLWidget(QWidget *parent = nullptr);
     ~OpenGLWidget();
     void setMap(const Healpix_Map<float> &map);
-    PixelOrdering pixelOrdering() const
+
+    inline PixelOrdering pixelOrdering() const
     {
         return m_pixelOrdering;
     }
-    void setPixelOrdering(PixelOrdering ordering)
+
+    inline void setPixelOrdering(PixelOrdering ordering)
     {
         m_pixelOrdering = ordering;
         update();
     }
 
-    Colormap colormap() const
+    inline Colormap colormap() const
     {
         return m_colormap;
     }
-    void setColormap(Colormap colormap)
+
+    inline void setColormap(Colormap colormap)
     {
         m_colormap = colormap;
         update();
+    }
+
+    float colormapMin() const
+    {
+        return m_vmin;
+    }
+    float colormapMax() const
+    {
+        return m_vmax;
+    }
+
+    // Restore the colormap range to the min/max of the loaded map
+    inline void resetColormapRange()
+    {
+        m_vmin = m_dataMin;
+        m_vmax = m_dataMax;
+        update();
+    }
+
+    inline void setColormapMin(double min)
+    {
+        m_vmin = static_cast<float>(min);
+        update();
+    }
+
+    inline void setColormapMax(double max)
+    {
+        m_vmax = static_cast<float>(max);
+        update();
+    }
+
+    inline void setColormapScale(ColormapScale scale)
+    {
+        m_colormapScale = scale;
+        update();
+    }
+
+    ColormapScale colormapScale() const
+    {
+        return m_colormapScale;
     }
 
 protected:
@@ -50,11 +93,14 @@ private:
 private:
     PixelOrdering m_pixelOrdering = PixelOrdering::RING;
     Colormap m_colormap           = Colormap::VIRIDIS;
+    ColormapScale m_colormapScale = ColormapScale::LINEAR;
     long m_nside                  = 0;
     long m_npix                   = 0;
     GLuint m_mapTexture           = 0;
     float m_vmin                  = 0.0f;
     float m_vmax                  = 1.0f;
+    float m_dataMin               = 0.0f;
+    float m_dataMax               = 1.0f;
     bool m_hasPendingMap          = false;
     Healpix_Map<float> m_pendingMap;
     QOpenGLVertexArrayObject m_vao;
