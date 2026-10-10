@@ -192,11 +192,12 @@ HpixView::initMenubar()
     m_viewMenu->addAction(m_viewSidePanelAction);
     m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
 
-    auto zoomLevels = {0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
+    auto zoomLevels
+        = {0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f};
 
     for (float zoom : zoomLevels)
     {
-        QString label = QString::number(zoom, 'f', 2) + "x";
+        QString label = QString::number(zoom * 100) + "x";
         m_viewZoomMenu->addAction(label, this, [this, zoom]()
         {
             if (m_view)
@@ -253,6 +254,9 @@ HpixView::OpenFile(const QString &filePath)
     {
         auto filename = QFileInfo(resolvedPath).fileName();
         m_tabWidget->addTab(view, filename);
+        // Show it now so the GPU upload happens at open time, not on the
+        // first tab switch
+        m_tabWidget->setCurrentWidget(view);
         initViewConnections(view);
     }
 }
@@ -261,10 +265,10 @@ void
 HpixView::initViewConnections(const View *view)
 {
     connect(view->glWidget(), &OpenGLWidget::mapLoaded, this,
-            [this, view](long nside, long npix)
+            [this, view](long nside, long npix, double avg, double rms)
     {
         if (view == m_view)
-            m_sidePanel->setMapInfo(nside, npix);
+            m_sidePanel->setMapInfo(nside, npix, avg, rms);
     });
 
     connect(view, &View::cursorPosChanged, m_statusBar,
@@ -295,8 +299,9 @@ HpixView::updateSidePanelStateFromView(const View *view)
     if (!view || !view->glWidget() || !view->glWidget()->healpixMap())
         return;
 
-    m_sidePanel->setMapInfo(view->glWidget()->healpixMap()->Nside(),
-                            view->glWidget()->healpixMap()->Npix());
+    auto *map = view->glWidget()->healpixMap();
+    m_sidePanel->setMapInfo(map->Nside(), map->Npix(), map->average(),
+                            map->rms());
     m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
     m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),

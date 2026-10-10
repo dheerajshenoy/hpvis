@@ -252,6 +252,13 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
     m_vmin = m_dataMin;
     m_vmax = m_dataMax;
 
+    // With a live context, upload now rather than on the next paint
+    if (isValid())
+    {
+        uploadMapToGPU(m_pendingMap);
+        m_hasPendingMap = false;
+    }
+
     update();
 }
 
@@ -307,7 +314,8 @@ OpenGLWidget::paintGL()
         uploadMapToGPU(m_pendingMap);
         m_hasPendingMap = false;
 
-        emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix());
+        emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(),
+                       m_pendingMap.average(), m_pendingMap.rms());
     }
 
     if (m_maskDirty)
@@ -708,11 +716,19 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
     // 1D textures are limited (~16k texels); pack the map into a 2D texture
     const int W = 4096;
     const int H = (m_npix + W - 1) / W;
-    std::vector<float> buf((size_t)W * H, 0.0f);
-    std::copy(mapDataPtr, mapDataPtr + m_npix, buf.begin());
+    // Allocate the padded texture, then upload straight from the map: whole
+    // rows first, then the partial last row (no intermediate CPU copy)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, W, H, 0, GL_RED, GL_FLOAT,
-                 buf.data());
+                 nullptr);
+    const int fullRows = int(m_npix / W);
+    const int rest     = int(m_npix % W);
+    if (fullRows > 0)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, W, fullRows, GL_RED, GL_FLOAT,
+                        mapDataPtr);
+    if (rest > 0)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, fullRows, rest, 1, GL_RED,
+                        GL_FLOAT, mapDataPtr + size_t(fullRows) * W);
     // Restore the default: Qt's text renderer relies on it
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 

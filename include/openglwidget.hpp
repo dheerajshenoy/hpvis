@@ -188,7 +188,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 signals:
-    void mapLoaded(long nside, long npix);
+    void mapLoaded(long nside, long npix, double avg, double rms);
     void zoomChanged(float zoom);
     void masksChanged(); // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)

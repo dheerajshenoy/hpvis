@@ -17,7 +17,7 @@ struct MapCamera
     }
 
     // Clamp zoom levels to prevent inverse flipping or infinite scaling
-    void adjustZoom(float factor, float minZoom = 1.0f, float maxZoom = 50.0f)
+    void adjustZoom(float factor, float minZoom = 0.1f, float maxZoom = 64.0f)
     {
         zoom = std::clamp(zoom * factor, minZoom, maxZoom);
         if (zoom <= minZoom)
