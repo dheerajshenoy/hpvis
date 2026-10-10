@@ -10,6 +10,7 @@
 #include <QGraphicsView>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QStatusBar>
 #include <QVBoxLayout>
 
 HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
@@ -44,13 +45,18 @@ HpixView::initUI()
     m_sidePanel = new SidePanel();
     m_statusBar = new StatusBar();
 
+    m_statusBar->showMessage("Welcome to HpixView!", 5000);
     initMenubar();
 
     layout->addWidget(m_tabWidget);
-    layout->addWidget(m_statusBar);
     setCentralWidget(widget);
 
     this->addDockWidget(Qt::LeftDockWidgetArea, m_sidePanel);
+
+    // QMainWindow's own status bar sits below the dock areas and spans the
+    // full window width; our widget fills it.
+    statusBar()->setSizeGripEnabled(false);
+    statusBar()->addWidget(m_statusBar, 1);
 
     initConnections();
 }

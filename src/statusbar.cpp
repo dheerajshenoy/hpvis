@@ -14,7 +14,7 @@ StatusBar::initUI()
 {
     // Create a horizontal layout for the status bar
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(5, 5, 5, 5);
+    layout->setContentsMargins(5, 0, 5, 0);
 
     m_messageLabel   = new QLabel();
     m_zoomLabel      = new QLabel();
@@ -37,5 +37,7 @@ void
 StatusBar::showMessage(const QString &message, int timeout)
 {
     m_messageLabel->setText(message);
-    QTimer::singleShot(timeout, this, [this]() { m_messageLabel->clear(); });
+    if (timeout > 0) // 0 = keep until replaced
+        QTimer::singleShot(timeout, this,
+                           [this]() { m_messageLabel->clear(); });
 }
