@@ -66,6 +66,9 @@ SidePanel::setupConnections()
     connect(m_colormapResetBtn, &QPushButton::clicked, this,
             &SidePanel::colormapRangeResetRequested);
 
+    connect(m_reverseColormapCheck, &QCheckBox::toggled, this,
+            &SidePanel::colormapReverseChanged);
+
     connect(m_colormapScaleCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     {
@@ -133,11 +136,14 @@ SidePanel::colormapWidget()
     const QStringList colormaps
         = {"Grayscale", "Inferno", "Magma",  "Plasma", "Viridis",
            "Cubehelix", "Jet",     "HSV",    "Hot",    "Cool",
-           "Spring",    "Summer",  "Autumn", "Winter",  "Rainbow"};
+           "Spring",    "Summer",  "Autumn", "Winter", "Rainbow"};
 
     m_colormapCombo->addItems(colormaps);
     m_colormapCombo->setCurrentIndex(static_cast<int>(Colormap::VIRIDIS));
     layout->addRow("Colormap", m_colormapCombo);
+
+    m_reverseColormapCheck = new QCheckBox("Reverse Colormap");
+    layout->addRow(m_reverseColormapCheck);
 
     m_colormapMinSpin = new QDoubleSpinBox();
     m_colormapMinSpin->setRange(-1e9, 1e9);

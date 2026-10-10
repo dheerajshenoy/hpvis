@@ -24,5 +24,5 @@ void main() {
     const int W = 4096;
     float mapVal = texelFetch(mapTexture, ivec2(pixIdx % W, pixIdx / W), 0).r;
     float t = applyScale(mapVal);
-    FragColor = vec4(applyColormap(t, colormap), 1.0);
+    FragColor = vec4(applyColormap(t, colormap, invert_colormap), 1.0);
 }

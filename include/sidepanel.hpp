@@ -3,6 +3,7 @@
 #include "colormap.hpp"
 #include "pixelordering.hpp"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QPushButton>
@@ -37,6 +38,12 @@ public:
 
     void setColormapScale(ColormapScale scale);
 
+    inline void setColormapReverse(bool reverse)
+    {
+        QSignalBlocker blocker(m_reverseColormapCheck);
+        m_reverseColormapCheck->setChecked(reverse);
+    }
+
     // Update the min/max spinboxes without emitting change signals
     void setColormapRange(double min, double max);
 
@@ -47,6 +54,7 @@ signals:
     void colormapMaxChanged(double max);
     void colormapScaleChanged(ColormapScale scale);
     void colormapRangeResetRequested();
+    void colormapReverseChanged(bool state);
 
 private:
     void setupUI();
@@ -57,6 +65,7 @@ private:
 private:
     QComboBox *m_pixOrdCombo          = nullptr;
     QComboBox *m_colormapCombo        = nullptr;
+    QCheckBox *m_reverseColormapCheck = nullptr;
     QDoubleSpinBox *m_colormapMinSpin = nullptr;
     QDoubleSpinBox *m_colormapMaxSpin = nullptr;
     QComboBox *m_colormapScaleCombo   = nullptr;

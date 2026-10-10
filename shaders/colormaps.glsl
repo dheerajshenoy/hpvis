@@ -124,23 +124,26 @@ vec3 sampleRainbow(float t) {
 }
 
 // Master Switch Dispatcher
-vec3 applyColormap(float t, int type) {
+vec3 applyColormap(float t, int type, bool invert) {
+    float val = invert ? (1.0 - t) : t;
+    val = clamp(val, 0.0, 1.0);
+
     switch(type) {
-        case 0:  return sampleGrayscale(t);
-        case 1:  return sampleInferno(t);
-        case 2:  return sampleMagma(t);
-        case 3:  return samplePlasma(t);
-        case 4:  return sampleViridis(t);
-        case 5:  return sampleCubehelix(t);
-        case 6:  return sampleJet(t);
-        case 7:  return sampleHsv(t);
-        case 8:  return sampleHot(t);
-        case 9:  return sampleCool(t);
-        case 10: return sampleSpring(t);
-        case 11: return sampleSummer(t);
-        case 12: return sampleAutumn(t);
-        case 13: return sampleWinter(t);
-        case 14: return sampleRainbow(t);
-        default: return sampleGrayscale(t);
+        case 0:  return sampleGrayscale(val);
+        case 1:  return sampleInferno(val);
+        case 2:  return sampleMagma(val);
+        case 3:  return samplePlasma(val);
+        case 4:  return sampleViridis(val);
+        case 5:  return sampleCubehelix(val);
+        case 6:  return sampleJet(val);
+        case 7:  return sampleHsv(val);
+        case 8:  return sampleHot(val);
+        case 9:  return sampleCool(val);
+        case 10: return sampleSpring(val);
+        case 11: return sampleSummer(val);
+        case 12: return sampleAutumn(val);
+        case 13: return sampleWinter(val);
+        case 14: return sampleRainbow(val);
+        default: return sampleGrayscale(val);
     }
 }

@@ -71,6 +71,16 @@ public:
         m_glWidget->setColormapScale(scale);
     }
 
+    inline bool colormapInvert() const
+    {
+        return m_glWidget->colormapInvert();
+    }
+
+    inline void setColormapInvert(bool invert)
+    {
+        m_glWidget->setColormapInvert(invert);
+    }
+
     void loadMap(const std::string &filename);
 
 private:

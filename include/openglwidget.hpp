@@ -17,7 +17,6 @@ class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
 public:
     explicit OpenGLWidget(QWidget *parent = nullptr);
     ~OpenGLWidget();
-    void setMap(const Healpix_Map<float> &map);
 
     inline PixelOrdering pixelOrdering() const
     {
@@ -41,11 +40,12 @@ public:
         update();
     }
 
-    float colormapMin() const
+    inline float colormapMin() const
     {
         return m_vmin;
     }
-    float colormapMax() const
+
+    inline float colormapMax() const
     {
         return m_vmax;
     }
@@ -76,10 +76,23 @@ public:
         update();
     }
 
-    ColormapScale colormapScale() const
+    inline ColormapScale colormapScale() const
     {
         return m_colormapScale;
     }
+
+    bool colormapInvert() const
+    {
+        return m_invertColormap;
+    }
+
+    inline void setColormapInvert(bool invert)
+    {
+        m_invertColormap = invert;
+        update();
+    }
+
+    void setMap(const Healpix_Map<float> &map);
 
 protected:
     void initializeGL() override;
@@ -102,6 +115,7 @@ private:
     float m_dataMin               = 0.0f;
     float m_dataMax               = 1.0f;
     bool m_hasPendingMap          = false;
+    bool m_invertColormap         = false;
     Healpix_Map<float> m_pendingMap;
     QOpenGLVertexArrayObject m_vao;
     QOpenGLBuffer m_vbo{QOpenGLBuffer::VertexBuffer}; // VBO wrapper

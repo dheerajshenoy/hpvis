@@ -1,21 +1,21 @@
 # TODO
 
 ## Rendering
+- [ ] Integer uniforms / 2D index math for nside > 1024 (float precision)
+- [ ] Check shader compile errors (`addShaderFromSourceCode` return values) and show them in a dialog
+- [ ] Smooth/bilinear interpolation option
+- [ ] Mask bad pixels (`UNSEEN`) with a distinct color
 - [x] Verify HEALPix RING lookup against `Healpix_Map::ang2pix` (spot-check values)
 - [x] NESTED ordering support (convert on load or add `ang2pix_nest` in shader)
 - [x] Fix east/west orientation (longitude increasing to the left, healpy style)
-- [ ] Integer uniforms / 2D index math for nside > 1024 (float precision)
-- [ ] Check shader compile errors (`addShaderFromSourceCode` return values) and show them in a dialog
 - [x] Embed shaders as Qt resources instead of loading from `applicationDirPath()/../shaders`
-- [ ] Smooth/bilinear interpolation option
-- [ ] Mask bad pixels (`UNSEEN`) with a distinct color
 
 ## Color scale
+- [ ] Colorbar widget with tick labels
+- [ ] Percentile clipping (1%/99%) and auto-range button
 - [x] Colormap selection (viridis, plasma, coolwarm, planck, grayscale)
 - [x] User-adjustable min/max (spinboxes + sliders)
-- [ ] Percentile clipping (1%/99%) and auto-range button
 - [x] Scaling modes: linear, log, asinh, histogram-equalized
-- [ ] Colorbar widget with tick labels
 
 ## Projections & navigation
 - [ ] Additional projections: Gnomonic, Orthographic, Cartesian, Hammer-Aitoff
@@ -67,7 +67,7 @@
 Group into collapsible sections (QGroupBox / toolbox).
 
 ### Display
-- [ ] Colormap combo (viridis, plasma, coolwarm, Planck, grayscale) + reverse checkbox
+- [x] Colormap combo (viridis, plasma, coolwarm, Planck, grayscale) + reverse checkbox
 - [ ] Min/max spinboxes, Auto button, percentile presets (100/99/95%)
 - [ ] Scale combo (linear, log, asinh, histogram-equalized)
 - [ ] Bad pixel (`UNSEEN`) color picker

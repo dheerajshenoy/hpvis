@@ -63,21 +63,13 @@ HpixView::initConnections()
             &HpixView::onColormapChanged);
 
     connect(m_sidePanel, &SidePanel::colormapRangeResetRequested, this,
-            [this]()
-    {
-        if (!m_view)
-            return;
-        m_view->resetColormapRange();
-        m_sidePanel->setColormapRange(m_view->colormapMin(),
-                                      m_view->colormapMax());
-    });
+            &HpixView::onColormapRangeResetRequested);
+
+    connect(m_sidePanel, &SidePanel::colormapReverseChanged, this,
+            &HpixView::onColormapInvertChanged);
 
     connect(m_sidePanel, &SidePanel::colormapScaleChanged, this,
-            [this](ColormapScale scale)
-    {
-        if (m_view)
-            m_view->setColormapScale(scale);
-    });
+            &HpixView::onColormapScaleChanged);
 
     connect(m_sidePanel, &SidePanel::colormapMaxChanged, this,
             &HpixView::onColormapMaxChanged);
@@ -155,6 +147,7 @@ HpixView::updateSidePanelStateFromView(const View *view)
     m_sidePanel->setPixelOrdering(view->pixelOrdering());
     m_sidePanel->setColormapRange(view->colormapMin(), view->colormapMax());
     m_sidePanel->setColormapScale(view->colormapScale());
+    m_sidePanel->setColormapReverse(view->colormapInvert());
 
     // setColormap emits colormapChanged only on change; block to avoid a loop
     QSignalBlocker blocker(m_sidePanel);
@@ -196,26 +189,45 @@ HpixView::onTabCloseRequested(int index)
 void
 HpixView::onColormapChanged(Colormap colormap)
 {
-    if (!m_view)
-        return;
-
-    m_view->setColormap(colormap);
+    if (m_view)
+        m_view->setColormap(colormap);
 }
 
 void
 HpixView::onColormapMaxChanged(double max)
 {
-    if (!m_view)
-        return;
-
-    m_view->setColormapMax(max);
+    if (m_view)
+        m_view->setColormapMax(max);
 }
 
 void
 HpixView::onColormapMinChanged(double min)
 {
-    if (!m_view)
-        return;
+    if (m_view)
+        m_view->setColormapMin(min);
+}
 
-    m_view->setColormapMin(min);
+void
+HpixView::onColormapInvertChanged(bool reversed)
+{
+    if (m_view)
+        m_view->setColormapInvert(reversed);
+}
+
+void
+HpixView::onColormapScaleChanged(ColormapScale scale)
+{
+    if (m_view)
+        m_view->setColormapScale(scale);
+}
+
+void
+HpixView::onColormapRangeResetRequested()
+{
+    if (m_view)
+    {
+        m_view->resetColormapRange();
+        m_sidePanel->setColormapRange(m_view->colormapMin(),
+                                      m_view->colormapMax());
+    }
 }

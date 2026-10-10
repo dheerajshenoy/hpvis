@@ -111,6 +111,8 @@ OpenGLWidget::paintGL()
                                     static_cast<int>(m_colormapScale));
     m_shaderProgram.setUniformValue("pixel_ordering",
                                     static_cast<int>(m_pixelOrdering));
+    m_shaderProgram.setUniformValue("invert_colormap",
+                                    m_invertColormap ? 1 : 0);
 
     m_vao.bind();
     glDrawArrays(GL_TRIANGLES, 0, 6);
