@@ -48,6 +48,17 @@ public:
         return m_fskyLabel->text().toFloat();
     }
 
+    inline bool colorBarVisible() const
+    {
+        return m_colorBarCheck->isChecked();
+    }
+
+    inline void setColorBarVisible(bool visible)
+    {
+        QSignalBlocker blocker(m_colorBarCheck);
+        m_colorBarCheck->setChecked(visible);
+    }
+
     void setFSky(float fsky)
     {
         m_fskyLabel->setText(QString::number(fsky, 'f', 6));
@@ -81,6 +92,7 @@ signals:
     void maskRemoveRequested(int index);
     void maskModeChanged(int mode);
     void maskOpacityChanged(float opacity);
+    void colorBarToggled(bool enabled);
 
 private:
     void setupUI();
@@ -106,6 +118,7 @@ private:
     QPushButton *m_colormapResetBtn   = nullptr;
     QPushButton *m_bgColorButton      = nullptr;
     QPushButton *m_unseenColorButton  = nullptr;
+    QCheckBox *m_colorBarCheck        = nullptr;
     QColor m_bgColor                  = QColor(0, 0, 0);
     QColor m_unseenColor              = QColor(0, 0, 0);
 

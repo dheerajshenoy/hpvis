@@ -12,13 +12,14 @@ class CollapsibleSection : public QFrame
 
 public:
     explicit CollapsibleSection(const QString &title, QWidget *content,
-                                bool expanded = true,
+                                bool expanded   = true,
                                 QWidget *parent = nullptr);
 
-    bool isExpanded() const
+    inline bool isExpanded() const
     {
         return m_header->isChecked();
     }
+
     void setExpanded(bool expanded);
 
 private:

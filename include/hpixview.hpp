@@ -46,11 +46,18 @@ private slots:
     void onUnseenColorChanged(const QColor &color);
     void onMaskFilesSelected(const QStringList &files);
     void onMaskCleared();
+    void onMinimapToggled(bool enabled);
 
 private:
-    QMenu *m_fileMenu = nullptr;
     QMenu *m_editMenu = nullptr;
-    QMenu *m_viewMenu = nullptr;
+
+    QMenu *m_fileMenu               = nullptr;
+    QAction *m_fileOpenAction       = nullptr;
+    QAction *m_fileOpenRecentAction = nullptr;
+
+    QMenu *m_viewMenu              = nullptr;
+    QAction *m_viewMinimapAction   = nullptr;
+    QAction *m_viewSidePanelAction = nullptr;
 
     View *m_view           = nullptr;
     TabWidget *m_tabWidget = nullptr;

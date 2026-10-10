@@ -1,3 +1,4 @@
+uniform vec2 viewport_size;
 uniform sampler2D mapTexture;
 uniform int nside;
 uniform int npix;

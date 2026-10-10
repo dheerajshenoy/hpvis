@@ -27,6 +27,15 @@ struct MapCamera
         }
     }
 
+    // Keep the visible window inside the map. The window spans
+    // panOffset +/- 1/zoom on the projection plane, which covers [-1, 1].
+    void clampPan()
+    {
+        const float limit = std::max(0.0f, 1.0f - 1.0f / zoom);
+        panOffset.setX(std::clamp(panOffset.x(), -limit, limit));
+        panOffset.setY(std::clamp(panOffset.y(), -limit, limit));
+    }
+
     // Zoom by `factor` keeping the point under `ndc` (cursor, [-1,1]^2, y up)
     // fixed on screen. The shader samples p = ndc / zoom + panOffset.
     void zoomAt(float factor, QVector2D ndc, float minZoom = 1.0f,
@@ -35,14 +44,20 @@ struct MapCamera
         const QVector2D anchor = ndc / zoom + panOffset;
         adjustZoom(factor, minZoom, maxZoom);
         if (zoom > minZoom)
+        {
             panOffset = anchor - ndc / zoom;
+            clampPan();
+        }
     }
 
     // Pan by a screen-space delta in NDC units (content follows the cursor)
     void panBy(QVector2D ndcDelta)
     {
         if (zoom > 1.0f)
+        {
             panOffset -= ndcDelta / zoom;
+            clampPan();
+        }
     }
 
     // Apply uniforms directly to the active shader program

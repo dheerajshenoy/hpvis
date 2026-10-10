@@ -41,9 +41,26 @@ public:
         return m_vmin;
     }
 
+    inline bool colorBarVisible() const
+    {
+        return m_colorBarVisible;
+    }
+
+    void setColorBarVisible(bool visible);
+
     inline float colormapMax() const
     {
         return m_vmax;
+    }
+
+    inline bool minimapEnabled() const
+    {
+        return m_minimapEnabled;
+    }
+
+    inline void setMinimapEnabled(bool enabled)
+    {
+        m_minimapEnabled = enabled;
     }
 
     // Restore the colormap range to the min/max of the loaded map
@@ -57,7 +74,7 @@ public:
         return m_colormapScale;
     }
 
-    bool colormapInvert() const
+    inline bool colormapInvert() const
     {
         return m_invertColormap;
     }
@@ -77,7 +94,7 @@ public:
         return m_unseenColor;
     }
 
-    float zoom() const
+    inline float zoom() const
     {
         return m_camera->zoom;
     }
@@ -94,8 +111,6 @@ public:
     void clearMasks();
     void setMaskEnabled(int index, bool enabled);
     void setMaskInverted(int index, bool inverted);
-
-    void calculateFSky();
 
     inline int maskCount() const
     {
@@ -136,6 +151,8 @@ public:
     void setMaskOpacity(float opacity);
     void setMap(const Healpix_Map<float> &map);
 
+    QRectF colorbarRect() const;
+
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -165,6 +182,7 @@ private:
     void applyMaskChange(bool texturesChanged);
     int maskBits(bool inverted = false) const;
     void setupGeometry();
+    double scaleValue(double v) const;
 
 private:
     PixelOrdering m_pixelOrdering = PixelOrdering::RING;
@@ -202,8 +220,10 @@ private:
     std::vector<MaskEntry> m_masks;
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels
     std::array<GLuint, 4> m_maskTextures{};
-    bool m_maskDirty    = false; // mask textures need re-uploading
-    int m_maskMode      = 0;
-    float m_maskOpacity = 0.8f;
-    float m_fsky        = 1.0f; // fraction of sky that is visible
+    bool m_maskDirty       = false; // mask textures need re-uploading
+    bool m_colorBarVisible = true;
+    int m_maskMode         = 0;
+    float m_maskOpacity    = 0.8f;
+    float m_fsky           = 1.0f; // fraction of sky that is visible
+    bool m_minimapEnabled  = true;
 };

@@ -22,7 +22,7 @@ public:
     }
 
     // Direct access to the renderer, for settings (colormap, masks, ...)
-    OpenGLWidget *glWidget() const
+    inline OpenGLWidget *glWidget() const
     {
         return m_glWidget;
     }

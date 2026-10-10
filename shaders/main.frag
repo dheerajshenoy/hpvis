@@ -9,9 +9,27 @@ out vec4 FragColor;
 #include "projections.glsl"
 #include "scale.glsl"
 #include "masks.glsl"
+#include "colorbar.glsl"
 
 void main() {
     float colat, phi;
+
+    vec2 px = TexCoord * viewport_size;
+
+    // colorbar_rect = (x0, y0, x1, y1) in device pixels, origin bottom-left
+    float bar_left  = colorbar_rect.x;
+    float bar_y0    = colorbar_rect.y;
+    float bar_right = colorbar_rect.z;
+    float bar_y1    = colorbar_rect.w;
+    float bar_w     = bar_right - bar_left;
+
+    if (colorbar_enabled) {
+        if (px.x > bar_left && px.x < bar_right && px.y > bar_y0 && px.y < bar_y1) {
+            float t = (px.x - bar_left) / bar_w;   // 0 at the left end, 1 at the right
+            FragColor = vec4(applyColormap(t, colormap, invert_colormap), 1.0);
+            return;
+        }
+    }
 
     // Camera: screen NDC -> zoomed/panned point on the projection plane
     vec2 p = (TexCoord - 0.5) * 2.0 / zoom + panOffset;

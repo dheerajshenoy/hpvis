@@ -11,9 +11,11 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
+#include <QPainter>
 #include <QVector3D>
 #include <QWheelEvent>
 #include <algorithm>
+#include <initializer_list>
 #include <cmath>
 #include <healpix_base.h>
 #include <iostream>
@@ -21,6 +23,43 @@
 #include <pointing.h>
 #include <qcoreapplication.h>
 #include <vector>
+
+static QVector<double>
+niceTicks(double lo, double hi, int count)
+{
+    if (!(hi > lo) || count < 1)
+        return {};
+    double raw  = (hi - lo) / count;
+    double mag  = std::pow(10.0, std::floor(std::log10(raw)));
+    double norm = raw / mag; // in [1, 10)
+    double step = (norm < 1.5 ? 1 : norm < 3.5 ? 2 : norm < 7.5 ? 5 : 10) * mag;
+    QVector<double> v;
+    // Integer multiples of the step: zero is exactly 0, not 5e-20
+    const long long k0 = static_cast<long long>(std::ceil(lo / step - 1e-9));
+    const long long k1 = static_cast<long long>(std::floor(hi / step + 1e-9));
+    for (long long k = k0; k <= k1 && v.size() < 4 * count; ++k)
+        v << k * step;
+    return v;
+}
+
+// Compact tick label. `step` is the spacing between ticks, `maxAbs` the
+// largest magnitude on the bar; both decide how many digits are needed.
+static QString
+formatTick(double v, double step, double maxAbs)
+{
+    if (v == 0.0)
+        return "0";
+    const int stepExp = int(std::floor(std::log10(step) + 1e-9));
+    if (maxAbs < 1e-3 || maxAbs >= 1e5)
+    {
+        // Scientific with one shared exponent: -4e-4, -2e-4, 0, 2e-4, ...
+        const int E      = int(std::floor(std::log10(maxAbs)));
+        const int digits = std::clamp(E - stepExp, 0, 6);
+        return QString::number(v / std::pow(10.0, E), 'f', digits) + "e"
+               + QString::number(E);
+    }
+    return QString::number(v, 'f', std::clamp(-stepExp, 0, 8));
+}
 
 OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
@@ -256,6 +295,7 @@ void
 OpenGLWidget::paintGL()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    QRectF colorbar_rect = colorbarRect();
 
     if (m_hasPendingMap)
     {
@@ -285,6 +325,9 @@ OpenGLWidget::paintGL()
             QByteArray("maskTex" + QByteArray::number(g)).constData(), 1 + g);
     }
     glActiveTexture(GL_TEXTURE0);
+    m_shaderProgram.setUniformValue("viewport_size",
+                                    QVector2D(width() * devicePixelRatioF(),
+                                              height() * devicePixelRatioF()));
     m_shaderProgram.setUniformValue("mask_bits", maskBits());
     m_shaderProgram.setUniformValue("mask_invert_bits", maskBits(true));
     m_shaderProgram.setUniformValue("mask_mode", m_maskMode);
@@ -308,13 +351,83 @@ OpenGLWidget::paintGL()
                                   m_unseenColor.blueF()));
     m_shaderProgram.setUniformValue("invert_colormap",
                                     m_invertColormap ? 1 : 0);
+    m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
+    m_shaderProgram.setUniformValue(
+        "colorbar_rect",
+        QVector4D(colorbar_rect.left(), colorbar_rect.top(),
+                  colorbar_rect.right(), colorbar_rect.bottom()));
 
     m_vao.bind();
     glDrawArrays(GL_TRIANGLES, 0, 6);
     m_vao.release();
 
     glBindTexture(GL_TEXTURE_2D, 0);
+
     m_shaderProgram.release();
+
+    if (!m_colorBarVisible)
+        return;
+
+    QPainter p(this);
+    p.setRenderHint(QPainter::TextAntialiasing);
+    const double dpr    = devicePixelRatioF();
+    const QRectF r      = colorbarRect(); // device px, y up
+    // Painter wants logical px with y DOWN:
+    const double left   = r.left() / dpr;
+    const double width  = r.width() / dpr;
+    const double bottom = height() - r.top() / dpr; // bar's bottom edge, y down
+    // Dark backdrop so the labels stay readable over bright parts of the map
+    const double barTop = bottom - r.height() / dpr;
+    // (clipped so it doesn't darken the gradient bar drawn by the shader)
+    const QRect outer(qRound(left - 14), qRound(barTop - 6), qRound(width + 28),
+                      qRound(r.height() / dpr + 36));
+    const QRect barRect(qRound(left), qRound(barTop), qRound(width),
+                        qRound(r.height() / dpr));
+    p.setClipRegion(QRegion(outer).subtracted(QRegion(barRect)));
+    p.fillRect(outer, QColor(0, 0, 0, 140));
+    p.setClipping(false);
+    p.setPen(Qt::white);
+
+    // Use as many ticks as fit without the labels touching (5 down to 2)
+    const double maxAbs
+        = std::max({std::abs(double(m_vmin)), std::abs(double(m_vmax)), 1e-30});
+    struct Tick
+    {
+        double x;
+        QString label;
+        double w;
+    };
+    QVector<Tick> ticks;
+    for (int count = 5; count >= 2; --count)
+    {
+        const QVector<double> values = niceTicks(m_vmin, m_vmax, count);
+        if (values.isEmpty())
+            continue;
+        const double step
+            = values.size() > 1 ? values[1] - values[0] : m_vmax - m_vmin;
+
+        ticks.clear();
+        bool fits = true;
+        double lastRight = -1e9;
+        for (double v : values)
+        {
+            Tick t;
+            t.x     = left + width * scaleValue(v);
+            t.label = formatTick(v, step, maxAbs);
+            t.w     = p.fontMetrics().horizontalAdvance(t.label);
+            if (t.x - t.w / 2 < lastRight + 6)
+                fits = false;
+            lastRight = t.x + t.w / 2;
+            ticks << t;
+        }
+        if (fits)
+            break;
+    }
+    for (const Tick &t : ticks)
+    {
+        p.drawLine(QPointF(t.x, bottom), QPointF(t.x, bottom + 5));
+        p.drawText(QPointF(t.x - t.w / 2, bottom + 18), t.label);
+    }
 }
 
 int
@@ -488,6 +601,8 @@ OpenGLWidget::uploadMaskToGPU()
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, buf.data());
+        // Restore the default: Qt's text renderer relies on it
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -528,6 +643,8 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, W, H, 0, GL_RED, GL_FLOAT,
                  buf.data());
+    // Restore the default: Qt's text renderer relies on it
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
     // 5. Set basic texture filtering parameters (NEAREST keeps crisp pixel
     // edges)
@@ -751,7 +868,34 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 }
 
 void
-OpenGLWidget::calculateFSky()
+OpenGLWidget::setColorBarVisible(bool visible)
 {
-    // f_sky = (number of valid unmasked pixels) / (total number of pixels)
+    if (m_colorBarVisible == visible)
+        return;
+    m_colorBarVisible = visible;
+    update();
+}
+
+QRectF
+OpenGLWidget::colorbarRect() const // device pixels, y up
+{
+    const double dpr = devicePixelRatioF();
+    const double W   = width() * dpr;
+    const double bw  = std::min(300.0 * dpr, 0.6 * W);
+    const double x0  = 0.5 * (W - bw);
+    return QRectF(x0, 34.0 * dpr, bw, 16.0 * dpr); // x, y, w, h
+}
+
+double
+OpenGLWidget::scaleValue(double v) const
+{
+    if (m_colormapScale == ColormapScale::LOG)
+    {
+        if (m_vmin > 0)
+            return (std::log(std::max(v, double(m_vmin))) - std::log(m_vmin))
+                   / (std::log(m_vmax) - std::log(m_vmin));
+        double u = std::clamp((v - m_vmin) / (m_vmax - m_vmin), 0.0, 1.0);
+        return std::log(1.0 + 1000.0 * u) / std::log(1001.0);
+    }
+    return std::clamp((v - m_vmin) / (m_vmax - m_vmin), 0.0, 1.0);
 }

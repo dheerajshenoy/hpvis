@@ -10,7 +10,7 @@
 - [x] Embed shaders as Qt resources instead of loading from `applicationDirPath()/../shaders`
 
 ## Color scale
-- [ ] Colorbar widget with tick labels
+- [x] Colorbar widget with tick labels
 - [ ] Percentile clipping (1%/99%) and auto-range button
 - [x] Colormap selection (viridis, plasma, coolwarm, planck, grayscale)
 - [x] User-adjustable min/max (spinboxes + sliders)

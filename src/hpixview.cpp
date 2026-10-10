@@ -111,6 +111,12 @@ HpixView::initConnections()
             m_view->glWidget()->setMaskOpacity(opacity);
     });
 
+    connect(m_sidePanel, &SidePanel::colorBarToggled, this, [this](bool state)
+    {
+        if (m_view)
+            m_view->glWidget()->setColorBarVisible(state);
+    });
+
     connect(m_sidePanel, &SidePanel::backgroundColorChanged, this,
             &HpixView::onBackgroundColorChanged);
 
@@ -150,12 +156,28 @@ HpixView::initMenubar()
 
     m_fileMenu = menuBar->addMenu("&File");
 
-    m_fileMenu->addAction("&Open", this, [this]() { OpenFile(); });
+    m_fileOpenAction
+        = m_fileMenu->addAction("&Open", this, [this]() { OpenFile(); });
+
+    m_fileOpenRecentAction = m_fileMenu->addMenu("&Open Recent")
+                                 ->menuAction()
+                                 ->menu()
+                                 ->addAction("No recent files");
+
     m_fileMenu->addAction("&Exit", this, &HpixView::close);
 
     m_editMenu = menuBar->addMenu("&Edit");
-
     m_viewMenu = menuBar->addMenu("&View");
+
+    m_viewMinimapAction
+        = m_viewMenu->addAction("&Minimap", this, &HpixView::onMinimapToggled);
+    m_viewMinimapAction->setCheckable(true);
+
+    // The dock provides a checkable action that stays in sync with its
+    // visibility (including its own close button)
+    m_viewSidePanelAction = m_sidePanel->toggleViewAction();
+    m_viewSidePanelAction->setText("&Side Panel");
+    m_viewMenu->addAction(m_viewSidePanelAction);
 
     auto helpMenu = menuBar->addMenu("&Help");
 
@@ -216,7 +238,8 @@ HpixView::initViewConnections(const View *view)
     connect(view, &View::masksChanged, this, [this, view]()
     {
         if (view == m_view)
-            updateMaskListFromView(view);
+            m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
+    updateMaskListFromView(view);
     });
 }
 
@@ -227,14 +250,18 @@ HpixView::updateSidePanelStateFromView(const View *view)
         return;
 
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
-    m_sidePanel->setColormapRange(view->glWidget()->colormapMin(), view->glWidget()->colormapMax());
+    m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),
+                                  view->glWidget()->colormapMax());
     updateMaskListFromView(view);
     m_sidePanel->setColormapScale(view->glWidget()->colormapScale());
     m_sidePanel->setColormapReverse(view->glWidget()->colormapInvert());
-    m_sidePanel->setBackgroundColor(view->glWidget()->backgroundColor().rgb() & 0xFFFFFF);
-    m_sidePanel->setUnseenColor(view->glWidget()->unseenColor().rgb() & 0xFFFFFF);
+    m_sidePanel->setBackgroundColor(view->glWidget()->backgroundColor().rgb()
+                                    & 0xFFFFFF);
+    m_sidePanel->setUnseenColor(view->glWidget()->unseenColor().rgb()
+                                & 0xFFFFFF);
 
-    // setColormap emits colormapChanged only on change; block to avoid a loop
+    // setColormap emits colormapChanged only on change; block to avoid a
+    // loop
     QSignalBlocker blocker(m_sidePanel);
     m_sidePanel->setColormap(view->glWidget()->colormap());
 }
@@ -275,7 +302,8 @@ HpixView::updateMaskListFromView(const View *view)
     }
 
     m_sidePanel->setFSky(view->glWidget()->fsky());
-    m_sidePanel->setMasks(names, paths, enabled, inverted, view->glWidget()->maskMode(),
+    m_sidePanel->setMasks(names, paths, enabled, inverted,
+                          view->glWidget()->maskMode(),
                           view->glWidget()->maskOpacity());
 }
 
@@ -375,4 +403,11 @@ HpixView::onMaskCleared()
 {
     if (m_view)
         m_view->glWidget()->clearMasks();
+}
+
+void
+HpixView::onMinimapToggled(bool state)
+{
+    if (m_view)
+        m_view->glWidget()->setMinimapEnabled(state);
 }

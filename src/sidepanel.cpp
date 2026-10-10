@@ -20,7 +20,7 @@ SidePanel::SidePanel(QWidget *parent) : QDockWidget(parent)
 void
 SidePanel::setupUI()
 {
-    setMinimumWidth(220);
+    // setMinimumWidth(150);
     setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
     QWidget *container  = new QWidget();
@@ -45,6 +45,9 @@ SidePanel::setupUI()
 void
 SidePanel::setupConnections()
 {
+    connect(m_colorBarCheck, &QCheckBox::toggled, this,
+            &SidePanel::colorBarToggled);
+
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });
@@ -249,6 +252,10 @@ SidePanel::colormapWidget()
     m_colormapResetBtn = new QPushButton("Reset Range");
     layout->addRow(m_colormapResetBtn);
 
+    m_colorBarCheck = new QCheckBox("Show Color Bar");
+
+    layout->addRow(m_colorBarCheck);
+
     widget->setLayout(layout);
     return widget;
 }
@@ -361,8 +368,8 @@ void
 SidePanel::updateDimRowVisibility()
 {
     constexpr int kDimMode = 1;
-    m_overlaysLayout->setRowVisible(m_maskOpacitySlider,
-                                    m_maskModeCombo->currentIndex() == kDimMode);
+    m_overlaysLayout->setRowVisible(
+        m_maskOpacitySlider, m_maskModeCombo->currentIndex() == kDimMode);
 }
 
 void
