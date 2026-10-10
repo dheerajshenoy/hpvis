@@ -68,6 +68,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     PkgConfig::HEALPIX
+    OpenMP::OpenMP_CXX
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

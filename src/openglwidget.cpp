@@ -1,12 +1,16 @@
 #include "openglwidget.hpp"
 
 #include "healpix_map.h"
+#include "healpix_cxx/healpix_map_fitsio.h"
 #include "shaderloader.hpp"
+#include "healpix_cxx/error_handling.h"
 
 #include <QEnterEvent>
 #include <healpix_base.h>
 #include <pointing.h>
 #include <QFile>
+#include <QMessageBox>
+#include <QFileInfo>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QVector3D>
@@ -35,6 +39,36 @@ OpenGLWidget::~OpenGLWidget()
         m_mapTexture = 0;
         doneCurrent();
     }
+    if (m_maskTexture)
+    {
+        makeCurrent();
+        glDeleteTextures(1, &m_maskTexture);
+        m_maskTexture = 0;
+        doneCurrent();
+    }
+}
+
+void
+OpenGLWidget::recomputeDataRange()
+{
+    // Range of valid pixels (ignoring non-finite, HEALPix UNSEEN, masked)
+    const bool useMask
+        = m_maskActive && m_maskData.size() == size_t(m_pendingMap.Npix());
+    m_dataMin         = std::numeric_limits<float>::max();
+    m_dataMax         = std::numeric_limits<float>::lowest();
+    const float *data = m_pendingMap.Map().begin();
+    for (long i = 0; i < m_pendingMap.Npix(); ++i)
+    {
+        float v = data[i];
+        if (!std::isfinite(v) || v < -1e30f)
+            continue;
+        if (useMask && m_maskData[i] < 0.5f)
+            continue;
+        m_dataMin = std::min(m_dataMin, v);
+        m_dataMax = std::max(m_dataMax, v);
+    }
+    if (m_dataMin >= m_dataMax)
+        m_dataMax = m_dataMin + 1.0f;
 }
 
 void
@@ -43,20 +77,7 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
     m_pendingMap    = map;
     m_hasPendingMap = true;
 
-    // Data range (ignoring non-finite and HEALPix UNSEEN pixels)
-    m_dataMin         = std::numeric_limits<float>::max();
-    m_dataMax         = std::numeric_limits<float>::lowest();
-    const float *data = map.Map().begin();
-    for (long i = 0; i < map.Npix(); ++i)
-    {
-        float v = data[i];
-        if (!std::isfinite(v) || v < -1e30f)
-            continue;
-        m_dataMin = std::min(m_dataMin, v);
-        m_dataMax = std::max(m_dataMax, v);
-    }
-    if (m_dataMin >= m_dataMax)
-        m_dataMax = m_dataMin + 1.0f;
+    recomputeDataRange();
     m_vmin = m_dataMin;
     m_vmax = m_dataMax;
 
@@ -110,6 +131,9 @@ OpenGLWidget::paintGL()
         m_hasPendingMap = false;
     }
 
+    if (m_maskDirty)
+        uploadMaskToGPU();
+
     m_shaderProgram.bind();
 
     m_camera->uploadUniforms(m_shaderProgram);
@@ -118,6 +142,15 @@ OpenGLWidget::paintGL()
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_mapTexture);
     m_shaderProgram.setUniformValue("mapTexture", 0);
+
+    const bool useMask = m_maskActive && m_maskTexture != 0;
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, useMask ? m_maskTexture : 0);
+    glActiveTexture(GL_TEXTURE0);
+    m_shaderProgram.setUniformValue("maskTexture", 1);
+    m_shaderProgram.setUniformValue("use_mask", useMask ? 1 : 0);
+    m_shaderProgram.setUniformValue("mask_mode", m_maskMode);
+    m_shaderProgram.setUniformValue("mask_opacity", m_maskOpacity);
 
     // 2. Pass map metadata uniforms to the shader
     m_shaderProgram.setUniformValue("nside", static_cast<int>(m_nside));
@@ -144,6 +177,162 @@ OpenGLWidget::paintGL()
 
     glBindTexture(GL_TEXTURE_2D, 0);
     m_shaderProgram.release();
+}
+
+int
+OpenGLWidget::addMaskFiles(const QStringList &files)
+{
+    if (m_pendingMap.Npix() == 0)
+    {
+        QMessageBox::warning(this, "Mask", "Load a map before loading a mask.");
+        return 0;
+    }
+
+    int added = 0;
+    for (const QString &file : files)
+    {
+        const QString path = QFileInfo(file).absoluteFilePath();
+        const bool dup     = std::any_of(m_masks.begin(), m_masks.end(),
+                                         [&](const MaskEntry &m)
+        { return m.path == path; });
+        if (dup)
+            continue;
+
+        try
+        {
+            Healpix_Map<float> mask;
+            read_Healpix_map_from_fits(file.toStdString(), mask, 1, 2);
+
+            if (mask.Nside() != m_pendingMap.Nside())
+            {
+                QMessageBox::warning(
+                    this, "Mask",
+                    QString("%1: nside %2 does not match the map (nside %3).")
+                        .arg(QFileInfo(file).fileName())
+                        .arg(mask.Nside())
+                        .arg(m_pendingMap.Nside()));
+                continue;
+            }
+            if (mask.Scheme() != m_pendingMap.Scheme())
+                mask.swap_scheme();
+
+            MaskEntry entry;
+            entry.name = QFileInfo(file).fileName();
+            entry.path = path;
+            entry.data.resize(size_t(mask.Npix()));
+            const float *d = mask.Map().begin();
+            for (long i = 0; i < mask.Npix(); ++i)
+            {
+                // NaN / UNSEEN count as masked; clamp weights to [0, 1]
+                float v = (std::isfinite(d[i]) && d[i] > -1e30f) ? d[i] : 0.0f;
+                entry.data[i] = std::clamp(v, 0.0f, 1.0f);
+            }
+            m_masks.push_back(std::move(entry));
+            ++added;
+        }
+        catch (const PlanckError &e)
+        {
+            QMessageBox::critical(this, "Mask",
+                                  QString("Failed to load %1: %2")
+                                      .arg(file, QString(e.what())));
+        }
+        catch (const std::exception &e)
+        {
+            QMessageBox::critical(this, "Mask",
+                                  QString("Failed to load %1: %2")
+                                      .arg(file, QString(e.what())));
+        }
+    }
+
+    if (added)
+        rebuildCombinedMask();
+    return added;
+}
+
+void
+OpenGLWidget::removeMask(int index)
+{
+    if (index < 0 || index >= maskCount())
+        return;
+    m_masks.erase(m_masks.begin() + index);
+    rebuildCombinedMask();
+}
+
+void
+OpenGLWidget::clearMasks()
+{
+    m_masks.clear();
+    rebuildCombinedMask();
+}
+
+void
+OpenGLWidget::setMaskEnabled(int index, bool enabled)
+{
+    if (index < 0 || index >= maskCount() || m_masks[index].enabled == enabled)
+        return;
+    m_masks[index].enabled = enabled;
+    rebuildCombinedMask();
+}
+
+// Combines the enabled masks (product) and refreshes everything that depends
+// on them: the GPU texture, the implicit colormap range and the UI list.
+void
+OpenGLWidget::rebuildCombinedMask()
+{
+    m_maskData.clear();
+    for (const MaskEntry &m : m_masks)
+    {
+        if (!m.enabled)
+            continue;
+        if (m_maskData.empty())
+            m_maskData = m.data;
+        else
+            for (size_t i = 0; i < m_maskData.size(); ++i)
+                m_maskData[i] *= m.data[i];
+    }
+    m_maskActive = !m_maskData.empty();
+    m_maskDirty  = true;
+
+    // The implicit range excludes masked pixels only while a mask is active
+    recomputeDataRange();
+    m_vmin = m_dataMin;
+    m_vmax = m_dataMax;
+
+    emit masksChanged();
+    emit colormapRangeChanged(m_vmin, m_vmax);
+    update();
+}
+
+void
+OpenGLWidget::uploadMaskToGPU()
+{
+    makeCurrent();
+    if (m_maskTexture)
+    {
+        glDeleteTextures(1, &m_maskTexture);
+        m_maskTexture = 0;
+    }
+    m_maskDirty = false;
+    if (m_maskData.empty())
+        return;
+
+    // Same 4096-wide packing as the map, 8 bits per pixel
+    const int W = 4096;
+    const int H = int((m_maskData.size() + W - 1) / W);
+    std::vector<unsigned char> buf(size_t(W) * H, 0);
+    for (size_t i = 0; i < m_maskData.size(); ++i)
+        buf[i] = static_cast<unsigned char>(m_maskData[i] * 255.0f + 0.5f);
+
+    glGenTextures(1, &m_maskTexture);
+    glBindTexture(GL_TEXTURE_2D, m_maskTexture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, W, H, 0, GL_RED, GL_UNSIGNED_BYTE,
+                 buf.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void

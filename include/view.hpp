@@ -101,16 +101,66 @@ public:
         m_glWidget->setUnseenColor(color);
     }
 
-    bool loadMap(const std::string &filename);
-
-    const QString &filePath() const
+    inline const QString &filePath() const
     {
         return m_filePath;
     }
-    float zoom() const
+
+    inline int addMaskFiles(const QStringList &files)
+    {
+        return m_glWidget->addMaskFiles(files);
+    }
+    inline void removeMask(int index)
+    {
+        m_glWidget->removeMask(index);
+    }
+    inline void clearMasks()
+    {
+        m_glWidget->clearMasks();
+    }
+    inline int maskCount() const
+    {
+        return m_glWidget->maskCount();
+    }
+    inline QString maskName(int index) const
+    {
+        return m_glWidget->maskName(index);
+    }
+    inline QString maskPath(int index) const
+    {
+        return m_glWidget->maskPath(index);
+    }
+    inline bool maskEnabled(int index) const
+    {
+        return m_glWidget->maskEnabled(index);
+    }
+    inline int maskMode() const
+    {
+        return m_glWidget->maskMode();
+    }
+    inline float maskOpacity() const
+    {
+        return m_glWidget->maskOpacity();
+    }
+    inline void setMaskEnabled(int index, bool enabled)
+    {
+        m_glWidget->setMaskEnabled(index, enabled);
+    }
+    inline void setMaskMode(int mode)
+    {
+        m_glWidget->setMaskMode(mode);
+    }
+    inline void setMaskOpacity(float opacity)
+    {
+        m_glWidget->setMaskOpacity(opacity);
+    }
+
+    inline float zoom() const
     {
         return m_glWidget->zoom();
     }
+
+    bool loadMap(const std::string &filename);
 
 private:
     void initConnections();
@@ -119,6 +169,8 @@ signals:
     // lonLat in degrees; value is NaN and index -1 when off the map
     void cursorPosChanged(QPointF lonLat, double value, qlonglong index);
     void zoomChanged(float zoom);
+    void masksChanged();
+    void colormapRangeChanged(float min, float max);
 
 private:
     OpenGLWidget *m_glWidget = nullptr;

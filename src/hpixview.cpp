@@ -8,8 +8,8 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QLocale>
 #include <QGraphicsView>
+#include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStatusBar>
@@ -70,6 +70,33 @@ HpixView::initConnections()
 {
     connect(m_sidePanel, &SidePanel::pixelOrderingChanged, this,
             &HpixView::onPixelOrderingChanged);
+
+    connect(m_sidePanel, &SidePanel::maskFilesSelected, this,
+            &HpixView::onMaskFilesSelected);
+    connect(m_sidePanel, &SidePanel::maskClearRequested, this,
+            &HpixView::onMaskCleared);
+    connect(m_sidePanel, &SidePanel::maskToggled, this,
+            [this](int index, bool enabled)
+    {
+        if (m_view)
+            m_view->setMaskEnabled(index, enabled);
+    });
+    connect(m_sidePanel, &SidePanel::maskRemoveRequested, this, [this](int index)
+    {
+        if (m_view)
+            m_view->removeMask(index);
+    });
+    connect(m_sidePanel, &SidePanel::maskModeChanged, this, [this](int mode)
+    {
+        if (m_view)
+            m_view->setMaskMode(mode);
+    });
+    connect(m_sidePanel, &SidePanel::maskOpacityChanged, this,
+            [this](float opacity)
+    {
+        if (m_view)
+            m_view->setMaskOpacity(opacity);
+    });
 
     connect(m_sidePanel, &SidePanel::backgroundColorChanged, this,
             &HpixView::onBackgroundColorChanged);
@@ -165,6 +192,19 @@ HpixView::initViewConnections(const View *view)
     connect(view, &View::cursorPosChanged, m_statusBar,
             &StatusBar::setCursorData);
     connect(view, &View::zoomChanged, m_statusBar, &StatusBar::setZoom);
+
+    // Mask load/clear/toggle changes the implicit colormap range
+    connect(view, &View::colormapRangeChanged, this,
+            [this, view](float min, float max)
+    {
+        if (view == m_view)
+            m_sidePanel->setColormapRange(min, max);
+    });
+    connect(view, &View::masksChanged, this, [this, view]()
+    {
+        if (view == m_view)
+            updateMaskListFromView(view);
+    });
 }
 
 void
@@ -175,6 +215,7 @@ HpixView::updateSidePanelStateFromView(const View *view)
 
     m_sidePanel->setPixelOrdering(view->pixelOrdering());
     m_sidePanel->setColormapRange(view->colormapMin(), view->colormapMax());
+    updateMaskListFromView(view);
     m_sidePanel->setColormapScale(view->colormapScale());
     m_sidePanel->setColormapReverse(view->colormapInvert());
     m_sidePanel->setBackgroundColor(view->backgroundColor().rgb() & 0xFFFFFF);
@@ -205,6 +246,21 @@ HpixView::onTabChanged(int index)
 
     updateSidePanelStateFromView(m_view);
     updateStatusBarFromView(m_view);
+}
+
+void
+HpixView::updateMaskListFromView(const View *view)
+{
+    QStringList names, paths;
+    QList<bool> enabled;
+    for (int i = 0; i < view->maskCount(); ++i)
+    {
+        names << view->maskName(i);
+        paths << view->maskPath(i);
+        enabled << view->maskEnabled(i);
+    }
+    m_sidePanel->setMasks(names, paths, enabled, view->maskMode(),
+                          view->maskOpacity());
 }
 
 void
@@ -289,4 +345,18 @@ HpixView::onUnseenColorChanged(const QColor &color)
 {
     if (m_view)
         m_view->setUnseenColor(color);
+}
+
+void
+HpixView::onMaskFilesSelected(const QStringList &files)
+{
+    if (m_view)
+        m_view->addMaskFiles(files);
+}
+
+void
+HpixView::onMaskCleared()
+{
+    if (m_view)
+        m_view->clearMasks();
 }

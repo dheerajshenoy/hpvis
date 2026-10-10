@@ -29,9 +29,9 @@
 - [ ] Region selection with stats (mean, std, min, max)
 
 ## Overlays
+- [x] Mask overlay
 - [ ] Graticule (lon/lat grid) with labels
 - [ ] Markers / catalog overlay (load from CSV)
-- [ ] Mask overlay
 - [ ] Text annotations
 
 ## Data & files

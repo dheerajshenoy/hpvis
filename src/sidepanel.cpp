@@ -3,7 +3,11 @@
 #include "collapsiblesection.hpp"
 
 #include <QColorDialog>
+#include <QFileDialog>
 #include <QFormLayout>
+#include <QSlider>
+#include <QToolButton>
+#include <QHBoxLayout>
 #include <QScrollArea>
 #include <qpushbutton.h>
 
@@ -27,6 +31,7 @@ SidePanel::setupUI()
     layout->addWidget(
         new CollapsibleSection("Pixel Ordering", pixelOrderingWidget()));
     layout->addWidget(new CollapsibleSection("Color", colormapWidget()));
+    layout->addWidget(new CollapsibleSection("Overlays", overlaysWidget()));
     layout->addStretch();
 
     QScrollArea *scrollArea = new QScrollArea();
@@ -70,6 +75,20 @@ SidePanel::setupConnections()
     connect(m_colormapMaxSpin,
             QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
             &SidePanel::colormapMaxChanged);
+
+    connect(m_maskOverlayButton, &QPushButton::clicked, this,
+            &SidePanel::onLoadMaskButtonClicked);
+    connect(m_clearMaskButton, &QPushButton::clicked, this,
+            &SidePanel::maskClearRequested);
+    connect(m_maskModeCombo, &QComboBox::currentIndexChanged, this,
+            [this](int mode)
+    {
+        m_maskOpacitySlider->setEnabled(m_clearMaskButton->isEnabled()
+                                        && mode == 1);
+        emit maskModeChanged(mode);
+    });
+    connect(m_maskOpacitySlider, &QSlider::valueChanged, this,
+            [this](int v) { emit maskOpacityChanged(v / 100.0f); });
 
     connect(m_colormapResetBtn, &QPushButton::clicked, this,
             &SidePanel::colormapRangeResetRequested);
@@ -128,6 +147,43 @@ SidePanel::pixelOrderingWidget()
     m_pixOrdCombo->addItem("Ring");
 
     layout->addRow("Pixel Ordering:", m_pixOrdCombo);
+    return widget;
+}
+
+QWidget *
+SidePanel::overlaysWidget()
+{
+    QWidget *widget     = new QWidget();
+    QFormLayout *layout = new QFormLayout(widget);
+
+    m_maskOverlayButton = new QPushButton("Add Mask...");
+    m_clearMaskButton   = new QPushButton("Clear");
+    m_maskModeCombo     = new QComboBox();
+    m_maskModeCombo->addItems({"Hide", "Dim"});
+    m_maskOpacitySlider = new QSlider(Qt::Horizontal);
+    m_maskOpacitySlider->setRange(0, 100);
+    m_maskOpacitySlider->setValue(80);
+
+    QWidget *buttons = new QWidget();
+    QHBoxLayout *row = new QHBoxLayout(buttons);
+    row->setContentsMargins(0, 0, 0, 0);
+    row->addWidget(m_maskOverlayButton);
+    row->addWidget(m_clearMaskButton);
+
+    // One checkbox row per loaded mask; filled by setMasks()
+    m_maskListWidget = new QWidget();
+    m_maskListLayout = new QVBoxLayout(m_maskListWidget);
+    m_maskListLayout->setContentsMargins(0, 0, 0, 0);
+    m_maskListLayout->setSpacing(2);
+
+    layout->addRow(buttons);
+    layout->addRow(m_maskListWidget);
+    layout->addRow("Mode", m_maskModeCombo);
+    layout->addRow("Dim strength", m_maskOpacitySlider);
+
+    setMasks({}, {}, {}, 0, 0.8f);
+
+    widget->setLayout(layout);
     return widget;
 }
 
@@ -233,4 +289,69 @@ SidePanel::onUnseenColorButtonClicked()
         setUnseenColor(unseencolor);
         emit unseenColorChanged(unseencolor);
     }
+}
+
+void
+SidePanel::setMasks(const QStringList &names, const QStringList &paths,
+                     const QList<bool> &enabled, int mode, float opacity)
+{
+    // Drop the old rows
+    while (QLayoutItem *item = m_maskListLayout->takeAt(0))
+    {
+        if (QWidget *w = item->widget())
+        {
+            // May be called from this row's own toggled/clicked signal
+            w->hide();
+            w->deleteLater();
+        }
+        delete item;
+    }
+
+    for (int i = 0; i < names.size(); ++i)
+    {
+        QWidget *rowWidget = new QWidget();
+        QHBoxLayout *row   = new QHBoxLayout(rowWidget);
+        row->setContentsMargins(0, 0, 0, 0);
+
+        QCheckBox *check = new QCheckBox(names[i]);
+        check->setToolTip(paths[i]);
+        check->setChecked(enabled[i]);
+        connect(check, &QCheckBox::toggled, this,
+                [this, i](bool on) { emit maskToggled(i, on); });
+
+        QToolButton *remove = new QToolButton();
+        remove->setText(QString::fromUtf8("\u00d7"));
+        remove->setAutoRaise(true);
+        remove->setToolTip("Remove this mask");
+        connect(remove, &QToolButton::clicked, this,
+                [this, i]() { emit maskRemoveRequested(i); });
+
+        row->addWidget(check, 1);
+        row->addWidget(remove);
+        m_maskListLayout->addWidget(rowWidget);
+    }
+
+    const bool any = !names.isEmpty();
+    QSignalBlocker b1(m_maskModeCombo);
+    QSignalBlocker b2(m_maskOpacitySlider);
+    m_maskModeCombo->setCurrentIndex(mode);
+    m_maskOpacitySlider->setValue(qRound(opacity * 100.0f));
+
+    m_clearMaskButton->setEnabled(any);
+    m_maskModeCombo->setEnabled(any);
+    m_maskOpacitySlider->setEnabled(any && mode == 1);
+}
+
+void
+SidePanel::onLoadMaskButtonClicked()
+{
+    // TODO: Enable loading multiple masks that cab be toggled on/off in the
+    // overlays section
+    auto files = QFileDialog::getOpenFileNames(
+        this, "Load Mask(s)", "", "FITS Files (*.fits);;All Files (*)");
+
+    if (files.isEmpty())
+        return;
+
+    emit maskFilesSelected(files);
 }

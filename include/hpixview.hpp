@@ -29,6 +29,7 @@ private:
     void initMenubar();
     void initCFITSIO();
     void updateStatusBarFromView(const View *view);
+    void updateMaskListFromView(const View *view);
     void updateSidePanelStateFromView(const View *view);
 
 private slots:
@@ -43,6 +44,8 @@ private slots:
     void onColormapRangeResetRequested();
     void onBackgroundColorChanged(const QColor &color);
     void onUnseenColorChanged(const QColor &color);
+    void onMaskFilesSelected(const QStringList &files);
+    void onMaskCleared();
 
 private:
     QMenu *m_fileMenu = nullptr;

@@ -36,5 +36,15 @@ void main() {
     }
 
     float t = applyScale(mapVal);
-    FragColor = vec4(applyColormap(t, colormap, invert_colormap), 1.0);
+    vec3 color = applyColormap(t, colormap, invert_colormap);
+
+    if (use_mask) {
+        // 1 = keep, 0 = masked (fractional weights dim proportionally)
+        float keep = texelFetch(maskTexture, ivec2(pixIdx % W, pixIdx / W), 0).r;
+        if (mask_mode == 0)
+            color = (keep < 0.5) ? unseen_color : color;
+        else
+            color = mix(color, unseen_color, (1.0 - keep) * mask_opacity);
+    }
+    FragColor = vec4(color, 1.0);
 }

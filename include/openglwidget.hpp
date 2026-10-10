@@ -10,6 +10,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
 #include <healpix_map.h>
+#include <vector>
 
 class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
@@ -121,6 +122,47 @@ public:
         return m_camera->zoom;
     }
 
+    // Adds mask maps to the list (each must match the map's nside; files
+    // already in the list are skipped). Returns the number added.
+    int addMaskFiles(const QStringList &files);
+    void removeMask(int index);
+    void clearMasks();
+    void setMaskEnabled(int index, bool enabled);
+
+    int maskCount() const
+    {
+        return static_cast<int>(m_masks.size());
+    }
+    QString maskName(int index) const
+    {
+        return m_masks[index].name;
+    }
+    QString maskPath(int index) const
+    {
+        return m_masks[index].path;
+    }
+    bool maskEnabled(int index) const
+    {
+        return m_masks[index].enabled;
+    }
+    int maskMode() const
+    {
+        return m_maskMode;
+    }
+    float maskOpacity() const
+    {
+        return m_maskOpacity;
+    }
+    void setMaskMode(int mode)
+    {
+        m_maskMode = mode;
+        update();
+    }
+    void setMaskOpacity(float opacity)
+    {
+        m_maskOpacity = opacity;
+        update();
+    }
     void setMap(const Healpix_Map<float> &map);
 
 protected:
@@ -137,6 +179,9 @@ protected:
 
 signals:
     void zoomChanged(float zoom);
+    void masksChanged(); // list or enabled flags changed
+    // Emitted when the implicit colormap range changes (e.g. mask applied)
+    void colormapRangeChanged(float min, float max);
     // lonLat in degrees; value is NaN and index -1 when off the map
     void cursorPosChanged(QPointF lonLat, double value, qlonglong index);
 
@@ -144,6 +189,9 @@ private:
     QVector2D toNdc(const QPointF &pos) const;
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
+    void uploadMaskToGPU();
+    void recomputeDataRange();
+    void rebuildCombinedMask();
     void setupGeometry();
 
 private:
@@ -169,4 +217,18 @@ private:
     bool m_isPanning    = false;
     QPoint m_lastMousePos;
     QPointF m_cursorPos; // last pointer position in widget coords
+    struct MaskEntry
+    {
+        QString name;
+        QString path;
+        std::vector<float> data; // 1 = keep, 0 = masked
+        bool enabled = true;
+    };
+    std::vector<MaskEntry> m_masks;
+    std::vector<float> m_maskData; // product of the enabled masks
+    bool m_maskActive  = false;    // at least one mask enabled
+    GLuint m_maskTexture = 0;
+    bool m_maskDirty     = false;
+    int m_maskMode       = 0;
+    float m_maskOpacity  = 0.8f;
 };
