@@ -1,0 +1,15 @@
+numpy>=1.19
+astropy
+
+[all]
+matplotlib
+scipy
+
+[test]
+pytest
+pytest-astropy-header
+pytest-cython
+pytest-doctestplus
+requests
+matplotlib
+scipy

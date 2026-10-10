@@ -1,0 +1,108 @@
+[project]
+name = "healpy"
+description = "Healpix tools package for Python"
+dynamic = ["version"]
+readme = "README.rst"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+    "Operating System :: POSIX",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+authors = [
+    { name = "C. Rosset", email = "cyrille.rosset@apc.univ-paris-diderot.fr" },
+    { name = "A. Zonca" },
+]
+license = { text = "GPL-2.0-only" }
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.19", "astropy"]
+
+[project.optional-dependencies]
+all = ["matplotlib", "scipy"]
+test = [
+    "pytest",
+    "pytest-astropy-header",
+    "pytest-cython",
+    "pytest-doctestplus",
+    "requests",
+    "matplotlib",
+    "scipy",
+]
+
+[project.urls]
+homepage = "http://github.com/healpy"
+
+[build-system]
+
+requires = ["setuptools>=60",
+            "setuptools-scm>=8.0",
+            "cython>=0.16",
+            "numpy>=2.0.0rc1",
+            "pykg-config"]
+
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools]
+script-files = ["bin/healpy_get_wmap_maps.sh"]
+
+[tool.setuptools.packages.find]
+include = ["healpy*"]
+where = ["lib"]
+
+[tool.setuptools.package-data]
+healpy = ["data/*.fits",
+          "data/*_cmap.dat",
+          "data/totcls.dat",
+          "test/data/*.fits",
+          "test/data/*.fits.gz",
+          "test/data/*.sh"]
+
+[tool.setuptools.exclude-package-data]
+# Exclude C/C++/Cython source files from wheels.
+"*" = ["*.cc", "*.cpp", "*.h", "*.pxd", "*.pyx"]
+
+[tool.cibuildwheel]
+# Skip PyPy builds; Astropy wheels are not built for PyPy.
+# Skip i686 builds.
+# Skip MUSL libc builds.
+skip = "pp* *_i686 *-musllinux_*"
+test-command = [
+    "pytest --doctest-plus --doctest-cython --pyargs healpy",
+    "pytest {project}/test"
+]
+test-extras = ["test"]
+
+[tool.cibuildwheel.linux]
+# Build wheels for aarch64 under emulation.
+archs = ["auto", "aarch64"]
+
+[tool.cibuildwheel.macos]
+before-all = "brew install autoconf automake libtool libomp"
+
+[tool.cibuildwheel.macos.environment]
+CC = "$(brew --prefix llvm@15)/bin/clang"
+CXX = "$(brew --prefix llvm@15)/bin/clang++"
+CPPFLAGS = "-I$(brew --prefix libomp)/include"
+LDFLAGS = "-L$(brew --prefix libomp)/lib"
+
+[[tool.cibuildwheel.overrides]]
+# macOS arm64 wheels are built on GitHub on macOS 13; set deployment target accordingly
+select = "*macosx_x86_64"
+inherit.environment = "append"
+environment.MACOSX_DEPLOYMENT_TARGET = "13.6"
+
+[[tool.cibuildwheel.overrides]]
+# macOS arm64 wheels are built on GitHub on macOS 14; set deployment target accordingly
+select = "*macosx_arm64"
+inherit.environment = "append"
+environment.MACOSX_DEPLOYMENT_TARGET = "14.0"
+
+[tool.setuptools_scm]
+write_to = "lib/healpy/version.py"
