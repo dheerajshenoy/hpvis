@@ -3,6 +3,7 @@
 #include "healpix_map.h"
 #include "shaderloader.hpp"
 
+#include <QEnterEvent>
 #include <QFile>
 #include <QNativeGestureEvent>
 #include <QMouseEvent>
@@ -18,6 +19,8 @@
 OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
     m_camera = new MapCamera();
+    setMouseTracking(true);
+    m_cursorPos = QPointF(width() / 2.0, height() / 2.0);
 }
 
 OpenGLWidget::~OpenGLWidget()
@@ -87,7 +90,10 @@ OpenGLWidget::initializeGL()
 void
 OpenGLWidget::resizeGL(int w, int h)
 {
-    glViewport(0, 0, w, h);
+    // w/h are logical sizes; the framebuffer is devicePixelRatio times larger
+    // on scaled (HiDPI / fractional) displays
+    const qreal dpr = devicePixelRatioF();
+    glViewport(0, 0, qRound(w * dpr), qRound(h * dpr));
 }
 
 void
@@ -233,7 +239,7 @@ OpenGLWidget::event(QEvent *e)
         auto *g = static_cast<QNativeGestureEvent *>(e);
         if (g->gestureType() == Qt::ZoomNativeGesture)
         {
-            m_camera->zoomAt(1.0f + float(g->value()), toNdc(g->position()));
+            m_camera->zoomAt(1.0f + float(g->value()), toNdc(m_cursorPos));
             update();
             return true;
         }
@@ -266,6 +272,7 @@ OpenGLWidget::wheelEvent(QWheelEvent *e)
     const double steps = (px.isNull() ? e->angleDelta().y() / 120.0
                                       : px.y() / 50.0);
     m_camera->zoomAt(float(std::pow(1.15, steps)), toNdc(e->position()));
+    m_cursorPos = e->position();
     update();
     e->accept();
 }
@@ -302,8 +309,16 @@ OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
 }
 
 void
+OpenGLWidget::enterEvent(QEnterEvent *e)
+{
+    m_cursorPos = e->position();
+    QOpenGLWidget::enterEvent(e);
+}
+
+void
 OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 {
+    m_cursorPos = e->position();
     if (!m_isPanning)
         return;
 
