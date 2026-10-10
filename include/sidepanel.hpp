@@ -75,6 +75,8 @@ public:
                   const QList<bool> &enabled, const QList<bool> &inverted,
                   int mode, float opacity);
 
+    void setMapInfo(int nside, int npix);
+
 signals:
     void pixelOrderingChanged(PixelOrdering ordering);
     void colormapChanged(Colormap colormap);
@@ -104,6 +106,7 @@ private:
     QWidget *pixelOrderingWidget();
     QWidget *colormapWidget();
     QWidget *overlaysWidget();
+    QWidget *mapInfoWidget();
 
 private:
     // Pixel ordering controls
@@ -131,6 +134,10 @@ private:
     QSlider *m_maskOpacitySlider     = nullptr;
     QFormLayout *m_overlaysLayout    = nullptr;
     QLabel *m_fskyLabel              = nullptr;
+
+    // Map info controls
+    QLabel *m_nsideLabel = nullptr;
+    QLabel *m_npixLabel  = nullptr;
 
     // FITS Header info
     // TODO: Add a widget to display FITS header information

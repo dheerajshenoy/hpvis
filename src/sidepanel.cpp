@@ -28,6 +28,7 @@ SidePanel::setupUI()
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(6);
 
+    layout->addWidget(new CollapsibleSection("Map Info", mapInfoWidget()));
     layout->addWidget(
         new CollapsibleSection("Pixel Ordering", pixelOrderingWidget()));
     layout->addWidget(new CollapsibleSection("Color", colormapWidget()));
@@ -385,4 +386,26 @@ SidePanel::onLoadMaskButtonClicked()
         return;
 
     emit maskFilesSelected(files);
+}
+
+QWidget *
+SidePanel::mapInfoWidget()
+{
+    QWidget *widget     = new QWidget();
+    QFormLayout *layout = new QFormLayout(widget);
+
+    m_nsideLabel = new QLabel();
+    m_npixLabel  = new QLabel();
+
+    layout->addRow("Nside:", m_nsideLabel);
+    layout->addRow("Npix:", m_npixLabel);
+
+    return widget;
+}
+
+void
+SidePanel::setMapInfo(int nside, int npix)
+{
+    m_nsideLabel->setText(QString::number(nside));
+    m_npixLabel->setText(QString::number(npix));
 }

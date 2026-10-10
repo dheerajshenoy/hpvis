@@ -190,6 +190,19 @@ HpixView::initMenubar()
     m_viewSidePanelAction = m_sidePanel->toggleViewAction();
     m_viewSidePanelAction->setText("&Side Panel");
     m_viewMenu->addAction(m_viewSidePanelAction);
+    m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
+
+    auto zoomLevels = {0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
+
+    for (float zoom : zoomLevels)
+    {
+        QString label = QString::number(zoom, 'f', 2) + "x";
+        m_viewZoomMenu->addAction(label, this, [this, zoom]()
+        {
+            if (m_view)
+                m_view->glWidget()->setZoom(zoom);
+        });
+    }
 
     m_viewResetViewAction = m_viewMenu->addAction("&Reset View", this, [this]()
     {
@@ -247,8 +260,16 @@ HpixView::OpenFile(const QString &filePath)
 void
 HpixView::initViewConnections(const View *view)
 {
+    connect(view->glWidget(), &OpenGLWidget::mapLoaded, this,
+            [this, view](long nside, long npix)
+    {
+        if (view == m_view)
+            m_sidePanel->setMapInfo(nside, npix);
+    });
+
     connect(view, &View::cursorPosChanged, m_statusBar,
             &StatusBar::setCursorData);
+
     connect(view, &View::zoomChanged, m_statusBar, &StatusBar::setZoom);
 
     // Mask load/clear/toggle changes the implicit colormap range
@@ -258,6 +279,7 @@ HpixView::initViewConnections(const View *view)
         if (view == m_view)
             m_sidePanel->setColormapRange(min, max);
     });
+
     connect(view, &View::masksChanged, this, [this, view]()
     {
         if (view == m_view)
@@ -270,9 +292,12 @@ HpixView::initViewConnections(const View *view)
 void
 HpixView::updateSidePanelStateFromView(const View *view)
 {
-    if (!view)
+    if (!view || !view->glWidget() || !view->glWidget()->healpixMap())
         return;
 
+    m_sidePanel->setMapInfo(view->glWidget()->healpixMap()->Nside(),
+                            view->glWidget()->healpixMap()->Npix());
+    m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
     m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),
                                   view->glWidget()->colormapMax());

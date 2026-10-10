@@ -27,6 +27,11 @@ public:
         return m_glWidget;
     }
 
+    inline const Healpix_Map<float> *healpixMap() const
+    {
+        return m_glWidget->healpixMap();
+    }
+
     bool loadMap(const std::string &filename);
 
 private:

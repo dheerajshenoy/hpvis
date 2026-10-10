@@ -64,6 +64,7 @@ private:
     QAction *m_viewMinimapAction   = nullptr;
     QAction *m_viewSidePanelAction = nullptr;
     QAction *m_viewResetViewAction = nullptr;
+    QMenu *m_viewZoomMenu          = nullptr;
 
     QMenu *m_toolsMenu             = nullptr;
     QAction *m_toolsSettingsAction = nullptr;

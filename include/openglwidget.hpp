@@ -55,10 +55,12 @@ public:
     }
 
     QRect minimapRect() const;
+
     bool minimapVisible() const
     {
         return m_minimapEnabled && m_camera->zoom > 1.0f;
     }
+
     void panToMinimapPoint(const QPointF &pos);
 
     inline bool minimapEnabled() const
@@ -108,6 +110,8 @@ public:
         return m_camera->zoom;
     }
 
+    void setZoom(float zoom);
+
     inline float fsky() const
     {
         return m_fsky;
@@ -156,6 +160,11 @@ public:
         return m_maskOpacity;
     }
 
+    inline const Healpix_Map<float> *healpixMap() const
+    {
+        return m_nside > 0 ? &m_pendingMap : nullptr;
+    }
+
     void setMaskMode(int mode);
     void setMaskOpacity(float opacity);
     void setMap(const Healpix_Map<float> &map);
@@ -179,6 +188,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 signals:
+    void mapLoaded(long nside, long npix);
     void zoomChanged(float zoom);
     void masksChanged(); // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
@@ -234,13 +244,13 @@ private:
     std::vector<MaskEntry> m_masks;
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels
     std::array<GLuint, 4> m_maskTextures{};
-    bool m_maskDirty       = false; // mask textures need re-uploading
-    bool m_colorBarVisible = true;
-    int m_maskMode         = 0;
-    float m_maskOpacity    = 0.8f;
-    float m_fsky           = 1.0f; // fraction of sky that is visible
-    static constexpr int kMinimapW      = 200;
-    static constexpr int kMinimapH      = 100;
+    bool m_maskDirty               = false; // mask textures need re-uploading
+    bool m_colorBarVisible         = true;
+    int m_maskMode                 = 0;
+    float m_maskOpacity            = 0.8f;
+    float m_fsky                   = 1.0f; // fraction of sky that is visible
+    static constexpr int kMinimapW = 200;
+    static constexpr int kMinimapH = 100;
     static constexpr int kMinimapMargin = 12;
-    bool m_minimapEnabled  = false;
+    bool m_minimapEnabled               = false;
 };

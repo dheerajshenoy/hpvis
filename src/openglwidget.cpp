@@ -306,6 +306,8 @@ OpenGLWidget::paintGL()
     {
         uploadMapToGPU(m_pendingMap);
         m_hasPendingMap = false;
+
+        emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix());
     }
 
     if (m_maskDirty)
@@ -369,18 +371,17 @@ OpenGLWidget::paintGL()
     glBindTexture(GL_TEXTURE_2D, 0);
 
     // Minimap: the whole map in a small 2:1 viewport (bottom-right corner)
-    const double dpr = devicePixelRatioF();
+    const double dpr        = devicePixelRatioF();
     const QRect minimapRect = this->minimapRect();
     // Only useful once the view is smaller than the whole map
-    const bool showMinimap = minimapVisible();
+    const bool showMinimap  = minimapVisible();
     if (showMinimap)
     {
         const GLint physW = qRound(kMinimapW * dpr);
         const GLint physH = qRound(kMinimapH * dpr);
         const GLint physX = qRound(minimapRect.left() * dpr);
         // GL origin is bottom-left, Qt's is top-left
-        const GLint physY
-            = qRound((height() - minimapRect.bottom() - 1) * dpr);
+        const GLint physY = qRound((height() - minimapRect.bottom() - 1) * dpr);
 
         glViewport(physX, physY, physW, physH);
         m_shaderProgram.setUniformValue("zoom", 1.0f);
@@ -419,10 +420,10 @@ OpenGLWidget::paintGL()
         // plane [-1, 1]^2, which the minimap shows in full
         const double hw = 0.5 * kMinimapW;
         const double hh = 0.5 * kMinimapH;
-        const double cx = minimapRect.left() + hw
-                          + double(m_camera->panOffset.x()) * hw;
-        const double cy = minimapRect.top() + hh
-                          - double(m_camera->panOffset.y()) * hh;
+        const double cx
+            = minimapRect.left() + hw + double(m_camera->panOffset.x()) * hw;
+        const double cy
+            = minimapRect.top() + hh - double(m_camera->panOffset.y()) * hh;
         const double vw = hw / m_camera->zoom;
         const double vh = hh / m_camera->zoom;
 
@@ -886,9 +887,9 @@ OpenGLWidget::minimapRect() const
 void
 OpenGLWidget::panToMinimapPoint(const QPointF &pos)
 {
-    const QRect r  = minimapRect();
-    const float nx = float((pos.x() - r.left()) / r.width() * 2.0 - 1.0);
-    const float ny = float(1.0 - (pos.y() - r.top()) / r.height() * 2.0);
+    const QRect r       = minimapRect();
+    const float nx      = float((pos.x() - r.left()) / r.width() * 2.0 - 1.0);
+    const float ny      = float(1.0 - (pos.y() - r.top()) / r.height() * 2.0);
     m_camera->panOffset = QVector2D(nx, ny);
     m_camera->clampPan();
     emitCursorData();
@@ -919,7 +920,7 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
     if (e->button() == Qt::LeftButton)
     {
         m_draggingMinimap = false;
-        m_isPanning = false;
+        m_isPanning       = false;
         unsetCursor();
     }
 }
@@ -1023,6 +1024,15 @@ void
 OpenGLWidget::resetView()
 {
     m_camera->reset();
+    emit zoomChanged(m_camera->zoom);
+    emitCursorData();
+    update();
+}
+
+void
+OpenGLWidget::setZoom(float zoom)
+{
+    m_camera->adjustZoom(zoom);
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
     update();
