@@ -295,6 +295,11 @@ void
 OpenGLWidget::paintGL()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // ---------------------------
+    // Main Render              //
+    // ---------------------------
+
     QRectF colorbar_rect = colorbarRect();
 
     if (m_hasPendingMap)
@@ -363,14 +368,80 @@ OpenGLWidget::paintGL()
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
+    // Minimap: the whole map in a small 2:1 viewport (bottom-right corner)
+    const double dpr = devicePixelRatioF();
+    const QRect minimapRect(width() - kMinimapW - kMinimapMargin,
+                            height() - kMinimapH - kMinimapMargin, kMinimapW,
+                            kMinimapH);
+    // Only useful once the view is smaller than the whole map
+    const bool showMinimap = m_minimapEnabled && m_camera->zoom > 1.0f;
+    if (showMinimap)
+    {
+        const GLint physW = qRound(kMinimapW * dpr);
+        const GLint physH = qRound(kMinimapH * dpr);
+        const GLint physX = qRound(minimapRect.left() * dpr);
+        // GL origin is bottom-left, Qt's is top-left
+        const GLint physY
+            = qRound((height() - minimapRect.bottom() - 1) * dpr);
+
+        glViewport(physX, physY, physW, physH);
+        m_shaderProgram.setUniformValue("zoom", 1.0f);
+        m_shaderProgram.setUniformValue("panOffset", QVector2D(0.0f, 0.0f));
+        m_shaderProgram.setUniformValue("viewport_size",
+                                        QVector2D(physW, physH));
+        m_shaderProgram.setUniformValue("colorbar_enabled", false);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_mapTexture);
+        for (int g = 0; g < 4; ++g)
+        {
+            glActiveTexture(GL_TEXTURE1 + g);
+            glBindTexture(GL_TEXTURE_2D, m_maskTextures[g]);
+        }
+        glActiveTexture(GL_TEXTURE0);
+
+        m_vao.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        m_vao.release();
+
+        glViewport(0, 0, qRound(width() * dpr), qRound(height() * dpr));
+    }
+
     m_shaderProgram.release();
 
-    if (!m_colorBarVisible)
+    if (!m_colorBarVisible && !showMinimap)
         return;
 
     QPainter p(this);
     p.setRenderHint(QPainter::TextAntialiasing);
-    const double dpr    = devicePixelRatioF();
+
+    if (showMinimap)
+    {
+        // The view window spans panOffset +/- 1/zoom on the projection
+        // plane [-1, 1]^2, which the minimap shows in full
+        const double hw = 0.5 * kMinimapW;
+        const double hh = 0.5 * kMinimapH;
+        const double cx = minimapRect.left() + hw
+                          + double(m_camera->panOffset.x()) * hw;
+        const double cy = minimapRect.top() + hh
+                          - double(m_camera->panOffset.y()) * hh;
+        const double vw = hw / m_camera->zoom;
+        const double vh = hh / m_camera->zoom;
+
+        p.setClipRect(minimapRect);
+        p.setPen(QPen(QColor(255, 80, 80), 1.5));
+        p.setBrush(QColor(255, 80, 80, 40));
+        p.drawRect(QRectF(cx - vw, cy - vh, 2 * vw, 2 * vh));
+        p.setClipping(false);
+
+        p.setPen(QPen(QColor(200, 200, 200, 200), 1));
+        p.setBrush(Qt::NoBrush);
+        p.drawRect(minimapRect.adjusted(0, 0, -1, -1));
+    }
+
+    if (!m_colorBarVisible)
+        return;
+
     const QRectF r      = colorbarRect(); // device px, y up
     // Painter wants logical px with y DOWN:
     const double left   = r.left() / dpr;

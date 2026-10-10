@@ -199,6 +199,9 @@ HpixView::initMenubar()
 
     m_toolsMenu = menuBar->addMenu("&Tools");
 
+    m_toolsSettingsAction = m_toolsMenu->addAction(
+        "&Settings", this, &HpixView::onSettingsActionTriggered);
+
     auto helpMenu = menuBar->addMenu("&Help");
 
     helpMenu->addAction("&About", this, []()
@@ -307,6 +310,8 @@ HpixView::onTabChanged(int index)
 
     updateSidePanelStateFromView(m_view);
     updateStatusBarFromView(m_view);
+    if (m_view)
+        m_viewMinimapAction->setChecked(m_view->glWidget()->minimapEnabled());
 }
 
 void
@@ -459,4 +464,10 @@ void
 HpixView::populateRecentFilesMenu()
 {
     // TODO: Implement recent files functionality
+}
+
+void
+HpixView::onSettingsActionTriggered()
+{
+    // TODO: Implement settings dialog
 }

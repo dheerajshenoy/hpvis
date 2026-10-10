@@ -49,6 +49,7 @@ private slots:
     void onMaskCleared();
     void onMinimapToggled(bool enabled);
     void onExportActionTriggered();
+    void onSettingsActionTriggered();
 
 private:
     QMenu *m_editMenu = nullptr;
@@ -64,7 +65,8 @@ private:
     QAction *m_viewSidePanelAction = nullptr;
     QAction *m_viewResetViewAction = nullptr;
 
-    QMenu *m_toolsMenu = nullptr;
+    QMenu *m_toolsMenu             = nullptr;
+    QAction *m_toolsSettingsAction = nullptr;
 
     View *m_view           = nullptr;
     TabWidget *m_tabWidget = nullptr;

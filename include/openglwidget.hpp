@@ -62,6 +62,7 @@ public:
     inline void setMinimapEnabled(bool enabled)
     {
         m_minimapEnabled = enabled;
+        update();
     }
 
     // Restore the colormap range to the min/max of the loaded map
@@ -230,5 +231,8 @@ private:
     int m_maskMode         = 0;
     float m_maskOpacity    = 0.8f;
     float m_fsky           = 1.0f; // fraction of sky that is visible
-    bool m_minimapEnabled  = true;
+    static constexpr int kMinimapW      = 200;
+    static constexpr int kMinimapH      = 100;
+    static constexpr int kMinimapMargin = 12;
+    bool m_minimapEnabled  = false;
 };
