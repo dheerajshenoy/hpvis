@@ -5,6 +5,7 @@
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
 #include "sidepanel.hpp"
+#include "statusbar.hpp"
 #include "tabwidget.hpp"
 #include "view.hpp"
 
@@ -46,8 +47,8 @@ private:
     QMenu *m_editMenu = nullptr;
     QMenu *m_viewMenu = nullptr;
 
-    View *m_view = nullptr;
-
+    View *m_view           = nullptr;
     TabWidget *m_tabWidget = nullptr;
     SidePanel *m_sidePanel = nullptr;
+    StatusBar *m_statusBar = nullptr;
 };

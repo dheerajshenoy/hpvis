@@ -42,10 +42,12 @@ HpixView::initUI()
 
     m_tabWidget = new TabWidget();
     m_sidePanel = new SidePanel();
+    m_statusBar = new StatusBar();
 
     initMenubar();
 
     layout->addWidget(m_tabWidget);
+    layout->addWidget(m_statusBar);
     setCentralWidget(widget);
 
     this->addDockWidget(Qt::LeftDockWidgetArea, m_sidePanel);

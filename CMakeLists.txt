@@ -46,6 +46,7 @@ add_executable(${PROJECT_NAME}
     src/sidepanel.cpp
     src/collapsiblesection.cpp
     src/shaderloader.cpp
+    src/statusbar.cpp
     shaders.qrc
 
     include/view.hpp
@@ -57,7 +58,9 @@ add_executable(${PROJECT_NAME}
     include/sidepanel.hpp
     include/collapsiblesection.hpp
     include/shaderloader.hpp
-    include/mapcamera.hpp)
+    include/mapcamera.hpp
+    include/statusbar.hpp
+)
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES

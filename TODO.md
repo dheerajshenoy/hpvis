@@ -18,7 +18,7 @@
 
 ## Projections & navigation
 - [ ] Additional projections: Gnomonic, Orthographic, Cartesian, Hammer-Aitoff
-- [ ] Zoom and pan (mouse wheel / drag)
+- [x] Zoom and pan (mouse wheel / drag)
 - [ ] Rotate view (lon/lat center), reset view
 - [ ] Coordinate system conversion (Galactic / Equatorial / Ecliptic)
 
