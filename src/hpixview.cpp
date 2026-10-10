@@ -164,6 +164,16 @@ HpixView::initMenubar()
                                  ->menu()
                                  ->addAction("No recent files");
 
+    m_fileExportAction = m_fileMenu->addAction(
+        "&Export", this, &HpixView::onExportActionTriggered);
+
+    m_fileCloseTabAction = m_fileMenu->addAction("&Close Tab", this, [this]()
+    {
+        int index = m_tabWidget->currentIndex();
+        if (index >= 0)
+            onTabCloseRequested(index);
+    });
+
     m_fileMenu->addAction("&Exit", this, &HpixView::close);
 
     m_editMenu = menuBar->addMenu("&Edit");
@@ -238,8 +248,9 @@ HpixView::initViewConnections(const View *view)
     connect(view, &View::masksChanged, this, [this, view]()
     {
         if (view == m_view)
-            m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
-    updateMaskListFromView(view);
+            m_sidePanel->setColorBarVisible(
+                view->glWidget()->colorBarVisible());
+        updateMaskListFromView(view);
     });
 }
 
@@ -410,4 +421,20 @@ HpixView::onMinimapToggled(bool state)
 {
     if (m_view)
         m_view->glWidget()->setMinimapEnabled(state);
+}
+
+void
+HpixView::onExportActionTriggered()
+{
+    if (!m_view)
+        return;
+
+    const QString filePath
+        = QFileDialog::getSaveFileName(this, "Export Image", QDir::homePath(),
+                                       "PNG Files (*.png);;All Files (*)");
+
+    if (!filePath.isEmpty())
+    {
+        m_view->glWidget()->exportImage(filePath);
+    }
 }

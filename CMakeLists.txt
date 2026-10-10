@@ -47,8 +47,9 @@ add_executable(${PROJECT_NAME}
     src/collapsiblesection.cpp
     src/shaderloader.cpp
     src/statusbar.cpp
-    shaders.qrc
+    resources.qrc
 
+    include/exportoptions.hpp
     include/view.hpp
     include/hpixview.hpp
     include/openglwidget.hpp

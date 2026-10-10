@@ -1,6 +1,7 @@
 #pragma once
 
 #include "colormap.hpp"
+#include "exportoptions.hpp"
 #include "mapcamera.hpp"
 #include "pixelordering.hpp"
 
@@ -152,6 +153,9 @@ public:
     void setMap(const Healpix_Map<float> &map);
 
     QRectF colorbarRect() const;
+
+    void exportImage(const QString &filePath,
+                     const ExportOptions &options = {});
 
 protected:
     void initializeGL() override;

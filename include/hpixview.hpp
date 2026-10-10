@@ -47,6 +47,7 @@ private slots:
     void onMaskFilesSelected(const QStringList &files);
     void onMaskCleared();
     void onMinimapToggled(bool enabled);
+    void onExportActionTriggered();
 
 private:
     QMenu *m_editMenu = nullptr;
@@ -54,6 +55,8 @@ private:
     QMenu *m_fileMenu               = nullptr;
     QAction *m_fileOpenAction       = nullptr;
     QAction *m_fileOpenRecentAction = nullptr;
+    QAction *m_fileExportAction     = nullptr;
+    QAction *m_fileCloseTabAction   = nullptr;
 
     QMenu *m_viewMenu              = nullptr;
     QAction *m_viewMinimapAction   = nullptr;

@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/">
+
+    <!-- Shaders -->
         <file>shaders/vertex.vert</file>
         <file>shaders/main.frag</file>
         <file>shaders/common.glsl</file>
@@ -10,6 +12,10 @@
         <file>shaders/scale.glsl</file>
         <file>shaders/masks.glsl</file>
         <file>shaders/colorbar.glsl</file>
+
+        <!-- Fonts -->
+        <file>resources/fonts/Major-Mono-Display.ttf</file>
+
     </qresource>
 </RCC>
 

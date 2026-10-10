@@ -190,7 +190,7 @@ TabWidget::paintEvent(QPaintEvent *event)
         painter.fillRect(rect(), palette().color(QPalette::Window));
         painter.setPen(palette().color(QPalette::Disabled, QPalette::Text));
 
-        constexpr const char *logoText = "lektra";
+        constexpr const char *logoText = "HpixView";
 
         // Setup logo font - load from resources
         const int fontId = QFontDatabase::addApplicationFont(

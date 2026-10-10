@@ -253,6 +253,7 @@ SidePanel::colormapWidget()
     layout->addRow(m_colormapResetBtn);
 
     m_colorBarCheck = new QCheckBox("Show Color Bar");
+    m_colorBarCheck->setChecked(true);
 
     layout->addRow(m_colorBarCheck);
 

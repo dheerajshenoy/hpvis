@@ -15,9 +15,9 @@
 #include <QVector3D>
 #include <QWheelEvent>
 #include <algorithm>
-#include <initializer_list>
 #include <cmath>
 #include <healpix_base.h>
+#include <initializer_list>
 #include <iostream>
 #include <limits>
 #include <pointing.h>
@@ -407,7 +407,7 @@ OpenGLWidget::paintGL()
             = values.size() > 1 ? values[1] - values[0] : m_vmax - m_vmin;
 
         ticks.clear();
-        bool fits = true;
+        bool fits        = true;
         double lastRight = -1e9;
         for (double v : values)
         {
@@ -898,4 +898,19 @@ OpenGLWidget::scaleValue(double v) const
         return std::log(1.0 + 1000.0 * u) / std::log(1001.0);
     }
     return std::clamp((v - m_vmin) / (m_vmax - m_vmin), 0.0, 1.0);
+}
+
+void
+OpenGLWidget::exportImage(const QString &filePath, const ExportOptions &options)
+{
+    if (filePath.isEmpty())
+        return;
+
+    const QImage image = grabFramebuffer();
+    if (!image.save(filePath, nullptr, options.quality))
+    {
+        QMessageBox::critical(
+            this, "Export Image",
+            QString("Failed to save image to %1").arg(filePath));
+    }
 }
