@@ -114,6 +114,7 @@ public:
 
     double mapAverage() const { return m_mapAverage; }
     double mapRms() const { return m_mapRms; }
+    double mapStd() const { return m_mapStd; }
 
     inline float fsky() const
     {
@@ -191,7 +192,8 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 signals:
-    void mapLoaded(long nside, long npix, double avg, double rms);
+    void mapLoaded(long nside, long npix, double avg, double rms,
+                   double std);
     void zoomChanged(float zoom);
     void masksChanged(); // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
@@ -224,6 +226,7 @@ private:
     bool m_hasPendingMap          = false;
     double m_mapAverage           = 0.0;
     double m_mapRms               = 0.0;
+    double m_mapStd               = 0.0;
     bool m_invertColormap         = false;
     QColor m_bgColor              = QColor(10, 10, 15);
     QColor m_unseenColor          = QColor(0, 0, 0);

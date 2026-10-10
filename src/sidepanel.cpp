@@ -397,21 +397,25 @@ SidePanel::mapInfoWidget()
     m_nsideLabel = new QLabel();
     m_npixLabel  = new QLabel();
     m_rmsLabel   = new QLabel();
+    m_stdLabel   = new QLabel();
     m_avgLabel   = new QLabel();
 
     layout->addRow("Nside:", m_nsideLabel);
     layout->addRow("Npix:", m_npixLabel);
     layout->addRow("Average:", m_avgLabel);
     layout->addRow("RMS:", m_rmsLabel);
+    layout->addRow("Std dev:", m_stdLabel);
 
     return widget;
 }
 
 void
-SidePanel::setMapInfo(int nside, int npix, double avg, double rms)
+SidePanel::setMapInfo(int nside, int npix, double avg, double rms,
+                       double std)
 {
     m_nsideLabel->setText(QString::number(nside));
     m_npixLabel->setText(QString::number(npix));
     m_rmsLabel->setText(QString::number(rms, 'g', 6));
+    m_stdLabel->setText(QString::number(std, 'g', 6));
     m_avgLabel->setText(QString::number(avg, 'g', 6));
 }

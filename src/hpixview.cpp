@@ -265,10 +265,11 @@ void
 HpixView::initViewConnections(const View *view)
 {
     connect(view->glWidget(), &OpenGLWidget::mapLoaded, this,
-            [this, view](long nside, long npix, double avg, double rms)
+            [this, view](long nside, long npix, double avg, double rms,
+                          double std)
     {
         if (view == m_view)
-            m_sidePanel->setMapInfo(nside, npix, avg, rms);
+            m_sidePanel->setMapInfo(nside, npix, avg, rms, std);
     });
 
     connect(view, &View::cursorPosChanged, m_statusBar,
@@ -287,8 +288,15 @@ HpixView::initViewConnections(const View *view)
     connect(view, &View::masksChanged, this, [this, view]()
     {
         if (view == m_view)
+        {
             m_sidePanel->setColorBarVisible(
                 view->glWidget()->colorBarVisible());
+            // Statistics follow the enabled masks
+            const auto *gl = view->glWidget();
+            m_sidePanel->setMapInfo(gl->healpixMap()->Nside(),
+                                    gl->healpixMap()->Npix(), gl->mapAverage(),
+                                    gl->mapRms(), gl->mapStd());
+        }
         updateMaskListFromView(view);
     });
 }
@@ -301,7 +309,8 @@ HpixView::updateSidePanelStateFromView(const View *view)
 
     auto *map = view->glWidget()->healpixMap();
     m_sidePanel->setMapInfo(map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
-                            view->glWidget()->mapRms());
+                            view->glWidget()->mapRms(),
+                            view->glWidget()->mapStd());
     m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
     m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),

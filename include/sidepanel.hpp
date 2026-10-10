@@ -75,7 +75,8 @@ public:
                   const QList<bool> &enabled, const QList<bool> &inverted,
                   int mode, float opacity);
 
-    void setMapInfo(int nside, int npix, double avg, double rms);
+    void setMapInfo(int nside, int npix, double avg, double rms,
+                    double std);
 
 signals:
     void pixelOrderingChanged(PixelOrdering ordering);
@@ -140,6 +141,7 @@ private:
     QLabel *m_npixLabel  = nullptr;
     QLabel *m_avgLabel   = nullptr;
     QLabel *m_rmsLabel   = nullptr;
+    QLabel *m_stdLabel   = nullptr;
 
     // FITS Header info
     // TODO: Add a widget to display FITS header information

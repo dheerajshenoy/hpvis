@@ -69,8 +69,9 @@ First development release.
 - Side panel with collapsible sections (Pixel Ordering, Color, Overlays) in a
   scroll area.
 - Panel controls follow the current tab when you switch tabs.
-- "Map Info" section (nside, npix, average, RMS). The statistics are computed
-  once on load, so switching tabs with large maps stays fast.
+- "Map Info" section (nside, npix, average, RMS, standard deviation). The statistics are computed
+  once on load and whenever masks change, so switching tabs with large maps
+  stays fast. They only include pixels kept by the enabled masks.
 - Sky fraction (f_sky) shown for the enabled masks.
 - View menu toggles for the side panel and the minimap.
 - Full-width status bar showing the file name, file size, zoom level, and the

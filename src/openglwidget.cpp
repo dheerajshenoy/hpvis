@@ -173,6 +173,8 @@ OpenGLWidget::recomputeDataRange()
 {
     long totalPixels = m_pendingMap.Npix();
     long validPixels = 0;
+    double sum       = 0.0; // for the mask-aware average / rms
+    double sumSq     = 0.0;
 
     // Range of valid pixels (ignoring non-finite, HEALPix UNSEEN, masked)
     struct Active
@@ -210,10 +212,21 @@ OpenGLWidget::recomputeDataRange()
 
         // This pixel survived all cuts; count it toward f_sky
         validPixels++;
+        sum += v;
+        sumSq += double(v) * v;
 
         m_dataMin = std::min(m_dataMin, v);
         m_dataMax = std::max(m_dataMax, v);
     }
+
+    // Same definitions as Healpix_Map::average() / rms() (rms is about zero),
+    // but over the surviving pixels only
+    m_mapAverage = validPixels ? sum / validPixels : 0.0;
+    m_mapRms     = validPixels ? std::sqrt(sumSq / validPixels) : 0.0;
+    // Standard deviation about the mean (clamped: rounding can go negative)
+    m_mapStd = validPixels ? std::sqrt(std::max(
+                   0.0, sumSq / validPixels - m_mapAverage * m_mapAverage))
+                           : 0.0;
 
     if (totalPixels > 0)
         m_fsky = float(validPixels) / float(totalPixels);
@@ -252,17 +265,13 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
     m_vmin = m_dataMin;
     m_vmax = m_dataMax;
 
-    // Full passes over the map: do them once here, not on every tab switch
-    m_mapAverage = m_pendingMap.average();
-    m_mapRms     = m_pendingMap.rms();
-
     // With a live context, upload now rather than on the next paint
     if (isValid())
     {
         uploadMapToGPU(m_pendingMap);
         m_hasPendingMap = false;
         emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(), m_mapAverage,
-                       m_mapRms);
+                       m_mapRms, m_mapStd);
     }
 
     update();
@@ -321,7 +330,7 @@ OpenGLWidget::paintGL()
         m_hasPendingMap = false;
 
         emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(), m_mapAverage,
-                       m_mapRms);
+                       m_mapRms, m_mapStd);
     }
 
     if (m_maskDirty)
