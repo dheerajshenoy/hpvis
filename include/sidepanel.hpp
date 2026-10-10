@@ -50,7 +50,8 @@ public:
     // Rebuilds the mask list (one checkbox row per mask) and syncs the mode
     // and strength controls, without emitting signals
     void setMasks(const QStringList &names, const QStringList &paths,
-                  const QList<bool> &enabled, int mode, float opacity);
+                  const QList<bool> &enabled, const QList<bool> &inverted,
+                  int mode, float opacity);
 
 signals:
     void pixelOrderingChanged(PixelOrdering ordering);
@@ -65,6 +66,7 @@ signals:
     void maskFilesSelected(const QStringList &files);
     void maskClearRequested();
     void maskToggled(int index, bool enabled);
+    void maskInvertToggled(int index, bool inverted);
     void maskRemoveRequested(int index);
     void maskModeChanged(int mode);
     void maskOpacityChanged(float opacity);

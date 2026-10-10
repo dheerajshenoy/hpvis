@@ -14,6 +14,7 @@ uniform sampler2D maskTex1;
 uniform sampler2D maskTex2;
 uniform sampler2D maskTex3;
 uniform int mask_bits;       // bit i set = mask i enabled
+uniform int mask_invert_bits; // bit i set = mask i inverted (1 - m)
 uniform int mask_mode;       // 0 = hide, 1 = dim
 uniform float mask_opacity;  // strength of "dim"
 uniform float zoom;

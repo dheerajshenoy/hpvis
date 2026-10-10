@@ -181,7 +181,7 @@ SidePanel::overlaysWidget()
     layout->addRow("Mode", m_maskModeCombo);
     layout->addRow("Dim strength", m_maskOpacitySlider);
 
-    setMasks({}, {}, {}, 0, 0.8f);
+    setMasks({}, {}, {}, {}, 0, 0.8f);
 
     widget->setLayout(layout);
     return widget;
@@ -293,7 +293,8 @@ SidePanel::onUnseenColorButtonClicked()
 
 void
 SidePanel::setMasks(const QStringList &names, const QStringList &paths,
-                     const QList<bool> &enabled, int mode, float opacity)
+                     const QList<bool> &enabled, const QList<bool> &inverted,
+                     int mode, float opacity)
 {
     // Drop the old rows
     while (QLayoutItem *item = m_maskListLayout->takeAt(0))
@@ -319,6 +320,12 @@ SidePanel::setMasks(const QStringList &names, const QStringList &paths,
         connect(check, &QCheckBox::toggled, this,
                 [this, i](bool on) { emit maskToggled(i, on); });
 
+        QCheckBox *invert = new QCheckBox("Inv");
+        invert->setToolTip("Invert this mask (keep what it masks)");
+        invert->setChecked(inverted[i]);
+        connect(invert, &QCheckBox::toggled, this,
+                [this, i](bool on) { emit maskInvertToggled(i, on); });
+
         QToolButton *remove = new QToolButton();
         remove->setText(QString::fromUtf8("\u00d7"));
         remove->setAutoRaise(true);
@@ -327,6 +334,7 @@ SidePanel::setMasks(const QStringList &names, const QStringList &paths,
                 [this, i]() { emit maskRemoveRequested(i); });
 
         row->addWidget(check, 1);
+        row->addWidget(invert);
         row->addWidget(remove);
         m_maskListLayout->addWidget(rowWidget);
     }

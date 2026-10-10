@@ -81,6 +81,12 @@ HpixView::initConnections()
         if (m_view)
             m_view->setMaskEnabled(index, enabled);
     });
+    connect(m_sidePanel, &SidePanel::maskInvertToggled, this,
+            [this](int index, bool inverted)
+    {
+        if (m_view)
+            m_view->setMaskInverted(index, inverted);
+    });
     connect(m_sidePanel, &SidePanel::maskRemoveRequested, this, [this](int index)
     {
         if (m_view)
@@ -252,14 +258,15 @@ void
 HpixView::updateMaskListFromView(const View *view)
 {
     QStringList names, paths;
-    QList<bool> enabled;
+    QList<bool> enabled, inverted;
     for (int i = 0; i < view->maskCount(); ++i)
     {
         names << view->maskName(i);
         paths << view->maskPath(i);
         enabled << view->maskEnabled(i);
+        inverted << view->maskInverted(i);
     }
-    m_sidePanel->setMasks(names, paths, enabled, view->maskMode(),
+    m_sidePanel->setMasks(names, paths, enabled, inverted, view->maskMode(),
                           view->maskOpacity());
 }
 

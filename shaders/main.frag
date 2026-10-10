@@ -43,10 +43,10 @@ void main() {
         // Product of the enabled masks: 1 = keep, 0 = masked
         ivec2 mc = ivec2(pixIdx % W, pixIdx / W);
         float keep = 1.0;
-        if ((mask_bits & 0x000F) != 0) keep *= maskProduct(maskTex0, mc, mask_bits);
-        if ((mask_bits & 0x00F0) != 0) keep *= maskProduct(maskTex1, mc, mask_bits >> 4);
-        if ((mask_bits & 0x0F00) != 0) keep *= maskProduct(maskTex2, mc, mask_bits >> 8);
-        if ((mask_bits & 0xF000) != 0) keep *= maskProduct(maskTex3, mc, mask_bits >> 12);
+        if ((mask_bits & 0x000F) != 0) keep *= maskProduct(maskTex0, mc, mask_bits, mask_invert_bits);
+        if ((mask_bits & 0x00F0) != 0) keep *= maskProduct(maskTex1, mc, mask_bits >> 4, mask_invert_bits >> 4);
+        if ((mask_bits & 0x0F00) != 0) keep *= maskProduct(maskTex2, mc, mask_bits >> 8, mask_invert_bits >> 8);
+        if ((mask_bits & 0xF000) != 0) keep *= maskProduct(maskTex3, mc, mask_bits >> 12, mask_invert_bits >> 12);
 
         if (mask_mode == 0)
             color = (keep < 0.5) ? unseen_color : color;

@@ -130,6 +130,7 @@ public:
     void removeMask(int index);
     void clearMasks();
     void setMaskEnabled(int index, bool enabled);
+    void setMaskInverted(int index, bool inverted);
 
     int maskCount() const
     {
@@ -146,6 +147,10 @@ public:
     bool maskEnabled(int index) const
     {
         return m_masks[index].enabled;
+    }
+    bool maskInverted(int index) const
+    {
+        return m_masks[index].inverted;
     }
     int maskMode() const
     {
@@ -194,7 +199,7 @@ private:
     void uploadMaskToGPU();
     void recomputeDataRange();
     void applyMaskChange(bool texturesChanged);
-    int maskBits() const;
+    int maskBits(bool inverted = false) const;
     void setupGeometry();
 
 private:
@@ -225,7 +230,8 @@ private:
         QString name;
         QString path;
         std::vector<uint8_t> data; // 0..255, 255 = keep, 0 = masked
-        bool enabled = true;
+        bool enabled  = true;
+        bool inverted = false;
     };
     std::vector<MaskEntry> m_masks;
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels

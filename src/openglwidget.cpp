@@ -53,10 +53,15 @@ void
 OpenGLWidget::recomputeDataRange()
 {
     // Range of valid pixels (ignoring non-finite, HEALPix UNSEEN, masked)
-    std::vector<const uint8_t *> active;
+    struct Active
+    {
+        const uint8_t *data;
+        bool inverted;
+    };
+    std::vector<Active> active;
     for (const MaskEntry &m : m_masks)
         if (m.enabled && m.data.size() == size_t(m_pendingMap.Npix()))
-            active.push_back(m.data.data());
+            active.push_back({m.data.data(), m.inverted});
 
     m_dataMin         = std::numeric_limits<float>::max();
     m_dataMax         = std::numeric_limits<float>::lowest();
@@ -69,8 +74,11 @@ OpenGLWidget::recomputeDataRange()
         if (!active.empty())
         {
             float keep = 1.0f; // same product the shader computes
-            for (const uint8_t *m : active)
-                keep *= m[i] * (1.0f / 255.0f);
+            for (const Active &m : active)
+            {
+                const float w = m.data[i] * (1.0f / 255.0f);
+                keep *= m.inverted ? 1.0f - w : w;
+            }
             if (keep < 0.5f)
                 continue;
         }
@@ -174,6 +182,7 @@ OpenGLWidget::paintGL()
     }
     glActiveTexture(GL_TEXTURE0);
     m_shaderProgram.setUniformValue("mask_bits", maskBits());
+    m_shaderProgram.setUniformValue("mask_invert_bits", maskBits(true));
     m_shaderProgram.setUniformValue("mask_mode", m_maskMode);
     m_shaderProgram.setUniformValue("mask_opacity", m_maskOpacity);
 
@@ -299,6 +308,16 @@ OpenGLWidget::clearMasks()
 }
 
 void
+OpenGLWidget::setMaskInverted(int index, bool inverted)
+{
+    if (index < 0 || index >= maskCount()
+        || m_masks[index].inverted == inverted)
+        return;
+    m_masks[index].inverted = inverted;
+    applyMaskChange(false); // uniform only: no re-upload
+}
+
+void
 OpenGLWidget::setMaskEnabled(int index, bool enabled)
 {
     if (index < 0 || index >= maskCount() || m_masks[index].enabled == enabled)
@@ -307,12 +326,13 @@ OpenGLWidget::setMaskEnabled(int index, bool enabled)
     applyMaskChange(false); // only the enabled bits change: no re-upload
 }
 
+// Bit i = mask i is enabled (or, with `inverted`, mask i is inverted)
 int
-OpenGLWidget::maskBits() const
+OpenGLWidget::maskBits(bool inverted) const
 {
     int bits = 0;
     for (size_t i = 0; i < m_masks.size(); ++i)
-        if (m_masks[i].enabled)
+        if (inverted ? m_masks[i].inverted : m_masks[i].enabled)
             bits |= 1 << i;
     return bits;
 }

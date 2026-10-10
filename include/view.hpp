@@ -134,6 +134,14 @@ public:
     {
         return m_glWidget->maskEnabled(index);
     }
+    inline bool maskInverted(int index) const
+    {
+        return m_glWidget->maskInverted(index);
+    }
+    inline void setMaskInverted(int index, bool inverted)
+    {
+        m_glWidget->setMaskInverted(index, inverted);
+    }
     inline int maskMode() const
     {
         return m_glWidget->maskMode();
