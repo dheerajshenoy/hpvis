@@ -60,7 +60,7 @@ First development release.
 - Loading a map of a different size drops the loaded masks.
 
 ### Color bar
-- Optional color bar ("Show Color Bar") with tick marks and labels. The tick
+- Optional color bar (View > Color Bar) with tick marks and labels. The tick
   count adapts to the width, and labels use a compact or scientific format.
 
 ### Interface

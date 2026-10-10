@@ -32,7 +32,12 @@ void main() {
     }
 
     // Camera: screen NDC -> zoomed/panned point on the projection plane
-    vec2 p = (TexCoord - 0.5) * 2.0 / zoom + panOffset;
+    vec2 ndc = (TexCoord - 0.5) * 2.0 * view_scale;
+    if (abs(ndc.x) > 1.0 || abs(ndc.y) > 1.0) {
+        FragColor = vec4(bg_color, 1.0); // padding around the map
+        return;
+    }
+    vec2 p = ndc / zoom + panOffset;
     vec2 viewUV = p * 0.5 + 0.5;
 
     if (!inverseMollweide(viewUV, colat, phi)) {

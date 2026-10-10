@@ -1,4 +1,5 @@
 uniform vec2 viewport_size;
+uniform vec2 view_scale; // window NDC -> map NDC (inset by the padding)
 uniform sampler2D mapTexture;
 uniform int nside;
 uniform int npix;

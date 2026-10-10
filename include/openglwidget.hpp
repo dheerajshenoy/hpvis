@@ -111,10 +111,22 @@ public:
     }
 
     void setZoom(float zoom);
+    void resetZoom();
+    // Arms a rubber-band: the next left-drag zooms to the dragged rectangle
+    void beginZoomToRegion();
 
-    double mapAverage() const { return m_mapAverage; }
-    double mapRms() const { return m_mapRms; }
-    double mapStd() const { return m_mapStd; }
+    double mapAverage() const
+    {
+        return m_mapAverage;
+    }
+    double mapRms() const
+    {
+        return m_mapRms;
+    }
+    double mapStd() const
+    {
+        return m_mapStd;
+    }
 
     inline float fsky() const
     {
@@ -192,8 +204,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 signals:
-    void mapLoaded(long nside, long npix, double avg, double rms,
-                   double std);
+    void mapLoaded(long nside, long npix, double avg, double rms, double std);
     void zoomChanged(float zoom);
     void masksChanged(); // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
@@ -203,6 +214,8 @@ signals:
 
 private:
     QVector2D toNdc(const QPointF &pos) const;
+    QVector2D viewScale() const;
+    static constexpr int kMapPadding = 24; // logical px around the map
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
@@ -211,6 +224,7 @@ private:
     int maskBits(bool inverted = false) const;
     void setupGeometry();
     double scaleValue(double v) const;
+    void processSelectionRegion();
 
 private:
     PixelOrdering m_pixelOrdering = PixelOrdering::RING;
@@ -248,6 +262,11 @@ private:
         bool enabled  = true;
         bool inverted = false;
     };
+
+    bool m_isRegionSelecting = false;
+    bool m_zoomRegionArmed   = false;
+    QPoint m_regionStart;
+    QPoint m_regionEnd;
 
     std::vector<MaskEntry> m_masks;
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels

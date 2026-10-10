@@ -224,9 +224,10 @@ OpenGLWidget::recomputeDataRange()
     m_mapAverage = validPixels ? sum / validPixels : 0.0;
     m_mapRms     = validPixels ? std::sqrt(sumSq / validPixels) : 0.0;
     // Standard deviation about the mean (clamped: rounding can go negative)
-    m_mapStd = validPixels ? std::sqrt(std::max(
-                   0.0, sumSq / validPixels - m_mapAverage * m_mapAverage))
-                           : 0.0;
+    m_mapStd = validPixels
+                   ? std::sqrt(std::max(0.0, sumSq / validPixels
+                                                 - m_mapAverage * m_mapAverage))
+                   : 0.0;
 
     if (totalPixels > 0)
         m_fsky = float(validPixels) / float(totalPixels);
@@ -381,6 +382,7 @@ OpenGLWidget::paintGL()
                                   m_unseenColor.blueF()));
     m_shaderProgram.setUniformValue("invert_colormap",
                                     m_invertColormap ? 1 : 0);
+    m_shaderProgram.setUniformValue("view_scale", viewScale());
     m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
     m_shaderProgram.setUniformValue(
         "colorbar_rect",
@@ -412,6 +414,7 @@ OpenGLWidget::paintGL()
         m_shaderProgram.setUniformValue("viewport_size",
                                         QVector2D(physW, physH));
         m_shaderProgram.setUniformValue("colorbar_enabled", false);
+        m_shaderProgram.setUniformValue("view_scale", QVector2D(1.0f, 1.0f));
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_mapTexture);
@@ -431,7 +434,7 @@ OpenGLWidget::paintGL()
 
     m_shaderProgram.release();
 
-    if (!m_colorBarVisible && !showMinimap)
+    if (!m_colorBarVisible && !showMinimap && !m_isRegionSelecting)
         return;
 
     QPainter p(this);
@@ -459,6 +462,16 @@ OpenGLWidget::paintGL()
         p.setPen(QPen(QColor(200, 200, 200, 200), 1));
         p.setBrush(Qt::NoBrush);
         p.drawRect(minimapRect.adjusted(0, 0, -1, -1));
+    }
+
+    if (m_isRegionSelecting)
+    {
+        p.setPen(QPen(QColor(255, 80, 80), 1.5));
+        p.setBrush(QColor(255, 80, 80, 40));
+        QRectF r(m_regionStart, m_regionEnd);
+        r = QRectF(std::min(r.left(), r.right()), std::min(r.top(), r.bottom()),
+                   std::abs(r.width()), std::abs(r.height()));
+        p.drawRect(r);
     }
 
     if (!m_colorBarVisible)
@@ -734,8 +747,7 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
     // Allocate the padded texture, then upload straight from the map: whole
     // rows first, then the partial last row (no intermediate CPU copy)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, W, H, 0, GL_RED, GL_FLOAT,
-                 nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, W, H, 0, GL_RED, GL_FLOAT, nullptr);
     const int fullRows = int(m_npix / W);
     const int rest     = int(m_npix % W);
     if (fullRows > 0)
@@ -824,10 +836,11 @@ void
 OpenGLWidget::emitCursorData()
 {
     // Same mapping as the fragment shader: NDC -> camera -> projection
-    const QVector2D p
-        = toNdc(m_cursorPos) / m_camera->zoom + m_camera->panOffset;
+    const QVector2D ndc = toNdc(m_cursorPos);
+    const QVector2D p   = ndc / m_camera->zoom + m_camera->panOffset;
     double colat, phi;
-    if (m_nside <= 0 || m_pendingMap.Npix() == 0
+    if (m_nside <= 0 || m_pendingMap.Npix() == 0 || std::abs(ndc.x()) > 1.0f
+        || std::abs(ndc.y()) > 1.0f // in the padding
         || !inverseMollweide(p * 0.5f + QVector2D(0.5f, 0.5f), colat, phi))
     {
         emit cursorPosChanged(QPointF(), std::nan(""), -1);
@@ -851,8 +864,21 @@ OpenGLWidget::emitCursorData()
 QVector2D
 OpenGLWidget::toNdc(const QPointF &pos) const
 {
-    return QVector2D(2.0f * float(pos.x()) / width() - 1.0f,
-                     1.0f - 2.0f * float(pos.y()) / height());
+    // The map occupies the window minus kMapPadding on each side, so the
+    // [-1, 1] range maps to that inner rectangle (see view_scale in the shader)
+    const QVector2D s = viewScale();
+    return QVector2D((2.0f * float(pos.x()) / width() - 1.0f) * s.x(),
+                     (1.0f - 2.0f * float(pos.y()) / height()) * s.y());
+}
+
+QVector2D
+OpenGLWidget::viewScale() const
+{
+    const float w = float(std::max(width(), 1));
+    const float h = float(std::max(height(), 1));
+    const float pad = float(kMapPadding);
+    return QVector2D(w / std::max(w - 2.0f * pad, 1.0f),
+                     h / std::max(h - 2.0f * pad, 1.0f));
 }
 
 bool
@@ -889,8 +915,9 @@ OpenGLWidget::wheelEvent(QWheelEvent *e)
     // Two-finger touchpad scroll: pan (pixelDelta is only set by touchpads)
     if (!px.isNull() && !(e->modifiers() & Qt::ControlModifier))
     {
-        m_camera->panBy(QVector2D(2.0f * px.x() / float(width()),
-                                  -2.0f * px.y() / float(height())));
+        const QVector2D s = viewScale();
+        m_camera->panBy(QVector2D(2.0f * px.x() / float(width()) * s.x(),
+                                  -2.0f * px.y() / float(height()) * s.y()));
         emitCursorData();
         update();
         e->accept();
@@ -930,6 +957,18 @@ OpenGLWidget::panToMinimapPoint(const QPointF &pos)
 void
 OpenGLWidget::mousePressEvent(QMouseEvent *e)
 {
+    // Region Selection: Shift + Left drag, or the next drag after
+    // View > Zoom > Zoom To Region
+    if (e->button() == Qt::LeftButton
+        && (e->modifiers() == Qt::ShiftModifier || m_zoomRegionArmed))
+    {
+        m_isRegionSelecting = true;
+        m_regionStart       = e->pos();
+        m_regionEnd         = e->pos();
+        e->accept();
+        return;
+    }
+
     if (e->button() == Qt::LeftButton && minimapVisible()
         && minimapRect().contains(e->pos()))
     {
@@ -948,6 +987,17 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
 void
 OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
 {
+    if (m_isRegionSelecting && e->button() == Qt::LeftButton)
+    {
+        m_isRegionSelecting = false;
+        m_zoomRegionArmed   = false;
+        unsetCursor();
+        processSelectionRegion();
+        update();
+        e->accept();
+        return;
+    }
+
     if (e->button() == Qt::LeftButton)
     {
         m_draggingMinimap = false;
@@ -982,6 +1032,13 @@ OpenGLWidget::enterEvent(QEnterEvent *e)
 void
 OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 {
+    if (m_isRegionSelecting)
+    {
+        m_regionEnd = e->pos();
+        update();
+        return;
+    }
+
     m_cursorPos = e->position();
     if (m_draggingMinimap)
     {
@@ -997,8 +1054,9 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
     const QPoint delta = e->pos() - m_lastMousePos;
     m_lastMousePos     = e->pos();
 
-    m_camera->panBy(QVector2D(2.0f * delta.x() / float(width()),
-                              -2.0f * delta.y() / float(height())));
+    const QVector2D s = viewScale();
+    m_camera->panBy(QVector2D(2.0f * delta.x() / float(width()) * s.x(),
+                              -2.0f * delta.y() / float(height()) * s.y()));
     emitCursorData();
     update();
 }
@@ -1061,10 +1119,38 @@ OpenGLWidget::resetView()
 }
 
 void
+OpenGLWidget::resetZoom()
+{
+    m_camera->resetZoom();
+    emit zoomChanged(m_camera->zoom);
+    emitCursorData();
+    update();
+}
+
+void
 OpenGLWidget::setZoom(float zoom)
 {
     m_camera->adjustZoom(zoom);
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
     update();
+}
+
+void
+OpenGLWidget::processSelectionRegion()
+{
+    const QRectF r = QRectF(m_regionStart, m_regionEnd).normalized();
+    if (r.width() < 4 || r.height() < 4) // a click, not a drag
+        return;
+
+    m_camera->zoomToRect(toNdc(r.topLeft()), toNdc(r.bottomRight()));
+    emit zoomChanged(m_camera->zoom);
+    emitCursorData();
+}
+
+void
+OpenGLWidget::beginZoomToRegion()
+{
+    m_zoomRegionArmed = true;
+    setCursor(Qt::CrossCursor);
 }

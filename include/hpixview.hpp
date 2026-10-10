@@ -62,6 +62,7 @@ private:
 
     QMenu *m_viewMenu              = nullptr;
     QAction *m_viewMinimapAction   = nullptr;
+    QAction *m_viewColorBarAction  = nullptr;
     QAction *m_viewSidePanelAction = nullptr;
     QAction *m_viewResetViewAction = nullptr;
     QMenu *m_viewZoomMenu          = nullptr;

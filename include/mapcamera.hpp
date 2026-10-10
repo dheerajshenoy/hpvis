@@ -12,8 +12,13 @@ struct MapCamera
 
     void reset()
     {
-        zoom      = 1.0f;
+        resetZoom();
         panOffset = QVector2D(0.0f, 0.0f);
+    }
+
+    void resetZoom()
+    {
+        zoom = 1.0f;
     }
 
     // Clamp zoom levels to prevent inverse flipping or infinite scaling
@@ -48,6 +53,24 @@ struct MapCamera
             panOffset = anchor - ndc / zoom;
             clampPan();
         }
+    }
+
+    // Fit the rectangle spanned by two screen points (NDC, y up) into the
+    // window, keeping the window's aspect ratio. Zoom stays within
+    // [1, maxZoom].
+    void zoomToRect(QVector2D ndcA, QVector2D ndcB, float maxZoom = 64.0f)
+    {
+        const QVector2D a = ndcA / zoom + panOffset; // projection plane
+        const QVector2D b = ndcB / zoom + panOffset;
+        const float w     = std::abs(a.x() - b.x());
+        const float h     = std::abs(a.y() - b.y());
+        if (w < 1e-6f || h < 1e-6f)
+            return;
+
+        // The window shows 2/zoom of the plane in each direction
+        zoom      = std::clamp(std::min(2.0f / w, 2.0f / h), 1.0f, maxZoom);
+        panOffset = (a + b) * 0.5f;
+        clampPan();
     }
 
     // Pan by a screen-space delta in NDC units (content follows the cursor)

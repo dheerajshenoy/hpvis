@@ -112,12 +112,6 @@ HpixView::initConnections()
             m_view->glWidget()->setMaskOpacity(opacity);
     });
 
-    connect(m_sidePanel, &SidePanel::colorBarToggled, this, [this](bool state)
-    {
-        if (m_view)
-            m_view->glWidget()->setColorBarVisible(state);
-    });
-
     connect(m_sidePanel, &SidePanel::backgroundColorChanged, this,
             &HpixView::onBackgroundColorChanged);
 
@@ -185,6 +179,15 @@ HpixView::initMenubar()
         = m_viewMenu->addAction("&Minimap", this, &HpixView::onMinimapToggled);
     m_viewMinimapAction->setCheckable(true);
 
+    m_viewColorBarAction = m_viewMenu->addAction(
+        "&Color Bar", this, [this](bool state)
+    {
+        if (m_view)
+            m_view->glWidget()->setColorBarVisible(state);
+    });
+    m_viewColorBarAction->setCheckable(true);
+    m_viewColorBarAction->setChecked(true);
+
     // The dock provides a checkable action that stays in sync with its
     // visibility (including its own close button)
     m_viewSidePanelAction = m_sidePanel->toggleViewAction();
@@ -204,6 +207,20 @@ HpixView::initMenubar()
                 m_view->glWidget()->setZoom(zoom);
         });
     }
+
+    m_viewZoomMenu->addSeparator();
+
+    m_viewZoomMenu->addAction("Zoom To Region", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->beginZoomToRegion();
+    });
+
+    m_viewZoomMenu->addAction("Reset Zoom", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->resetZoom();
+    });
 
     m_viewResetViewAction = m_viewMenu->addAction("&Reset View", this, [this]()
     {
@@ -264,9 +281,9 @@ HpixView::OpenFile(const QString &filePath)
 void
 HpixView::initViewConnections(const View *view)
 {
-    connect(view->glWidget(), &OpenGLWidget::mapLoaded, this,
-            [this, view](long nside, long npix, double avg, double rms,
-                          double std)
+    connect(
+        view->glWidget(), &OpenGLWidget::mapLoaded, this,
+        [this, view](long nside, long npix, double avg, double rms, double std)
     {
         if (view == m_view)
             m_sidePanel->setMapInfo(nside, npix, avg, rms, std);
@@ -289,8 +306,6 @@ HpixView::initViewConnections(const View *view)
     {
         if (view == m_view)
         {
-            m_sidePanel->setColorBarVisible(
-                view->glWidget()->colorBarVisible());
             // Statistics follow the enabled masks
             const auto *gl = view->glWidget();
             m_sidePanel->setMapInfo(gl->healpixMap()->Nside(),
@@ -308,10 +323,9 @@ HpixView::updateSidePanelStateFromView(const View *view)
         return;
 
     auto *map = view->glWidget()->healpixMap();
-    m_sidePanel->setMapInfo(map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
-                            view->glWidget()->mapRms(),
-                            view->glWidget()->mapStd());
-    m_sidePanel->setColorBarVisible(view->glWidget()->colorBarVisible());
+    m_sidePanel->setMapInfo(
+        map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
+        view->glWidget()->mapRms(), view->glWidget()->mapStd());
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
     m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),
                                   view->glWidget()->colormapMax());
@@ -350,7 +364,10 @@ HpixView::onTabChanged(int index)
     updateSidePanelStateFromView(m_view);
     updateStatusBarFromView(m_view);
     if (m_view)
+    {
         m_viewMinimapAction->setChecked(m_view->glWidget()->minimapEnabled());
+        m_viewColorBarAction->setChecked(m_view->glWidget()->colorBarVisible());
+    }
 }
 
 void

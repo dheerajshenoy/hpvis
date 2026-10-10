@@ -46,9 +46,6 @@ SidePanel::setupUI()
 void
 SidePanel::setupConnections()
 {
-    connect(m_colorBarCheck, &QCheckBox::toggled, this,
-            &SidePanel::colorBarToggled);
-
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });
@@ -253,11 +250,6 @@ SidePanel::colormapWidget()
     m_colormapResetBtn = new QPushButton("Reset Range");
     layout->addRow(m_colormapResetBtn);
 
-    m_colorBarCheck = new QCheckBox("Show Color Bar");
-    m_colorBarCheck->setChecked(true);
-
-    layout->addRow(m_colorBarCheck);
-
     widget->setLayout(layout);
     return widget;
 }
@@ -394,28 +386,30 @@ SidePanel::mapInfoWidget()
     QWidget *widget     = new QWidget();
     QFormLayout *layout = new QFormLayout(widget);
 
-    m_nsideLabel = new QLabel();
-    m_npixLabel  = new QLabel();
-    m_rmsLabel   = new QLabel();
-    m_stdLabel   = new QLabel();
-    m_avgLabel   = new QLabel();
+    // Read-only (but selectable) values
+    auto makeField = [](QLineEdit *&field)
+    {
+        field = new QLineEdit();
+        field->setReadOnly(true);
+        return field;
+    };
 
-    layout->addRow("Nside:", m_nsideLabel);
-    layout->addRow("Npix:", m_npixLabel);
-    layout->addRow("Average:", m_avgLabel);
-    layout->addRow("RMS:", m_rmsLabel);
-    layout->addRow("Std dev:", m_stdLabel);
+    layout->addRow("Nside:", makeField(m_nsideEdit));
+    layout->addRow("Npix:", makeField(m_npixEdit));
+    layout->addRow("Average:", makeField(m_avgEdit));
+    layout->addRow("RMS:", makeField(m_rmsEdit));
+    layout->addRow("Std dev:", makeField(m_stdEdit));
 
     return widget;
 }
 
 void
-SidePanel::setMapInfo(int nside, int npix, double avg, double rms,
-                       double std)
+SidePanel::setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
+                      double std)
 {
-    m_nsideLabel->setText(QString::number(nside));
-    m_npixLabel->setText(QString::number(npix));
-    m_rmsLabel->setText(QString::number(rms, 'g', 6));
-    m_stdLabel->setText(QString::number(std, 'g', 6));
-    m_avgLabel->setText(QString::number(avg, 'g', 6));
+    m_nsideEdit->setText(QString::number(nside));
+    m_npixEdit->setText(QString::number(npix));
+    m_avgEdit->setText(QString::number(avg, 'g', 6));
+    m_rmsEdit->setText(QString::number(rms, 'g', 6));
+    m_stdEdit->setText(QString::number(std, 'g', 6));
 }

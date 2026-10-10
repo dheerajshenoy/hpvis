@@ -8,6 +8,7 @@
 #include <QDockWidget>
 #include <QFormLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
@@ -48,17 +49,6 @@ public:
         return m_fskyLabel->text().toFloat();
     }
 
-    inline bool colorBarVisible() const
-    {
-        return m_colorBarCheck->isChecked();
-    }
-
-    inline void setColorBarVisible(bool visible)
-    {
-        QSignalBlocker blocker(m_colorBarCheck);
-        m_colorBarCheck->setChecked(visible);
-    }
-
     void setFSky(float fsky)
     {
         m_fskyLabel->setText(QString::number(fsky, 'f', 6));
@@ -75,7 +65,7 @@ public:
                   const QList<bool> &enabled, const QList<bool> &inverted,
                   int mode, float opacity);
 
-    void setMapInfo(int nside, int npix, double avg, double rms,
+    void setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
                     double std);
 
 signals:
@@ -95,7 +85,6 @@ signals:
     void maskRemoveRequested(int index);
     void maskModeChanged(int mode);
     void maskOpacityChanged(float opacity);
-    void colorBarToggled(bool enabled);
 
 private:
     void setupUI();
@@ -122,7 +111,6 @@ private:
     QPushButton *m_colormapResetBtn   = nullptr;
     QPushButton *m_bgColorButton      = nullptr;
     QPushButton *m_unseenColorButton  = nullptr;
-    QCheckBox *m_colorBarCheck        = nullptr;
     QColor m_bgColor                  = QColor(0, 0, 0);
     QColor m_unseenColor              = QColor(0, 0, 0);
 
@@ -137,11 +125,11 @@ private:
     QLabel *m_fskyLabel              = nullptr;
 
     // Map info controls
-    QLabel *m_nsideLabel = nullptr;
-    QLabel *m_npixLabel  = nullptr;
-    QLabel *m_avgLabel   = nullptr;
-    QLabel *m_rmsLabel   = nullptr;
-    QLabel *m_stdLabel   = nullptr;
+    QLineEdit *m_nsideEdit = nullptr;
+    QLineEdit *m_npixEdit  = nullptr;
+    QLineEdit *m_avgEdit   = nullptr;
+    QLineEdit *m_rmsEdit   = nullptr;
+    QLineEdit *m_stdEdit   = nullptr;
 
     // FITS Header info
     // TODO: Add a widget to display FITS header information
