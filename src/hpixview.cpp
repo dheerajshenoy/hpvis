@@ -340,6 +340,12 @@ HpixView::onTabCloseRequested(int index)
     QWidget *widget = m_tabWidget->widget(index);
     m_tabWidget->removeTab(index);
     delete widget;
+
+    if (m_tabWidget->count() == 0)
+    {
+        m_sidePanel->close();
+        m_statusBar->clear();
+    }
 }
 
 void

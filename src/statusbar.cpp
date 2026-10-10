@@ -83,3 +83,15 @@ StatusBar::setFilesize(const QString &filesize)
 {
     m_fileSizeLabel->setText(QString("Size: %1").arg(filesize));
 }
+
+void
+StatusBar::clear()
+{
+    m_messageLabel->clear();
+    m_zoomLabel->clear();
+    m_fileNameLabel->clear();
+    m_cursorPosLabel->clear();
+    m_pixelIndexLabel->clear();
+    m_pixelValueLabel->clear();
+    m_fileSizeLabel->clear();
+}
