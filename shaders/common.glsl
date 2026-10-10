@@ -8,5 +8,8 @@ uniform int colormap;
 uniform int colormap_scale; // 0 = linear, 1 = log
 uniform bool invert_colormap;
 uniform vec3 bg_color;
+uniform float zoom;
+uniform vec2 panOffset;
+uniform vec3 unseen_color;
 
 #define PI 3.14159265358979323846

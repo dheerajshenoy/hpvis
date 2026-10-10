@@ -1,6 +1,7 @@
 #pragma once
 
 #include "colormap.hpp"
+#include "mapcamera.hpp"
 #include "pixelordering.hpp"
 
 #include <QOpenGLBuffer>
@@ -92,10 +93,26 @@ public:
         update();
     }
 
+    inline QColor backgroundColor() const
+    {
+        return m_bgColor;
+    }
+
     inline void setBackgroundColor(const QColor &color)
     {
         m_bgColor = color;
         update();
+    }
+
+    inline void setUnseenColor(const QColor &color)
+    {
+        m_unseenColor = color;
+        update();
+    }
+
+    inline QColor unseenColor() const
+    {
+        return m_unseenColor;
     }
 
     void setMap(const Healpix_Map<float> &map);
@@ -104,8 +121,15 @@ protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
+    bool event(QEvent *e) override;
+    void wheelEvent(QWheelEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
+    void mouseReleaseEvent(QMouseEvent *e) override;
+    void mouseMoveEvent(QMouseEvent *e) override;
+    void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 private:
+    QVector2D toNdc(const QPointF &pos) const;
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void setupGeometry();
 
@@ -123,8 +147,12 @@ private:
     bool m_hasPendingMap          = false;
     bool m_invertColormap         = false;
     QColor m_bgColor              = QColor(10, 10, 15);
+    QColor m_unseenColor          = QColor(0, 0, 0);
     Healpix_Map<float> m_pendingMap;
     QOpenGLVertexArrayObject m_vao;
     QOpenGLBuffer m_vbo{QOpenGLBuffer::VertexBuffer}; // VBO wrapper
     QOpenGLShaderProgram m_shaderProgram;
+    MapCamera *m_camera = nullptr;
+    bool m_isPanning    = false;
+    QPoint m_lastMousePos;
 };

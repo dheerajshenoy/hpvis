@@ -62,6 +62,9 @@ HpixView::initConnections()
     connect(m_sidePanel, &SidePanel::backgroundColorChanged, this,
             &HpixView::onBackgroundColorChanged);
 
+    connect(m_sidePanel, &SidePanel::unseenColorChanged, this,
+            &HpixView::onUnseenColorChanged);
+
     connect(m_sidePanel, &SidePanel::colormapChanged, this,
             &HpixView::onColormapChanged);
 
@@ -151,6 +154,8 @@ HpixView::updateSidePanelStateFromView(const View *view)
     m_sidePanel->setColormapRange(view->colormapMin(), view->colormapMax());
     m_sidePanel->setColormapScale(view->colormapScale());
     m_sidePanel->setColormapReverse(view->colormapInvert());
+    m_sidePanel->setBackgroundColor(view->backgroundColor().rgb() & 0xFFFFFF);
+    m_sidePanel->setUnseenColor(view->unseenColor().rgb() & 0xFFFFFF);
 
     // setColormap emits colormapChanged only on change; block to avoid a loop
     QSignalBlocker blocker(m_sidePanel);
@@ -240,4 +245,11 @@ HpixView::onBackgroundColorChanged(const QColor &color)
 {
     if (m_view)
         m_view->setBackgroundColor(color);
+}
+
+void
+HpixView::onUnseenColorChanged(const QColor &color)
+{
+    if (m_view)
+        m_view->setUnseenColor(color);
 }

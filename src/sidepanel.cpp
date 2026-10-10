@@ -44,6 +44,9 @@ SidePanel::setupConnections()
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });
 
+    connect(m_unseenColorButton, &QPushButton::clicked, this,
+            &SidePanel::onUnseenColorButtonClicked);
+
     connect(m_bgColorButton, &QPushButton::clicked, this,
             &SidePanel::onBackgroundColorButtonClicked);
 
@@ -126,6 +129,13 @@ SidePanel::pixelOrderingWidget()
 
     layout->addRow("Background Color:", m_bgColorButton);
 
+    m_unseenColorButton = new QPushButton("");
+    m_unseenColorButton->setFixedSize(50, 20);
+    m_unseenColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(0x000000, 6, 16, QChar('0')));
+
+    layout->addRow("Unseen Color:", m_unseenColorButton);
+
     widget->setLayout(layout);
     m_pixOrdCombo = new QComboBox();
     m_pixOrdCombo->addItem("Nested");
@@ -194,13 +204,33 @@ void
 SidePanel::onBackgroundColorButtonClicked()
 {
 
-    QColor color = QColorDialog::getColor(
-        QColor(m_bgColor), this,
-        "Select Background Color");
+    QColor color = QColorDialog::getColor(QColor(m_bgColor), this,
+                                          "Select Background Color");
     if (color.isValid())
     {
         auto bgcolor = color.rgb() & 0xFFFFFF;
         setBackgroundColor(bgcolor);
         emit backgroundColorChanged(bgcolor);
+    }
+}
+
+void
+SidePanel::setUnseenColor(uint32_t color)
+{
+    m_unseenColor = QColor::fromRgb(color & 0xFFFFFF);
+    m_unseenColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(color, 6, 16, QChar('0')));
+}
+
+void
+SidePanel::onUnseenColorButtonClicked()
+{
+    QColor color = QColorDialog::getColor(QColor(m_unseenColor), this,
+                                          "Select Unseen Color");
+    if (color.isValid())
+    {
+        auto unseencolor = color.rgb() & 0xFFFFFF;
+        setUnseenColor(unseencolor);
+        emit unseenColorChanged(unseencolor);
     }
 }

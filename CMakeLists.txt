@@ -56,7 +56,8 @@ add_executable(${PROJECT_NAME}
     include/tabbar.hpp
     include/sidepanel.hpp
     include/collapsiblesection.hpp
-    include/shaderloader.hpp)
+    include/shaderloader.hpp
+    include/mapcamera.hpp)
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES

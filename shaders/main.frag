@@ -11,7 +11,12 @@ out vec4 FragColor;
 
 void main() {
     float colat, phi;
-    if (!inverseMollweide(TexCoord, colat, phi)) {
+
+    // Camera: screen NDC -> zoomed/panned point on the projection plane
+    vec2 p = (TexCoord - 0.5) * 2.0 / zoom + panOffset;
+    vec2 viewUV = p * 0.5 + 0.5;
+
+    if (!inverseMollweide(viewUV, colat, phi)) {
         FragColor = vec4(bg_color, 1.0); // background outside
         return;
     }
@@ -23,6 +28,13 @@ void main() {
     // Integer math + texelFetch keeps indices exact for large nside.
     const int W = 4096;
     float mapVal = texelFetch(mapTexture, ivec2(pixIdx % W, pixIdx / W), 0).r;
+
+    // HEALPix UNSEEN is -1.6375e30 (finite, not NaN); also catch NaN/Inf.
+    if (mapVal < -1.0e30 || isnan(mapVal) || isinf(mapVal)) {
+        FragColor = vec4(unseen_color, 1.0);
+        return;
+    }
+
     float t = applyScale(mapVal);
     FragColor = vec4(applyColormap(t, colormap, invert_colormap), 1.0);
 }

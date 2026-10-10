@@ -81,16 +81,28 @@ public:
         m_glWidget->setColormapInvert(invert);
     }
 
+    inline QColor backgroundColor() const
+    {
+        return m_glWidget->backgroundColor();
+    }
+
     inline void setBackgroundColor(const QColor &color)
     {
         m_glWidget->setBackgroundColor(color);
     }
 
+    inline QColor unseenColor() const
+    {
+        return m_glWidget->unseenColor();
+    }
+
+    inline void setUnseenColor(const QColor &color)
+    {
+        m_glWidget->setUnseenColor(color);
+    }
+
     void loadMap(const std::string &filename);
 
 private:
-    QVBoxLayout *m_layout    = nullptr;
     OpenGLWidget *m_glWidget = nullptr;
-    Healpix_Map<float> m_healpix_map;
-    bool m_mapLoaded = false;
 };

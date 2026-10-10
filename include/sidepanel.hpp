@@ -42,6 +42,7 @@ public:
     }
 
     void setBackgroundColor(uint32_t color);
+    void setUnseenColor(uint32_t color);
     void setPixelOrdering(PixelOrdering ordering);
     void setColormapScale(ColormapScale scale);
     void setColormapRange(double min, double max);
@@ -55,11 +56,13 @@ signals:
     void colormapRangeResetRequested();
     void colormapReverseChanged(bool state);
     void backgroundColorChanged(uint32_t color);
+    void unseenColorChanged(uint32_t color);
 
 private:
     void setupUI();
     void setupConnections();
     void onBackgroundColorButtonClicked();
+    void onUnseenColorButtonClicked();
     QWidget *pixelOrderingWidget();
     QWidget *colormapWidget();
 
@@ -72,5 +75,7 @@ private:
     QComboBox *m_colormapScaleCombo   = nullptr;
     QPushButton *m_colormapResetBtn   = nullptr;
     QPushButton *m_bgColorButton      = nullptr;
-    QColor m_bgColor                  = QColor(10, 10, 15);
+    QPushButton *m_unseenColorButton  = nullptr;
+    QColor m_bgColor                  = QColor(0, 0, 0);
+    QColor m_unseenColor              = QColor(0, 0, 0);
 };

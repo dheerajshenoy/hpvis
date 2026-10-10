@@ -4,7 +4,10 @@
 #include "shaderloader.hpp"
 
 #include <QFile>
+#include <QNativeGestureEvent>
+#include <QMouseEvent>
 #include <QVector3D>
+#include <QWheelEvent>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -12,7 +15,10 @@
 #include <qcoreapplication.h>
 #include <vector>
 
-OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent) {}
+OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
+{
+    m_camera = new MapCamera();
+}
 
 OpenGLWidget::~OpenGLWidget()
 {
@@ -97,6 +103,8 @@ OpenGLWidget::paintGL()
 
     m_shaderProgram.bind();
 
+    m_camera->uploadUniforms(m_shaderProgram);
+
     // 1. Bind the 1D HEALPix map texture to texture unit 0
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_mapTexture);
@@ -113,8 +121,11 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("pixel_ordering",
                                     static_cast<int>(m_pixelOrdering));
     m_shaderProgram.setUniformValue(
-        "bg_color", QVector3D(m_bgColor.redF(), m_bgColor.greenF(),
-                              m_bgColor.blueF()));
+        "bg_color",
+        QVector3D(m_bgColor.redF(), m_bgColor.greenF(), m_bgColor.blueF()));
+    m_shaderProgram.setUniformValue(
+        "unseen_color", QVector3D(m_unseenColor.redF(), m_unseenColor.greenF(),
+                                  m_unseenColor.blueF()));
     m_shaderProgram.setUniformValue("invert_colormap",
                                     m_invertColormap ? 1 : 0);
 
@@ -204,4 +215,102 @@ OpenGLWidget::setupGeometry()
     // Release bindings
     m_vbo.release();
     m_vao.release();
+}
+
+QVector2D
+OpenGLWidget::toNdc(const QPointF &pos) const
+{
+    return QVector2D(2.0f * float(pos.x()) / width() - 1.0f,
+                     1.0f - 2.0f * float(pos.y()) / height());
+}
+
+bool
+OpenGLWidget::event(QEvent *e)
+{
+    // Touchpad pinch (Wayland / macOS native gestures)
+    if (e->type() == QEvent::NativeGesture)
+    {
+        auto *g = static_cast<QNativeGestureEvent *>(e);
+        if (g->gestureType() == Qt::ZoomNativeGesture)
+        {
+            m_camera->zoomAt(1.0f + float(g->value()), toNdc(g->position()));
+            update();
+            return true;
+        }
+        if (g->gestureType() == Qt::SmartZoomNativeGesture)
+        {
+            m_camera->reset();
+            update();
+            return true;
+        }
+    }
+    return QOpenGLWidget::event(e);
+}
+
+void
+OpenGLWidget::wheelEvent(QWheelEvent *e)
+{
+    const QPoint px = e->pixelDelta();
+
+    // Two-finger touchpad scroll: pan (pixelDelta is only set by touchpads)
+    if (!px.isNull() && !(e->modifiers() & Qt::ControlModifier))
+    {
+        m_camera->panBy(QVector2D(2.0f * px.x() / float(width()),
+                                  -2.0f * px.y() / float(height())));
+        update();
+        e->accept();
+        return;
+    }
+
+    // Mouse wheel, or pinch reported as Ctrl+wheel: zoom about the cursor
+    const double steps = (px.isNull() ? e->angleDelta().y() / 120.0
+                                      : px.y() / 50.0);
+    m_camera->zoomAt(float(std::pow(1.15, steps)), toNdc(e->position()));
+    update();
+    e->accept();
+}
+
+void
+OpenGLWidget::mousePressEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton)
+    {
+        m_isPanning    = true;
+        m_lastMousePos = e->pos();
+        setCursor(Qt::ClosedHandCursor);
+    }
+}
+
+void
+OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton)
+    {
+        m_isPanning = false;
+        unsetCursor();
+    }
+}
+
+void
+OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton)
+    {
+        m_camera->reset();
+        update();
+    }
+}
+
+void
+OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
+{
+    if (!m_isPanning)
+        return;
+
+    const QPoint delta = e->pos() - m_lastMousePos;
+    m_lastMousePos     = e->pos();
+
+    m_camera->panBy(QVector2D(2.0f * delta.x() / float(width()),
+                              -2.0f * delta.y() / float(height())));
+    update();
 }

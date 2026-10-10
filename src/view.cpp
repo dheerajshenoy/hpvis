@@ -8,15 +8,15 @@
 
 View::View(QWidget *parent) : QWidget(parent)
 {
-    m_layout   = new QVBoxLayout(this);
-    m_glWidget = new OpenGLWidget(this);
-    m_layout->addWidget(m_glWidget);
+    QVBoxLayout *layout = new QVBoxLayout(this);
+    m_glWidget          = new OpenGLWidget(this);
+    layout->addWidget(m_glWidget);
 
-    m_layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(0, 0, 0, 0);
     m_glWidget->setContentsMargins(0, 0, 0, 0);
     this->setContentsMargins(0, 0, 0, 0);
 
-    setLayout(m_layout);
+    setLayout(layout);
 }
 
 View::~View() {}
@@ -26,8 +26,10 @@ View::loadMap(const std::string &filename)
 {
     try
     {
-        read_Healpix_map_from_fits(filename, m_healpix_map, 1, 2);
-        m_glWidget->setMap(m_healpix_map);
+        Healpix_Map<float> healpix_map;
+
+        read_Healpix_map_from_fits(filename, healpix_map, 1, 2);
+        m_glWidget->setMap(healpix_map);
     }
     catch (const PlanckError &e)
     {

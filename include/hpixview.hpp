@@ -39,6 +39,7 @@ private slots:
     void onColormapScaleChanged(ColormapScale scale);
     void onColormapRangeResetRequested();
     void onBackgroundColorChanged(const QColor &color);
+    void onUnseenColorChanged(const QColor &color);
 
 private:
     QMenu *m_fileMenu = nullptr;
