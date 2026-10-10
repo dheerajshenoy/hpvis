@@ -54,6 +54,13 @@ public:
         return m_vmax;
     }
 
+    QRect minimapRect() const;
+    bool minimapVisible() const
+    {
+        return m_minimapEnabled && m_camera->zoom > 1.0f;
+    }
+    void panToMinimapPoint(const QPointF &pos);
+
     inline bool minimapEnabled() const
     {
         return m_minimapEnabled;
@@ -212,6 +219,7 @@ private:
     MapCamera *m_camera = nullptr;
     bool m_isPanning    = false;
     QPoint m_lastMousePos;
+    bool m_draggingMinimap = false;
     QPointF m_cursorPos; // last pointer position in widget coords
 
     struct MaskEntry

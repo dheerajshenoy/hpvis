@@ -370,11 +370,9 @@ OpenGLWidget::paintGL()
 
     // Minimap: the whole map in a small 2:1 viewport (bottom-right corner)
     const double dpr = devicePixelRatioF();
-    const QRect minimapRect(width() - kMinimapW - kMinimapMargin,
-                            height() - kMinimapH - kMinimapMargin, kMinimapW,
-                            kMinimapH);
+    const QRect minimapRect = this->minimapRect();
     // Only useful once the view is smaller than the whole map
-    const bool showMinimap = m_minimapEnabled && m_camera->zoom > 1.0f;
+    const bool showMinimap = minimapVisible();
     if (showMinimap)
     {
         const GLint physW = qRound(kMinimapW * dpr);
@@ -878,9 +876,35 @@ OpenGLWidget::wheelEvent(QWheelEvent *e)
     e->accept();
 }
 
+QRect
+OpenGLWidget::minimapRect() const
+{
+    return QRect(width() - kMinimapW - kMinimapMargin,
+                 height() - kMinimapH - kMinimapMargin, kMinimapW, kMinimapH);
+}
+
+void
+OpenGLWidget::panToMinimapPoint(const QPointF &pos)
+{
+    const QRect r  = minimapRect();
+    const float nx = float((pos.x() - r.left()) / r.width() * 2.0 - 1.0);
+    const float ny = float(1.0 - (pos.y() - r.top()) / r.height() * 2.0);
+    m_camera->panOffset = QVector2D(nx, ny);
+    m_camera->clampPan();
+    emitCursorData();
+    update();
+}
+
 void
 OpenGLWidget::mousePressEvent(QMouseEvent *e)
 {
+    if (e->button() == Qt::LeftButton && minimapVisible()
+        && minimapRect().contains(e->pos()))
+    {
+        m_draggingMinimap = true;
+        panToMinimapPoint(e->position());
+        return;
+    }
     if (e->button() == Qt::LeftButton)
     {
         m_isPanning    = true;
@@ -894,6 +918,7 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
 {
     if (e->button() == Qt::LeftButton)
     {
+        m_draggingMinimap = false;
         m_isPanning = false;
         unsetCursor();
     }
@@ -902,6 +927,9 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
 void
 OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
 {
+    if (e->button() == Qt::LeftButton && minimapVisible()
+        && minimapRect().contains(e->pos()))
+        return;
     if (e->button() == Qt::LeftButton)
     {
         m_camera->reset();
@@ -923,6 +951,11 @@ void
 OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 {
     m_cursorPos = e->position();
+    if (m_draggingMinimap)
+    {
+        panToMinimapPoint(e->position());
+        return;
+    }
     if (!m_isPanning)
     {
         emitCursorData();
