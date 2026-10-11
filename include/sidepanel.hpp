@@ -72,6 +72,18 @@ public:
         return m_graticuleStepCombo->currentData().toDouble();
     }
 
+    // Show the view's orientation (degrees) without emitting
+    // rotationEdited
+    void setRotation(double lonDeg, double latDeg, double rollDeg)
+    {
+        QSignalBlocker b1(m_centerLonSpin);
+        QSignalBlocker b2(m_centerLatSpin);
+        QSignalBlocker b3(m_rollSpin);
+        m_centerLonSpin->setValue(lonDeg);
+        m_centerLatSpin->setValue(latDeg);
+        m_rollSpin->setValue(rollDeg);
+    }
+
     // Select a projection without emitting projectionChanged
     void setProjection(Projection projection)
     {
@@ -122,6 +134,8 @@ signals:
     void graticuleColorChanged(uint32_t color);
     void graticuleStepChanged(double degrees);
     void projectionChanged(Projection index);
+    void rotationEdited(double lonDeg, double latDeg, double rollDeg);
+    void rotationResetRequested();
 
 private:
     void initUI();
@@ -154,6 +168,9 @@ private:
 
     // Projection controls
     QComboBox *m_projectionCombo = nullptr;
+    QDoubleSpinBox *m_centerLonSpin = nullptr;
+    QDoubleSpinBox *m_centerLatSpin = nullptr;
+    QDoubleSpinBox *m_rollSpin      = nullptr;
 
     // Pixel ordering controls
     QComboBox *m_pixOrdCombo = nullptr;

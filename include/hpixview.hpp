@@ -35,6 +35,7 @@ private:
     void initMenubar();
     void updateRecentMenu();
     void applyDefaults(View *view);
+    void syncRotationControls(const View *view);
     void initCFITSIO();
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
@@ -67,6 +68,7 @@ private:
     QAction *m_fileOpenAction   = nullptr;
     QMenu *m_fileOpenRecentMenu = nullptr;
     RecentFiles m_recentFiles;
+    bool m_editingRotation = false;
     AppSettings m_settings        = AppSettings::load();
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;

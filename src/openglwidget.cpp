@@ -1169,8 +1169,15 @@ OpenGLWidget::updateRotation(const QPointF &pos)
     if (!viewDirectionAt(pos, v1))
         return; // cursor left the shape: keep the last rotation
 
-    m_rotation = (m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
-                     .normalized();
+    setRotation((m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
+                    .normalized());
+}
+
+void
+OpenGLWidget::setRotation(const QQuaternion &rotation)
+{
+    m_rotation = rotation;
+    emit rotationChanged();
     emitCursorData();
     update();
 }
@@ -1178,9 +1185,41 @@ OpenGLWidget::updateRotation(const QPointF &pos)
 void
 OpenGLWidget::resetRotation()
 {
-    m_rotation = QQuaternion();
-    emitCursorData();
-    update();
+    setRotation(QQuaternion());
+}
+
+void
+OpenGLWidget::setRotationAngles(double lonDeg, double latDeg, double rollDeg)
+{
+    const QQuaternion rz
+        = QQuaternion::fromAxisAndAngle(0, 0, 1, float(lonDeg));
+    const QQuaternion ry
+        = QQuaternion::fromAxisAndAngle(0, 1, 0, float(-latDeg));
+    const QQuaternion rx
+        = QQuaternion::fromAxisAndAngle(1, 0, 0, float(rollDeg));
+    setRotation((rz * ry * rx).normalized());
+}
+
+void
+OpenGLWidget::rotationAngles(double &lonDeg, double &latDeg,
+                             double &rollDeg) const
+{
+    // The view center is where the x axis ends up
+    const QVector3D c = m_rotation.rotatedVector(QVector3D(1, 0, 0));
+    const double lon  = std::atan2(double(c.y()), double(c.x()));
+    const double lat  = std::asin(std::clamp(double(c.z()), -1.0, 1.0));
+
+    // Undo lon and lat; what is left is the roll about x
+    const QQuaternion rz
+        = QQuaternion::fromAxisAndAngle(0, 0, 1, float(-qRadiansToDegrees(lon)));
+    const QQuaternion ry
+        = QQuaternion::fromAxisAndAngle(0, 1, 0, float(qRadiansToDegrees(lat)));
+    const QVector3D u
+        = (ry * rz * m_rotation).rotatedVector(QVector3D(0, 1, 0));
+
+    lonDeg  = qRadiansToDegrees(lon);
+    latDeg  = qRadiansToDegrees(lat);
+    rollDeg = qRadiansToDegrees(std::atan2(double(u.z()), double(u.y())));
 }
 
 void
@@ -1309,7 +1348,7 @@ OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
     if (e->button() == Qt::LeftButton)
     {
         m_camera->reset();
-        m_rotation = QQuaternion();
+        setRotation(QQuaternion());
         emit zoomChanged(m_camera->zoom);
         emitCursorData();
         update();
@@ -1376,7 +1415,7 @@ void
 OpenGLWidget::resetView()
 {
     m_camera->reset();
-    m_rotation = QQuaternion();
+    setRotation(QQuaternion());
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
     update();

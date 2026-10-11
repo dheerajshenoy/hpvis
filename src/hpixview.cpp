@@ -70,6 +70,23 @@ HpixView::initUI()
 void
 HpixView::initConnections()
 {
+    connect(m_sidePanel, &SidePanel::rotationEdited, this,
+            [this](double lon, double lat, double roll)
+    {
+        if (!m_view)
+            return;
+        // Don't write the values back into the box being edited
+        m_editingRotation = true;
+        m_view->glWidget()->setRotationAngles(lon, lat, roll);
+        m_editingRotation = false;
+    });
+
+    connect(m_sidePanel, &SidePanel::rotationResetRequested, this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->resetRotation();
+    });
+
     connect(m_sidePanel, &SidePanel::projectionChanged, this,
             [this](Projection projection)
     {
@@ -409,6 +426,14 @@ HpixView::initViewConnections(const View *view)
 
     connect(view, &View::zoomChanged, m_statusBar, &StatusBar::setZoom);
 
+    // Dragging (or resetting) the view moves the side panel's values
+    connect(view->glWidget(), &OpenGLWidget::rotationChanged, this,
+            [this, view]()
+    {
+        if (view == m_view && !m_editingRotation)
+            syncRotationControls(view);
+    });
+
     // Result of switching HDU / column from the side panel
     connect(view, &View::hduLoaded, this,
             [this, view](bool ok, const QString &error)
@@ -459,6 +484,7 @@ HpixView::updateSidePanelStateFromView(const View *view)
     auto *map = view->glWidget()->healpixMap();
     m_sidePanel->setFitsInfo(view->fitsInfo(), view->hdu(), view->column());
     m_sidePanel->setProjection(view->glWidget()->projection());
+    syncRotationControls(view);
     m_sidePanel->setMapInfo(
         map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
         view->glWidget()->mapRms(), view->glWidget()->mapStd(),
@@ -709,6 +735,14 @@ HpixView::onSettingsActionTriggered()
     // Refresh the side panel and menu check marks for the current tab
     if (m_view)
         onTabChanged(m_tabWidget->currentIndex());
+}
+
+void
+HpixView::syncRotationControls(const View *view)
+{
+    double lon, lat, roll;
+    view->glWidget()->rotationAngles(lon, lat, roll);
+    m_sidePanel->setRotation(lon, lat, roll);
 }
 
 // Gives a newly loaded map the user's default view options

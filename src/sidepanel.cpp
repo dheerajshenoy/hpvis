@@ -577,5 +577,33 @@ SidePanel::projectionWidget()
             m_projectionCombo->itemData(index).toInt()));
     });
 
+    // Orientation of the sky in the view. Dragging in the view updates these
+    auto makeSpin = [this](double min, double max, bool wrap)
+    {
+        auto *spin = new QDoubleSpinBox();
+        spin->setRange(min, max);
+        spin->setDecimals(2);
+        spin->setSingleStep(1.0);
+        spin->setSuffix(QString::fromUtf8("\u00b0"));
+        spin->setWrapping(wrap);
+        connect(spin, &QDoubleSpinBox::valueChanged, this, [this](double)
+        {
+            emit rotationEdited(m_centerLonSpin->value(),
+                                m_centerLatSpin->value(), m_rollSpin->value());
+        });
+        return spin;
+    };
+    m_centerLonSpin = makeSpin(-180.0, 180.0, true);
+    m_centerLatSpin = makeSpin(-90.0, 90.0, false);
+    m_rollSpin      = makeSpin(-180.0, 180.0, true);
+    layout->addRow("Center longitude:", m_centerLonSpin);
+    layout->addRow("Center latitude:", m_centerLatSpin);
+    layout->addRow("Roll:", m_rollSpin);
+
+    auto *reset = new QPushButton("Reset Rotation");
+    connect(reset, &QPushButton::clicked, this,
+            &SidePanel::rotationResetRequested);
+    layout->addRow(reset);
+
     return widget;
 }

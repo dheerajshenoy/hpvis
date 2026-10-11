@@ -40,7 +40,8 @@ First development release.
 - Interactive sky rotation: Ctrl + left-drag or middle-drag in any projection
   (plain left-drag in the Orthographic and Azimuthal views) grabs the sky
   point under the cursor and keeps it there. Double-click or Reset View
-  restores the orientation. The cursor readout and graticule labels follow
+  restores the orientation. The Projection section has Center longitude /
+  Center latitude / Roll boxes that follow the drag and can be typed into. The cursor readout and graticule labels follow
   the rotation.
 - Mouse wheel zoom, left-drag pan, double-click to reset the view.
 - Touchpad support: pinch to zoom, two-finger scroll to pan, Ctrl+scroll to

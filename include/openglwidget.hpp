@@ -227,6 +227,11 @@ public:
     void resetView();
     void resetRotation();
 
+    // Where the view is centered (degrees) and how it is rolled about the
+    // line of sight. R = Rz(lon) * Ry(-lat) * Rx(roll)
+    void setRotationAngles(double lonDeg, double latDeg, double rollDeg);
+    void rotationAngles(double &lonDeg, double &latDeg, double &rollDeg) const;
+
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -243,6 +248,7 @@ signals:
     void mapLoaded(long nside, long npix, double avg, double rms, double std,
                    float min, float max);
     void zoomChanged(float zoom);
+    void rotationChanged(); // drag, reset or setRotationAngles
     void masksChanged(); // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
     void colormapRangeChanged(float min, float max);
@@ -254,6 +260,7 @@ private:
     QVector2D toNdc(const QPointF &pos) const;
     QVector2D viewScale() const;
     bool projectToWindow(double latRad, double lonRad, QPointF &out) const;
+    void setRotation(const QQuaternion &rotation);
     bool viewDirectionAt(const QPointF &pos, QVector3D &dir) const;
     bool startRotation(const QPointF &pos);
     void updateRotation(const QPointF &pos);
