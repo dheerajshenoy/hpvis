@@ -235,6 +235,15 @@ HpVis::initConnections()
     connect(m_toolBar, &ViewToolBar::colormapChanged, this,
             &HpVis::onColormapChanged);
 
+    // Plot colors picked in the dock are the new defaults in the settings
+    connect(m_powerDock, &PowerSpectrumDock::plotColorsChanged, this,
+            [this](const QColor &bg, const QColor &fg, const QColor &line)
+    {
+        m_settings.plotBackground = bg;
+        m_settings.plotForeground = fg;
+        m_settings.plotLine       = line;
+    });
+
     connect(m_tabWidget, &TabWidget::currentChanged, this,
             &HpVis::onTabChanged);
 
@@ -987,6 +996,8 @@ HpVis::applySavedSettings()
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     updateRecentMenu();
     applyInterfaceSettings();
+    m_powerDock->setPlotColors(m_settings.plotBackground,
+                               m_settings.plotForeground, m_settings.plotLine);
 
     // Apply what changed to the maps that are already open too. Only the
     // changed options are touched, so per-map tweaks to the others survive.

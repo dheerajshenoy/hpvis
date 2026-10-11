@@ -45,7 +45,7 @@ SettingsDialog::initUI()
     m_pageKeywords = {
         "general files recent history list folder directory remember last "
         "interface toolbar status bar show hide",
-        "appearance new maps defaults projection perspective inside outside sky globe mirror orientation free galactic ecliptic equatorial frame coordinates mollweide orthographic "
+        "appearance power spectrum plot background foreground line colors new maps defaults projection perspective inside outside sky globe mirror orientation free galactic ecliptic equatorial frame coordinates mollweide orthographic "
         "colormap animate "
         "color scale linear log reverse background unseen globe shadow limb "
         "darkening",
@@ -227,6 +227,9 @@ SettingsDialog::currentSettings() const
     a.globeShadow        = m_globeShadowCheck->isChecked();
     a.limbDarkening      = m_limbDarkeningCheck->isChecked();
     a.animateOrthoGlobe  = m_animateCheck->isChecked();
+    a.plotBackground     = m_plotBackground;
+    a.plotForeground     = m_plotForeground;
+    a.plotLine           = m_plotLine;
     return a;
 }
 
@@ -275,6 +278,12 @@ SettingsDialog::loadSettings()
     m_globeShadowCheck->setChecked(a.globeShadow);
     m_limbDarkeningCheck->setChecked(a.limbDarkening);
     m_animateCheck->setChecked(a.animateOrthoGlobe);
+    m_plotBackground = a.plotBackground;
+    m_plotForeground = a.plotForeground;
+    m_plotLine       = a.plotLine;
+    setColorButton(m_plotBgButton, m_plotBackground);
+    setColorButton(m_plotFgButton, m_plotForeground);
+    setColorButton(m_plotLineButton, m_plotLine);
 
     m_saved = currentSettings(); // normalised by the widgets (e.g. step)
     updateSaveEnabled();
@@ -425,8 +434,28 @@ SettingsDialog::createAppearanceSettingsPage()
     m_animateCheck      = new QCheckBox("Orthographic globe: spin after dragging, glide on reset");
     animationForm->addRow(m_animateCheck);
 
+    // --- Power spectrum plot ---
+    auto *plotBox  = new QGroupBox("Power spectrum plot");
+    auto *plotForm = new QFormLayout(plotBox);
+    auto addPlotColor = [&](QPushButton *&button, QColor &color,
+                            const QString &label, const QString &title)
+    {
+        button = new QPushButton();
+        button->setFixedHeight(22);
+        connect(button, &QPushButton::clicked, this,
+                [this, &button, &color, title]()
+        { pickColor(button, color, title); });
+        plotForm->addRow(label, button);
+    };
+    addPlotColor(m_plotBgButton, m_plotBackground, "Background:",
+                 "Plot Background");
+    addPlotColor(m_plotFgButton, m_plotForeground, "Foreground:",
+                 "Plot Foreground (text and axes)");
+    addPlotColor(m_plotLineButton, m_plotLine, "Line:", "Plot Line");
+
     outer->addWidget(orthoBox);
     outer->addWidget(animationBox);
+    outer->addWidget(plotBox);
 
     outer->addStretch();
     return page;

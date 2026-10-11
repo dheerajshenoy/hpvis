@@ -27,8 +27,33 @@ Item {
     property var ell: []
     property var values: []
 
-    readonly property color fg: "#e6e6e6"
-    readonly property color dim: "#5a5a64"
+    // Set from the dock (the user's choice); the rest is derived from them
+    property color bgColor: "#121217"
+    property color fgColor: "#e6e6e6"
+    property color lineColor: "#7fd1ff"
+
+    // GraphsView does not repaint when only a series' color changes, so
+    // refill the series (and ask for a redraw) after any color change
+    function refreshColors() {
+        series.color = lineColor
+        rebuild()
+        graph.update()
+    }
+    onLineColorChanged: refreshColors()
+    onBgColorChanged: graph.update()
+    onFgColorChanged: graph.update()
+
+    function mix(a, b, t) {   // t = 0 gives a, t = 1 gives b
+        return Qt.rgba(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t,
+                       a.b + (b.b - a.b) * t, 1)
+    }
+    readonly property color fg: fgColor
+    readonly property color dim: mix(fgColor, bgColor, 0.62)
+    readonly property color gridMain: mix(fgColor, bgColor, 0.84)
+    readonly property color gridSub: mix(fgColor, bgColor, 0.92)
+    readonly property color plotBg: mix(bgColor, fgColor, 0.04)
+    readonly property bool dark: (0.299 * bgColor.r + 0.587 * bgColor.g
+                                  + 0.114 * bgColor.b) < 0.5
 
     property var linX: ValueAxis {
         min: view.xMin
@@ -73,17 +98,18 @@ Item {
         axisY: view.logY ? view.logYAxis : view.linY
 
         theme: GraphsTheme {
-            colorScheme: GraphsTheme.ColorScheme.Dark
-            backgroundColor: "#121217"
-            plotAreaBackgroundColor: "#16161d"
+            colorScheme: view.dark ? GraphsTheme.ColorScheme.Dark
+                                   : GraphsTheme.ColorScheme.Light
+            backgroundColor: view.bgColor
+            plotAreaBackgroundColor: view.plotBg
             labelTextColor: view.fg
-            grid.mainColor: "#32323c"
-            grid.subColor: "#24242c"
+            grid.mainColor: view.gridMain
+            grid.subColor: view.gridSub
         }
 
         LineSeries {
             id: series
-            color: "#7fd1ff"
+            color: view.lineColor
             width: 2
         }
 
@@ -187,7 +213,7 @@ Item {
         height: 9
         radius: 5
         color: "#ffd166"
-        border.color: "#121217"
+        border.color: view.bgColor
         border.width: 1
         visible: false
         z: 5
@@ -196,8 +222,8 @@ Item {
     Rectangle {
         id: readout
         visible: hoverMarker.visible
-        color: "#e61a1a22"
-        border.color: "#5a5a64"
+        color: view.mix(view.bgColor, view.fgColor, 0.08)
+        border.color: view.dim
         radius: 4
         z: 6
         width: readoutText.implicitWidth + 14

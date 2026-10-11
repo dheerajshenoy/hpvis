@@ -67,6 +67,14 @@ AppSettings::load()
         s.value("view/graticuleStep", d.graticuleStep).toDouble(), 1.0, 90.0);
     a.globeShadow   = s.value("view/globeShadow", d.globeShadow).toBool();
     a.limbDarkening = s.value("view/limbDarkening", d.limbDarkening).toBool();
+    auto color = [&s](const char *key, const QColor &fallback)
+    {
+        const QColor c(s.value(key, fallback.name()).toString());
+        return c.isValid() ? c : fallback;
+    };
+    a.plotBackground = color("plot/background", d.plotBackground);
+    a.plotForeground = color("plot/foreground", d.plotForeground);
+    a.plotLine       = color("plot/line", d.plotLine);
     a.animateOrthoGlobe
         = s.value("view/animateOrthoGlobe", d.animateOrthoGlobe).toBool();
     return a;
@@ -102,5 +110,8 @@ AppSettings::save() const
     s.setValue("view/globeShadow", globeShadow);
     s.setValue("view/limbDarkening", limbDarkening);
     s.setValue("view/animateOrthoGlobe", animateOrthoGlobe);
+    s.setValue("plot/background", plotBackground.name());
+    s.setValue("plot/foreground", plotForeground.name());
+    s.setValue("plot/line", plotLine.name());
     s.sync();
 }

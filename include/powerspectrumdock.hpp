@@ -2,6 +2,7 @@
 
 #include "healpix_map.h"
 
+#include <QColor>
 #include <QDockWidget>
 #include <QHash>
 #include <QPointer>
@@ -45,8 +46,17 @@ public:
 
     // The map the dock shows (null when there is none)
     void setView(View *view);
+    // Plot colors (also set from the settings dialog)
+    void setPlotColors(const QColor &background, const QColor &foreground,
+                       const QColor &line);
+
     // Drops what was stored for a view that is going away
     void forget(const View *view);
+
+signals:
+    // The user picked a plot color in the dock
+    void plotColorsChanged(const QColor &background, const QColor &foreground,
+                           const QColor &line);
 
 private:
     struct Result
@@ -67,7 +77,9 @@ private:
     void updateProgress();
     void refresh();
     void updatePlot(const Spectra &spectra);
-    void applyPlotScales();
+    void applyPlotColors();
+    void pickPlotColor(QPushButton *button, QColor &color, const QString &title);
+    void showColorOnButton(QPushButton *button, const QColor &color);
     void exportCsv();
     void exportImage();
 
@@ -91,6 +103,12 @@ private:
     QCheckBox *m_logXCheck     = nullptr;
     QCheckBox *m_logYCheck     = nullptr;
     QToolButton *m_exportButton = nullptr;
+    QPushButton *m_bgButton     = nullptr;
+    QPushButton *m_fgButton     = nullptr;
+    QPushButton *m_lineButton   = nullptr;
+    QColor m_plotBackground;
+    QColor m_plotForeground;
+    QColor m_plotLine;
     QPushButton *m_computeButton = nullptr;
     QProgressBar *m_progressBar  = nullptr;
     QLabel *m_progressLabel      = nullptr;

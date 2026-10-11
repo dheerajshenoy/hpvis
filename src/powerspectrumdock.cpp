@@ -1,5 +1,6 @@
 #include "powerspectrumdock.hpp"
 
+#include "appsettings.hpp"
 #include "alm.h"
 #include "alm_healpix_tools.h"
 #include "alm_powspec_tools.h"
@@ -11,6 +12,7 @@
 #include "view.hpp"
 
 #include <QCheckBox>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QDir>
 #include <QFile>
@@ -408,12 +410,40 @@ PowerSpectrumDock::initUI()
     connect(m_logXCheck, &QCheckBox::toggled, this, replot);
     connect(m_logYCheck, &QCheckBox::toggled, this, replot);
 
+    // Plot colors: background, foreground (text and axes) and the line
+    {
+        const AppSettings defaults = AppSettings::load();
+        m_plotBackground           = defaults.plotBackground;
+        m_plotForeground           = defaults.plotForeground;
+        m_plotLine                 = defaults.plotLine;
+    }
+    auto makeColorButton = [this](QPushButton *&button, QColor &color,
+                                  const QString &tip, const QString &title)
+    {
+        button = new QPushButton();
+        button->setFixedSize(26, 20);
+        button->setToolTip(tip);
+        showColorOnButton(button, color);
+        connect(button, &QPushButton::clicked, this,
+                [this, &button, &color, title]()
+        { pickPlotColor(button, color, title); });
+    };
+    makeColorButton(m_bgButton, m_plotBackground, "Plot background",
+                    "Plot Background");
+    makeColorButton(m_fgButton, m_plotForeground,
+                    "Plot foreground (text and axes)", "Plot Foreground");
+    makeColorButton(m_lineButton, m_plotLine, "Plot line", "Plot Line");
+    m_chartView->setColor(m_plotBackground);
+
     auto *plotOptions = new QHBoxLayout();
     plotOptions->addWidget(new QLabel("y:"));
     plotOptions->addWidget(m_quantityCombo);
     plotOptions->addWidget(m_logXCheck);
     plotOptions->addWidget(m_logYCheck);
     plotOptions->addStretch();
+    plotOptions->addWidget(m_bgButton);
+    plotOptions->addWidget(m_fgButton);
+    plotOptions->addWidget(m_lineButton);
     plotOptions->addWidget(m_exportButton);
 
     auto *top = new QHBoxLayout();
@@ -560,6 +590,7 @@ PowerSpectrumDock::refresh()
     {
         m_chartView->setSource(QUrl("qrc:/src/qml/powerspectrumplot.qml"));
         m_plotLoaded = true;
+        applyPlotColors();
     }
     updatePlot(sp);
 }
@@ -702,6 +733,58 @@ PowerSpectrumDock::updateProgress()
             ? QString("Cancelling after the current step\u2026 (%1)")
                   .arg(elapsed)
             : QString("%1 \u2014 %2 elapsed").arg(job.stage.load()).arg(elapsed));
+}
+
+void
+PowerSpectrumDock::showColorOnButton(QPushButton *button, const QColor &color)
+{
+    button->setStyleSheet(
+        QString("background-color: %1; border: 1px solid gray;")
+            .arg(color.name()));
+}
+
+void
+PowerSpectrumDock::applyPlotColors()
+{
+    m_chartView->setColor(m_plotBackground);
+    if (QQuickItem *root = m_chartView->rootObject())
+    {
+        root->setProperty("bgColor", m_plotBackground);
+        root->setProperty("fgColor", m_plotForeground);
+        root->setProperty("lineColor", m_plotLine);
+    }
+}
+
+void
+PowerSpectrumDock::setPlotColors(const QColor &background,
+                                 const QColor &foreground, const QColor &line)
+{
+    m_plotBackground = background;
+    m_plotForeground = foreground;
+    m_plotLine       = line;
+    showColorOnButton(m_bgButton, background);
+    showColorOnButton(m_fgButton, foreground);
+    showColorOnButton(m_lineButton, line);
+    applyPlotColors();
+}
+
+// A color chosen in the dock is saved like the one in the settings dialog
+void
+PowerSpectrumDock::pickPlotColor(QPushButton *button, QColor &color,
+                                 const QString &title)
+{
+    const QColor chosen = QColorDialog::getColor(color, this, title);
+    if (!chosen.isValid())
+        return;
+    color = chosen;
+    showColorOnButton(button, color);
+    applyPlotColors();
+
+    QSettings settings;
+    settings.setValue("plot/background", m_plotBackground.name());
+    settings.setValue("plot/foreground", m_plotForeground.name());
+    settings.setValue("plot/line", m_plotLine.name());
+    emit plotColorsChanged(m_plotBackground, m_plotForeground, m_plotLine);
 }
 
 // The spectrum the combo selects, from a result

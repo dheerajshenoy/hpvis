@@ -128,7 +128,8 @@ First development release.
   Ctrl: y only), drag to pan and double-click to show everything. The Export
   menu saves the plot as a PNG image or all computed spectra (Cℓ and Dℓ for
   ℓ = 0..lmax, with nside, lmax and the refinement rounds in a header line) as
-  CSV.
+  CSV. The plot's background, foreground (text and axes) and line colors can
+  be picked in the dock or in Settings > Appearance, and are remembered.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are
   computed once on load and whenever masks change, so switching tabs with
