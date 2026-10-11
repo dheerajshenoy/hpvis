@@ -18,9 +18,9 @@
 - [x] Scaling modes: linear, log, asinh, histogram-equalized
 
 ## Projections & navigation
-- [ ] Additional projections: Gnomonic, Orthographic, Cartesian, Hammer-Aitoff
+- [x] Additional projections: Gnomonic, Orthographic, Cartesian, Hammer-Aitoff
 - [x] Zoom and pan (mouse wheel / drag)
-- [ ] Rotate view (lon/lat center), reset view
+- [x] Rotate view (lon/lat center), reset view
 - [ ] Coordinate system conversion (Galactic / Equatorial / Ecliptic)
 
 ## Interaction

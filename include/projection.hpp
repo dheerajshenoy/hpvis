@@ -6,12 +6,12 @@ enum class Projection
     PLATE_CARREE,
     ORTHOGRAPHIC,
     AZIMUTHAL_EQUIDISTANT,
+    GNOMONIC,
     // TODO: Add more projections
     // EQUIRECTANGULAR,
     // MERCATOR,
     // GALL_PETERS,
     // SINUSOIDAL,
     // LAMBERT_CYLINDRICAL,
-    // GNOMONIC,
     // STEREOGRAPHIC
 };

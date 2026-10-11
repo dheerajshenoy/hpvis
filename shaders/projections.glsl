@@ -2,6 +2,7 @@ const int PROJ_MOLLWEIDE = 0;
 const int PROJ_PLATE_CARREE = 1;
 const int PROJ_ORTHOGRAPHIC = 2;
 const int PROJ_AZIMUTHAL_EQUIDISTANT = 3;
+const int PROJ_GNOMONIC = 4;
 
 uniform mat3 globe_rotation;
 uniform int projection_type;
@@ -106,6 +107,25 @@ bool inverseAzimuthalEquidistant(
     return true;
 }
 
+// Tangent-plane projection centered on longitude 0 / latitude 0 (rotate to look
+// elsewhere): great circles are straight lines. The plane edge is 45 degrees
+// from the center, so the plane coordinates are plain tangents (tan 45 = 1).
+// Every point of the plane is valid. The CPU copy is in projectionmath.cpp.
+bool inverseGnomonic(
+    vec2 uv,
+    out float colat,
+    out float phi
+) {
+    float x = (uv.x - 0.5) * 2.0;
+    float y = (uv.y - 0.5) * 2.0;
+
+    vec3 dir = normalize(vec3(1.0, -x, y)); // -x: longitude increases left
+    colat = atan(length(dir.xy), dir.z);
+    phi   = mod(atan(dir.y, dir.x), 2.0 * PI);
+
+    return true;
+}
+
 bool inverseProjection(
     vec2 uv,
     out float colat,
@@ -124,6 +144,9 @@ bool inverseProjection(
         return inverseAzimuthalEquidistant(
             uv, colat, phi
         );
+
+    if (projection_type == PROJ_GNOMONIC)
+        return inverseGnomonic(uv, colat, phi);
 
     return false;
 }

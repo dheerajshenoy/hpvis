@@ -1006,8 +1006,8 @@ OpenGLWidget::emitCursorData()
         return;
     }
     // View frame -> sky (same rotation the shader applies)
-    anglesFromDirection(m_rotation.rotatedVector(directionFromAngles(colat, phi)),
-                        colat, phi);
+    anglesFromDirection(
+        m_rotation.rotatedVector(directionFromAngles(colat, phi)), colat, phi);
 
     const Healpix_Base base(
         static_cast<int>(m_nside),
@@ -1210,8 +1210,8 @@ OpenGLWidget::rotationAngles(double &lonDeg, double &latDeg,
     const double lat  = std::asin(std::clamp(double(c.z()), -1.0, 1.0));
 
     // Undo lon and lat; what is left is the roll about x
-    const QQuaternion rz
-        = QQuaternion::fromAxisAndAngle(0, 0, 1, float(-qRadiansToDegrees(lon)));
+    const QQuaternion rz = QQuaternion::fromAxisAndAngle(
+        0, 0, 1, float(-qRadiansToDegrees(lon)));
     const QQuaternion ry
         = QQuaternion::fromAxisAndAngle(0, 1, 0, float(qRadiansToDegrees(lat)));
     const QVector3D u
@@ -1248,7 +1248,8 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
     // Rotate with the middle button or Ctrl + left drag; the globe-like
     // projections rotate with a plain left drag (panning them is pointless)
     const bool disk = m_projection == Projection::ORTHOGRAPHIC
-                      || m_projection == Projection::AZIMUTHAL_EQUIDISTANT;
+                      || m_projection == Projection::AZIMUTHAL_EQUIDISTANT
+                      || m_projection == Projection::GNOMONIC;
     const bool wantsRotate
         = e->button() == Qt::MiddleButton
           || (e->button() == Qt::LeftButton
@@ -1480,10 +1481,9 @@ OpenGLWidget::projectToWindow(double lat, double lon, QPointF &out) const
 {
     // Sky -> view frame (inverse of the shader's rotation)
     double colat, phi;
-    anglesFromDirection(
-        m_rotation.inverted().rotatedVector(
-            directionFromAngles(M_PI / 2.0 - lat, lon)),
-        colat, phi);
+    anglesFromDirection(m_rotation.inverted().rotatedVector(
+                            directionFromAngles(M_PI / 2.0 - lat, lon)),
+                        colat, phi);
 
     QVector2D plane;
     if (!projectionmath::forward(m_projection, M_PI / 2.0 - colat, phi, plane))

@@ -567,6 +567,8 @@ SidePanel::projectionWidget()
     m_projectionCombo->addItem(
         "Azimuthal Equidistant",
         static_cast<int>(Projection::AZIMUTHAL_EQUIDISTANT));
+    m_projectionCombo->addItem("Gnomonic",
+                               static_cast<int>(Projection::GNOMONIC));
 
     layout->addRow("Projection:", m_projectionCombo);
 

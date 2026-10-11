@@ -167,7 +167,7 @@ private:
     QLineEdit *m_stdEdit   = nullptr;
 
     // Projection controls
-    QComboBox *m_projectionCombo = nullptr;
+    QComboBox *m_projectionCombo    = nullptr;
     QDoubleSpinBox *m_centerLonSpin = nullptr;
     QDoubleSpinBox *m_centerLatSpin = nullptr;
     QDoubleSpinBox *m_rollSpin      = nullptr;

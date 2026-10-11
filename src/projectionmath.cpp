@@ -34,6 +34,8 @@ aspect(Projection projection)
         case Projection::ORTHOGRAPHIC:
         case Projection::AZIMUTHAL_EQUIDISTANT:
             return 1.0;
+        case Projection::GNOMONIC:
+            return 1.0;
     }
     return 2.0;
 }
@@ -52,8 +54,8 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi)
             if ((x * x / 8.0) + (y * y / 2.0) > 1.0)
                 return false;
 
-            const double aux = std::asin(std::clamp(y / kSqrt2, -1.0, 1.0));
-            const double lat = std::asin(std::clamp(
+            const double aux    = std::asin(std::clamp(y / kSqrt2, -1.0, 1.0));
+            const double lat    = std::asin(std::clamp(
                 (2.0 * aux + std::sin(2.0 * aux)) / M_PI, -1.0, 1.0));
             const double cosAux = std::cos(aux);
             double lon          = 0.0;
@@ -63,10 +65,12 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi)
             phi   = wrap2Pi(lon);
             return true;
         }
+
         case Projection::PLATE_CARREE:
             colat = M_PI / 2.0 - py * M_PI / 2.0;
             phi   = wrap2Pi(-px * M_PI);
             return true;
+
         case Projection::ORTHOGRAPHIC:
         {
             const double r2 = px * px + py * py;
@@ -77,6 +81,7 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi)
             phi            = wrap2Pi(std::atan2(-px, z));
             return true;
         }
+
         case Projection::AZIMUTHAL_EQUIDISTANT:
         {
             const double x = px * M_PI, y = py * M_PI;
@@ -85,6 +90,17 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi)
                 return false;
             colat = r;
             phi   = wrap2Pi(std::atan2(-x, y));
+            return true;
+        }
+
+        case Projection::GNOMONIC:
+        {
+            // Tangent plane at the center: direction (1, -x, y) normalized
+            // (-x: longitude increases left); every plane point is valid
+            const double len = std::sqrt(1.0 + px * px + py * py);
+            const double dx = 1.0 / len, dy = -px / len, dz = py / len;
+            colat = std::atan2(std::hypot(dx, dy), dz);
+            phi   = wrap2Pi(std::atan2(dy, dx));
             return true;
         }
     }
@@ -111,10 +127,12 @@ forward(Projection projection, double lat, double lon, QVector2D &plane)
                               float(std::sin(t)));
             return true;
         }
+
         case Projection::PLATE_CARREE:
             plane = QVector2D(float(-wrapPi(lon) / M_PI),
                               float(lat / (M_PI / 2.0)));
             return true;
+
         case Projection::ORTHOGRAPHIC:
         {
             const double z = std::cos(lat) * std::cos(lon);
@@ -124,11 +142,22 @@ forward(Projection projection, double lat, double lon, QVector2D &plane)
                               float(std::sin(lat)));
             return true;
         }
+
         case Projection::AZIMUTHAL_EQUIDISTANT:
         {
             const double r = M_PI / 2.0 - lat; // colatitude
-            plane = QVector2D(float(-r * std::sin(lon) / M_PI),
-                              float(r * std::cos(lon) / M_PI));
+            plane          = QVector2D(float(-r * std::sin(lon) / M_PI),
+                                       float(r * std::cos(lon) / M_PI));
+            return true;
+        }
+
+        case Projection::GNOMONIC:
+        {
+            const double z = std::cos(lat) * std::cos(lon);
+            if (z <= 1e-6)
+                return false; // 90 degrees or more from the center
+            plane = QVector2D(float(-std::cos(lat) * std::sin(lon) / z),
+                              float(std::sin(lat) / z));
             return true;
         }
     }
@@ -147,6 +176,8 @@ labelMeridian(Projection projection)
             return 80.0 * M_PI / 180.0; // near the left limb
         case Projection::AZIMUTHAL_EQUIDISTANT:
             return M_PI / 2.0; // the left side of the disk
+        case Projection::GNOMONIC:
+            return 35.0 * M_PI / 180.0; // left part of the visible area
     }
     return M_PI;
 }
