@@ -87,7 +87,7 @@ add_executable(${PROJECT_NAME}
     src/openglwidget.cpp
     src/tabbar.cpp
     src/tabwidget.cpp
-    src/sidepanel.cpp
+    src/viewtoolbar.cpp
     src/collapsiblesection.cpp
     src/shaderloader.cpp
     src/statusbar.cpp
@@ -106,7 +106,7 @@ add_executable(${PROJECT_NAME}
     include/argparse.hpp
     include/tabwidget.hpp
     include/tabbar.hpp
-    include/sidepanel.hpp
+    include/viewtoolbar.hpp
     include/collapsiblesection.hpp
     include/shaderloader.hpp
     include/mapcamera.hpp

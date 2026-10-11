@@ -213,6 +213,10 @@ public:
     {
         return m_graticuleEnabled;
     }
+    QColor graticuleColor() const
+    {
+        return m_graticuleColor;
+    }
     double graticuleStep() const
     {
         return m_graticuleStepDeg;

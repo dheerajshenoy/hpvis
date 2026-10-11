@@ -6,10 +6,10 @@
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
 #include "recentfiles.hpp"
-#include "sidepanel.hpp"
 #include "statusbar.hpp"
 #include "tabwidget.hpp"
 #include "view.hpp"
+#include "viewtoolbar.hpp"
 
 #include <QMainWindow>
 #include <QTabWidget>
@@ -35,11 +35,11 @@ private:
     void initMenubar();
     void updateRecentMenu();
     void applyDefaults(View *view);
-    void syncRotationControls(const View *view);
     void initCFITSIO();
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
-    void updateSidePanelStateFromView(const View *view);
+    void updateControlsFromView(const View *view);
+    void rebuildMasksMenu(const View *view);
     void initShortcuts();
 
 private slots:
@@ -63,6 +63,7 @@ private slots:
     void onGraticuleToggled(bool enabled);
     void onPowerSpectrumActionTriggered();
     void onStatisticsActionTriggered();
+    void onRotationActionTriggered();
 
 private:
     QMenu *m_editMenu = nullptr;
@@ -71,7 +72,6 @@ private:
     QAction *m_fileOpenAction   = nullptr;
     QMenu *m_fileOpenRecentMenu = nullptr;
     RecentFiles m_recentFiles;
-    bool m_editingRotation        = false;
     AppSettings m_settings        = AppSettings::load();
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
@@ -80,7 +80,12 @@ private:
     QAction *m_viewMinimapAction   = nullptr;
     QAction *m_headerAction        = nullptr;
     QAction *m_viewColorBarAction  = nullptr;
-    QAction *m_viewSidePanelAction = nullptr;
+    QMenu *m_pixelOrderingMenu     = nullptr;
+    QAction *m_nestedAction        = nullptr;
+    QAction *m_ringAction          = nullptr;
+    QMenu *m_graticuleMenu         = nullptr;
+    QMenu *m_graticuleStepMenu     = nullptr;
+    QMenu *m_masksMenu             = nullptr;
     QAction *m_viewResetViewAction = nullptr;
     QMenu *m_viewZoomMenu          = nullptr;
 
@@ -90,6 +95,6 @@ private:
 
     View *m_view           = nullptr;
     TabWidget *m_tabWidget = nullptr;
-    SidePanel *m_sidePanel = nullptr;
+    ViewToolBar *m_toolBar = nullptr;
     StatusBar *m_statusBar = nullptr;
 };
