@@ -210,7 +210,8 @@ signals:
     // Emitted when the implicit colormap range changes (e.g. mask applied)
     void colormapRangeChanged(float min, float max);
     // lonLat in degrees; value is NaN and index -1 when off the map
-    void cursorPosChanged(QPointF lonLat, double value, qlonglong index);
+    void cursorPosChanged(QPointF lonLat, QPointF raDec, double value,
+                          qlonglong index);
 
 private:
     QVector2D toNdc(const QPointF &pos) const;

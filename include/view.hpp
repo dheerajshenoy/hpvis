@@ -39,7 +39,8 @@ private:
 
 signals:
     // lonLat in degrees; value is NaN and index -1 when off the map
-    void cursorPosChanged(QPointF lonLat, double value, qlonglong index);
+    void cursorPosChanged(QPointF lonLat, QPointF raDec, double value,
+                          qlonglong index);
     void zoomChanged(float zoom);
     void masksChanged();
     void colormapRangeChanged(float min, float max);

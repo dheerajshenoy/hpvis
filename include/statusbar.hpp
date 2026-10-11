@@ -13,7 +13,8 @@ public:
 
     void setZoom(float zoom);
     void setFilename(const QString &filename);
-    void setCursorData(QPointF lonLat, double value, qlonglong index);
+    void setCursorData(QPointF lonLat, QPointF raDec, double value,
+                       qlonglong index);
     void clear();
     void setFilesize(const QString &filesize);
 

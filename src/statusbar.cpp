@@ -60,7 +60,8 @@ StatusBar::setFilename(const QString &filename)
 }
 
 void
-StatusBar::setCursorData(QPointF lonLat, double value, qlonglong index)
+StatusBar::setCursorData(QPointF lonLat, QPointF raDec, double value,
+                         qlonglong index)
 {
     if (index < 0)
     {
@@ -69,9 +70,11 @@ StatusBar::setCursorData(QPointF lonLat, double value, qlonglong index)
         m_pixelValueLabel->clear();
         return;
     }
-    m_cursorPosLabel->setText(QString("Lon: %1°  Lat: %2°")
+    m_cursorPosLabel->setText(QString("Lon: %1°  Lat: %2° RA: %3°  Dec: %4°")
                                   .arg(lonLat.x(), 0, 'f', 2)
-                                  .arg(lonLat.y(), 0, 'f', 2));
+                                  .arg(lonLat.y(), 0, 'f', 2)
+                                  .arg(raDec.x(), 0, 'f', 2)
+                                  .arg(raDec.y(), 0, 'f', 2));
     m_pixelIndexLabel->setText(QString("Pixel: %1").arg(index));
     m_pixelValueLabel->setText(std::isfinite(value)
                                    ? QString("Value: %1").arg(value, 0, 'g', 6)

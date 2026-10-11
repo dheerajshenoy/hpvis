@@ -179,8 +179,8 @@ HpixView::initMenubar()
         = m_viewMenu->addAction("&Minimap", this, &HpixView::onMinimapToggled);
     m_viewMinimapAction->setCheckable(true);
 
-    m_viewColorBarAction = m_viewMenu->addAction(
-        "&Color Bar", this, [this](bool state)
+    m_viewColorBarAction
+        = m_viewMenu->addAction("&Color Bar", this, [this](bool state)
     {
         if (m_view)
             m_view->glWidget()->setColorBarVisible(state);
@@ -399,7 +399,8 @@ HpixView::updateStatusBarFromView(const View *view)
     m_statusBar->setFilename(info.fileName());
     m_statusBar->setFilesize(QLocale().formattedDataSize(info.size()));
     m_statusBar->setZoom(view->glWidget()->zoom());
-    m_statusBar->setCursorData(QPointF(), std::nan(""), -1); // clear stale
+    m_statusBar->setCursorData(QPointF(), QPointF(), std::nan(""),
+                               -1); // clear stale
 }
 
 void

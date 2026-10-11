@@ -24,6 +24,43 @@
 #include <qcoreapplication.h>
 #include <vector>
 
+// Converts Galactic coordinates (l, b) in degrees to Equatorial (RA, Dec) in
+// J2000 degrees
+static QPointF
+galacticToEquatorial(double l_deg, double b_deg)
+{
+    // 1. Convert to radians
+    double l = l_deg * M_PI / 180.0;
+    double b = b_deg * M_PI / 180.0;
+
+    // 2. North Galactic Pole (NGP) J2000 coordinates in equatorial system:
+    // RA_NGP = 192.85948 degrees, Dec_NGP = 27.12825 degrees
+    // Ascending node of galactic plane on celestial equator: l_omega = 32.93192
+    // degrees
+    const double ra_ngp  = 192.85948 * M_PI / 180.0;
+    const double dec_ngp = 27.12825 * M_PI / 180.0;
+    const double l_omega = 32.93192 * M_PI / 180.0;
+
+    double cb = std::cos(b);
+    double sb = std::sin(b);
+    double sl = std::sin(l - l_omega);
+    double cl = std::cos(l - l_omega);
+
+    // 3. Transformation via spherical trigonometry / rotation matrix
+    double sd  = sb * std::sin(dec_ngp) + cb * std::cos(dec_ngp) * cl;
+    double dec = std::asin(sd);
+
+    double y = cb * std::sin(dec_ngp) * cl - sb * std::cos(dec_ngp);
+    double x = cb * sl;
+
+    double ra = ra_ngp + std::atan2(y, x);
+
+    // Normalize RA to [0, 2pi) and convert both to degrees
+    ra = std::fmod(ra + 2.0 * M_PI, 2.0 * M_PI);
+
+    return {ra * 180.0 / M_PI, dec * 180.0 / M_PI};
+}
+
 static QVector<double>
 niceTicks(double lo, double hi, int count)
 {
@@ -66,6 +103,7 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
     m_camera = new MapCamera();
     setMouseTracking(true);
     m_cursorPos = QPointF(width() / 2.0, height() / 2.0);
+    setCursor(Qt::CrossCursor);
     emitCursorData();
 }
 
@@ -843,7 +881,7 @@ OpenGLWidget::emitCursorData()
         || std::abs(ndc.y()) > 1.0f // in the padding
         || !inverseMollweide(p * 0.5f + QVector2D(0.5f, 0.5f), colat, phi))
     {
-        emit cursorPosChanged(QPointF(), std::nan(""), -1);
+        emit cursorPosChanged(QPointF(), QPointF(), std::nan(""), -1);
         return;
     }
 
@@ -858,7 +896,10 @@ OpenGLWidget::emitCursorData()
     double lon = phi * 180.0 / M_PI;
     if (lon > 180.0)
         lon -= 360.0;
-    emit cursorPosChanged(QPointF(lon, 90.0 - colat * 180.0 / M_PI), v, idx);
+
+    auto lonlat = QPointF(lon, 90.0 - colat * 180.0 / M_PI);
+    auto radec  = galacticToEquatorial(lonlat.y(), lonlat.x());
+    emit cursorPosChanged(lonlat, radec, v, idx);
 }
 
 QVector2D
@@ -874,8 +915,8 @@ OpenGLWidget::toNdc(const QPointF &pos) const
 QVector2D
 OpenGLWidget::viewScale() const
 {
-    const float w = float(std::max(width(), 1));
-    const float h = float(std::max(height(), 1));
+    const float w   = float(std::max(width(), 1));
+    const float h   = float(std::max(height(), 1));
     const float pad = float(kMapPadding);
     return QVector2D(w / std::max(w - 2.0f * pad, 1.0f),
                      h / std::max(h - 2.0f * pad, 1.0f));
@@ -976,6 +1017,7 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
         panToMinimapPoint(e->position());
         return;
     }
+
     if (e->button() == Qt::LeftButton)
     {
         m_isPanning    = true;
@@ -991,7 +1033,8 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
     {
         m_isRegionSelecting = false;
         m_zoomRegionArmed   = false;
-        unsetCursor();
+        setCursor(Qt::CrossCursor);
+        // unsetCursor();
         processSelectionRegion();
         update();
         e->accept();
@@ -1002,7 +1045,8 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
     {
         m_draggingMinimap = false;
         m_isPanning       = false;
-        unsetCursor();
+        setCursor(Qt::CrossCursor);
+        // unsetCursor();
     }
 }
 
