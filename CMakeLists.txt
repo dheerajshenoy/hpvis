@@ -21,7 +21,7 @@ endif()
 set(HEALPIX_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/healpix)
 set(ENV{PKG_CONFIG_PATH} "${HEALPIX_ROOT}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Concurrent)
 find_package(OpenMP REQUIRED)
 find_package(PkgConfig REQUIRED)
 
@@ -64,6 +64,7 @@ add_executable(${PROJECT_NAME}
     include/collapsiblesection.hpp
     include/shaderloader.hpp
     include/mapcamera.hpp
+    include/parallel.hpp
     include/statusbar.hpp
 )
 
@@ -78,6 +79,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::OpenGLWidgets
+    Qt6::Concurrent
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

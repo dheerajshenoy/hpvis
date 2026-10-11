@@ -78,6 +78,11 @@ First development release.
   cursor's longitude/latitude, pixel index and pixel value.
 - Open files from the File menu, or from the command line (`Hpixview
   file.fits ...`).
+- Maps and masks are read on background threads, so the window stays
+  responsive while large files load (the status bar shows "Loading...").
+  Several files opened together load in parallel.
+- Map statistics (range, f_sky, average, RMS, standard deviation) and the mask
+  weight conversion run on all CPU cores.
 - Error dialog when a map cannot be loaded, including HEALPix library errors.
 
 ### Build and packaging

@@ -143,7 +143,8 @@ public:
 
     // Adds mask maps to the list (each must match the map's nside; files
     // already in the list are skipped). Returns the number added.
-    int addMaskFiles(const QStringList &files);
+    // Asynchronous: masks appear (and masksChanged fires) once they are read
+    void addMaskFiles(const QStringList &files);
     void removeMask(int index);
     void clearMasks();
     void setMaskEnabled(int index, bool enabled);
@@ -201,7 +202,8 @@ public:
     }
     void setMaskMode(int mode);
     void setMaskOpacity(float opacity);
-    void setMap(const Healpix_Map<float> &map);
+    // Takes ownership of `map` (its buffer is swapped in, not copied)
+    void setMap(Healpix_Map<float> &&map);
 
     QRectF colorbarRect() const;
 

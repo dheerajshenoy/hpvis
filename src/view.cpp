@@ -4,7 +4,9 @@
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 
-#include <QMessageBox>
+#include <QFutureWatcher>
+#include <QtConcurrent>
+#include <memory>
 
 View::View(QWidget *parent) : QWidget(parent)
 {
@@ -22,30 +24,57 @@ View::View(QWidget *parent) : QWidget(parent)
 
 View::~View() {}
 
-bool
-View::loadMap(const std::string &filename)
+namespace
 {
-    try
-    {
-        Healpix_Map<float> healpix_map;
+struct LoadResult
+{
+    std::shared_ptr<Healpix_Map<float>> map; // null on failure
+    QString error;
+};
+} // namespace
 
-        read_Healpix_map_from_fits(filename, healpix_map, 1, 2);
-        m_glWidget->setMap(healpix_map);
-        m_filePath = QString::fromStdString(filename);
-        return true;
-    }
-    catch (const PlanckError &e)
-    {
-        QMessageBox::critical(this, "Error",
-                              QString("Failed to load map: %1").arg(e.what()));
-    }
-    catch (const std::exception &e)
-    {
-        QMessageBox::critical(this, "Error",
-                              QString("Failed to load map: %1").arg(e.what()));
-    }
+// Reads the file on a worker thread; the (large) map is handed to the GL
+// widget on the GUI thread once it is done.
+void
+View::loadMap(const QString &filename)
+{
+    m_filePath = filename;
 
-    return false;
+    auto *watcher = new QFutureWatcher<LoadResult>(this);
+    connect(watcher, &QFutureWatcher<LoadResult>::finished, this,
+            [this, watcher]()
+    {
+        LoadResult result = watcher->result();
+        watcher->deleteLater();
+
+        if (!result.map)
+        {
+            emit loadFinished(false, result.error);
+            return;
+        }
+        m_glWidget->setMap(std::move(*result.map));
+        emit loadFinished(true, QString());
+    });
+
+    watcher->setFuture(QtConcurrent::run([filename]()
+    {
+        LoadResult result;
+        try
+        {
+            auto map = std::make_shared<Healpix_Map<float>>();
+            read_Healpix_map_from_fits(filename.toStdString(), *map, 1, 2);
+            result.map = std::move(map);
+        }
+        catch (const PlanckError &e)
+        {
+            result.error = e.what();
+        }
+        catch (const std::exception &e)
+        {
+            result.error = e.what();
+        }
+        return result;
+    }));
 }
 
 void

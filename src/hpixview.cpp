@@ -282,17 +282,35 @@ HpixView::OpenFile(const QString &filePath)
     if (filePath.startsWith("~"))
         resolvedPath = QDir::homePath() + filePath.mid(1);
 
-    View *view = new View();
+    const QString filename = QFileInfo(resolvedPath).fileName();
+    m_statusBar->showMessage(QString("Loading %1...").arg(filename));
 
-    if (view->loadMap(resolvedPath.toStdString()))
+    // Parented to the window so it is cleaned up if we quit while loading
+    View *view = new View(this);
+    view->hide();
+
+    connect(view, &View::loadFinished, this,
+            [this, view, filename](bool ok, const QString &error)
     {
-        auto filename = QFileInfo(resolvedPath).fileName();
+        if (!ok)
+        {
+            QMessageBox::critical(this, "Error",
+                                  QString("Failed to load map: %1").arg(error));
+            m_statusBar->showMessage(QString("Failed to load %1").arg(filename),
+                                     5000);
+            view->deleteLater();
+            return;
+        }
+
         m_tabWidget->addTab(view, filename);
         // Show it now so the GPU upload happens at open time, not on the
         // first tab switch
         m_tabWidget->setCurrentIndex(m_tabWidget->indexOf(view));
         initViewConnections(view);
-    }
+        m_statusBar->showMessage(QString("Loaded %1").arg(filename), 3000);
+    });
+
+    view->loadMap(resolvedPath);
 }
 
 void

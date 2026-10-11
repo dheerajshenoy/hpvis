@@ -32,12 +32,14 @@ public:
         return m_glWidget->healpixMap();
     }
 
-    bool loadMap(const std::string &filename);
+    // Asynchronous: reads the file in the background and emits loadFinished
+    void loadMap(const QString &filename);
 
 private:
     void initConnections();
 
 signals:
+    void loadFinished(bool ok, const QString &error);
     // lonLat in degrees; value is NaN and index -1 when off the map
     void cursorPosChanged(QPointF lonLat, QPointF raDec, double value,
                           qlonglong index);

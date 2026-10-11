@@ -3,9 +3,12 @@
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "healpix_map.h"
+#include "parallel.hpp"
 #include "shaderloader.hpp"
 
 #include <QEnterEvent>
+#include <QFutureWatcher>
+#include <QtConcurrent>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -210,10 +213,7 @@ OpenGLWidget::setMaskOpacity(float opacity)
 void
 OpenGLWidget::recomputeDataRange()
 {
-    long totalPixels = m_pendingMap.Npix();
-    long validPixels = 0;
-    double sum       = 0.0; // for the mask-aware average / rms
-    double sumSq     = 0.0;
+    const long totalPixels = m_pendingMap.Npix();
 
     // Range of valid pixels (ignoring non-finite, HEALPix UNSEEN, masked)
     struct Active
@@ -223,58 +223,80 @@ OpenGLWidget::recomputeDataRange()
     };
 
     std::vector<Active> active;
-
     for (const MaskEntry &m : m_masks)
         if (m.enabled && m.data.size() == size_t(totalPixels))
             active.push_back({m.data.data(), m.inverted});
 
-    m_dataMin = std::numeric_limits<float>::max();
-    m_dataMax = std::numeric_limits<float>::lowest();
+    struct Stats
+    {
+        long valid  = 0;
+        double sum  = 0.0; // for the mask-aware average / rms
+        double sumSq = 0.0;
+        float min   = std::numeric_limits<float>::max();
+        float max   = std::numeric_limits<float>::lowest();
+    };
 
     const float *data = m_pendingMap.Map().begin();
-    for (long i = 0; i < totalPixels; ++i)
+
+    // One chunk of the map per thread
+    const Stats st = parallel::reduceRange<Stats>(
+        totalPixels,
+        [&](long begin, long end)
     {
-        float v = data[i];
-        if (!std::isfinite(v) || v < -1e30f)
-            continue;
-        if (!active.empty())
+        Stats s;
+        for (long i = begin; i < end; ++i)
         {
-            float keep = 1.0f; // same product the shader computes
-            for (const Active &m : active)
-            {
-                const float w = m.data[i] * (1.0f / 255.0f);
-                keep *= m.inverted ? 1.0f - w : w;
-            }
-            if (keep < 0.5f)
+            const float v = data[i];
+            if (!std::isfinite(v) || v < -1e30f)
                 continue;
+            if (!active.empty())
+            {
+                float keep = 1.0f; // same product the shader computes
+                for (const Active &m : active)
+                {
+                    const float w = m.data[i] * (1.0f / 255.0f);
+                    keep *= m.inverted ? 1.0f - w : w;
+                }
+                if (keep < 0.5f)
+                    continue;
+            }
+
+            // This pixel survived all cuts; count it toward f_sky
+            ++s.valid;
+            s.sum += v;
+            s.sumSq += double(v) * v;
+            s.min = std::min(s.min, v);
+            s.max = std::max(s.max, v);
         }
+        return s;
+    },
+        [](Stats &total, const Stats &part)
+    {
+        total.valid += part.valid;
+        total.sum += part.sum;
+        total.sumSq += part.sumSq;
+        total.min = std::min(total.min, part.min);
+        total.max = std::max(total.max, part.max);
+    });
 
-        // This pixel survived all cuts; count it toward f_sky
-        validPixels++;
-        sum += v;
-        sumSq += double(v) * v;
-
-        m_dataMin = std::min(m_dataMin, v);
-        m_dataMax = std::max(m_dataMax, v);
-    }
+    const long validPixels = st.valid;
+    m_dataMin              = st.min;
+    m_dataMax              = st.max;
 
     // Same definitions as Healpix_Map::average() / rms() (rms is about zero),
     // but over the surviving pixels only
-    m_mapAverage = validPixels ? sum / validPixels : 0.0;
-    m_mapRms     = validPixels ? std::sqrt(sumSq / validPixels) : 0.0;
+    m_mapAverage = validPixels ? st.sum / validPixels : 0.0;
+    m_mapRms     = validPixels ? std::sqrt(st.sumSq / validPixels) : 0.0;
     // Standard deviation about the mean (clamped: rounding can go negative)
     m_mapStd = validPixels
-                   ? std::sqrt(std::max(0.0, sumSq / validPixels
+                   ? std::sqrt(std::max(0.0, st.sumSq / validPixels
                                                  - m_mapAverage * m_mapAverage))
                    : 0.0;
     // Extremes of the surviving pixels (before the empty-range fallbacks below)
     m_mapMin = validPixels ? m_dataMin : 0.0f;
     m_mapMax = validPixels ? m_dataMax : 0.0f;
 
-    if (totalPixels > 0)
-        m_fsky = float(validPixels) / float(totalPixels);
-    else
-        m_fsky = 0.0f;
+    m_fsky = totalPixels > 0 ? float(validPixels) / float(totalPixels) : 0.0f;
 
     // Handle edge case where no valid pixels were found
     if (m_dataMin > m_dataMax)
@@ -289,12 +311,12 @@ OpenGLWidget::recomputeDataRange()
 }
 
 void
-OpenGLWidget::setMap(const Healpix_Map<float> &map)
+OpenGLWidget::setMap(Healpix_Map<float> &&map)
 {
     // Masks only make sense for the resolution they were loaded for
     const bool sizeChanged = map.Npix() != m_pendingMap.Npix();
 
-    m_pendingMap    = map;
+    m_pendingMap.swap(map); // takes the buffer without copying it
     m_hasPendingMap = true;
 
     if (sizeChanged && !m_masks.empty())
@@ -605,82 +627,136 @@ OpenGLWidget::paintGL()
     }
 }
 
-int
+// Reads the files on a worker thread (they can be large), then adds the
+// masks on the GUI thread. Messages are collected and shown there too.
+void
 OpenGLWidget::addMaskFiles(const QStringList &files)
 {
     if (m_pendingMap.Npix() == 0)
     {
         QMessageBox::warning(this, "Mask", "Load a map before loading a mask.");
-        return 0;
+        return;
     }
 
-    int added = 0;
+    // Skip files that are already loaded
+    QStringList todo;
     for (const QString &file : files)
     {
-        if (maskCount() >= kMaxMasks)
-        {
-            QMessageBox::warning(
-                this, "Mask",
-                QString("At most %1 masks can be loaded.").arg(kMaxMasks));
-            break;
-        }
         const QString path = QFileInfo(file).absoluteFilePath();
         const bool dup
             = std::any_of(m_masks.begin(), m_masks.end(),
                           [&](const MaskEntry &m) { return m.path == path; });
-        if (dup)
-            continue;
+        if (!dup && !todo.contains(file))
+            todo << file;
+    }
+    if (todo.isEmpty())
+        return;
 
-        try
+    struct Result
+    {
+        std::vector<MaskEntry> masks;
+        QStringList warnings;
+        QStringList errors;
+    };
+
+    const long mapNside   = m_pendingMap.Nside();
+    const long mapNpix    = m_pendingMap.Npix();
+    const auto mapScheme  = m_pendingMap.Scheme();
+
+    auto *watcher = new QFutureWatcher<Result>(this);
+    connect(watcher, &QFutureWatcher<Result>::finished, this,
+            [this, watcher, mapNpix]()
+    {
+        Result result = watcher->result();
+        watcher->deleteLater();
+
+        // The map may have been replaced while the masks were loading
+        if (m_pendingMap.Npix() != mapNpix)
+            return;
+
+        int added = 0;
+        for (MaskEntry &entry : result.masks)
         {
-            Healpix_Map<float> mask;
-            read_Healpix_map_from_fits(file.toStdString(), mask, 1, 2);
-
-            if (mask.Nside() != m_pendingMap.Nside())
+            if (maskCount() >= kMaxMasks)
             {
-                QMessageBox::warning(
-                    this, "Mask",
-                    QString("%1: nside %2 does not match the map (nside %3).")
-                        .arg(QFileInfo(file).fileName())
-                        .arg(mask.Nside())
-                        .arg(m_pendingMap.Nside()));
+                result.warnings << QString("At most %1 masks can be loaded.")
+                                       .arg(kMaxMasks);
+                break;
+            }
+            const bool dup = std::any_of(
+                m_masks.begin(), m_masks.end(),
+                [&](const MaskEntry &m) { return m.path == entry.path; });
+            if (dup)
                 continue;
-            }
-            if (mask.Scheme() != m_pendingMap.Scheme())
-                mask.swap_scheme();
-
-            MaskEntry entry;
-            entry.name = QFileInfo(file).fileName();
-            entry.path = path;
-            entry.data.resize(size_t(mask.Npix()));
-            const float *d = mask.Map().begin();
-            for (long i = 0; i < mask.Npix(); ++i)
-            {
-                // NaN / UNSEEN count as masked; clamp weights to [0, 1]
-                float v = (std::isfinite(d[i]) && d[i] > -1e30f) ? d[i] : 0.0f;
-                entry.data[i] = static_cast<uint8_t>(
-                    std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
-            }
             m_masks.push_back(std::move(entry));
             ++added;
         }
-        catch (const PlanckError &e)
-        {
-            QMessageBox::critical(
-                this, "Mask",
-                QString("Failed to load %1: %2").arg(file, QString(e.what())));
-        }
-        catch (const std::exception &e)
-        {
-            QMessageBox::critical(
-                this, "Mask",
-                QString("Failed to load %1: %2").arg(file, QString(e.what())));
-        }
-    }
 
-    if (added)
-        applyMaskChange(true);
-    return added;
+        if (!result.warnings.isEmpty())
+            QMessageBox::warning(this, "Mask", result.warnings.join("\n"));
+        if (!result.errors.isEmpty())
+            QMessageBox::critical(this, "Mask", result.errors.join("\n"));
+        if (added)
+            applyMaskChange(true);
+    });
+
+    watcher->setFuture(QtConcurrent::run(
+        [todo, mapNside, mapNpix, mapScheme]()
+    {
+        Result result;
+        for (const QString &file : todo)
+        {
+            try
+            {
+                Healpix_Map<float> mask;
+                read_Healpix_map_from_fits(file.toStdString(), mask, 1, 2);
+
+                if (mask.Nside() != mapNside)
+                {
+                    result.warnings
+                        << QString("%1: nside %2 does not match the map "
+                                   "(nside %3).")
+                               .arg(QFileInfo(file).fileName())
+                               .arg(mask.Nside())
+                               .arg(mapNside);
+                    continue;
+                }
+                if (mask.Scheme() != mapScheme)
+                    mask.swap_scheme();
+
+                MaskEntry entry;
+                entry.name = QFileInfo(file).fileName();
+                entry.path = QFileInfo(file).absoluteFilePath();
+                entry.data.resize(size_t(mapNpix));
+                const float *d = mask.Map().begin();
+                uint8_t *out   = entry.data.data();
+                parallel::forRange(mapNpix, [d, out](long begin, long end)
+                {
+                    for (long i = begin; i < end; ++i)
+                    {
+                        // NaN / UNSEEN count as masked; weights clamp to [0, 1]
+                        const float v
+                            = (std::isfinite(d[i]) && d[i] > -1e30f) ? d[i]
+                                                                      : 0.0f;
+                        out[i] = static_cast<uint8_t>(
+                            std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
+                    }
+                });
+                result.masks.push_back(std::move(entry));
+            }
+            catch (const PlanckError &e)
+            {
+                result.errors << QString("Failed to load %1: %2")
+                                     .arg(file, QString(e.what()));
+            }
+            catch (const std::exception &e)
+            {
+                result.errors << QString("Failed to load %1: %2")
+                                     .arg(file, QString(e.what()));
+            }
+        }
+        return result;
+    }));
 }
 
 void
