@@ -113,7 +113,9 @@ First development release.
 - Statistics and Power Spectrum are dockable panels (Tools > Analysis): dock
   them to any edge, float them, or close them, and the layout is remembered.
   They follow the current tab. The power spectrum keeps a result per map and
-  only recomputes when you press Compute / Recompute, and warns when the map's
+  only recomputes when you press Compute / Recompute. While it runs the dock
+  shows a progress bar with the current step and the elapsed time, and the
+  button becomes Cancel (it stops after the current transform), and warns when the map's
   HDU, column or masks changed since.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are

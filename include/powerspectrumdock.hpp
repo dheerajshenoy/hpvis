@@ -15,6 +15,9 @@ class QLabel;
 class QPushButton;
 class QQuickView;
 class View;
+class QProgressBar;
+class QTimer;
+struct PowerSpectrumJob;
 
 struct Spectra
 {
@@ -55,6 +58,8 @@ private:
 
     void initUI();
     void compute();
+    void cancel();
+    void updateProgress();
     void refresh();
     void updatePlot(const Spectra &spectra);
 
@@ -62,6 +67,9 @@ private:
     QPointer<View> m_view;
     QHash<const View *, Result> m_results;
     QSet<const View *> m_busy;
+    // The running computation of each busy view (progress, cancel flag)
+    QHash<const View *, std::shared_ptr<PowerSpectrumJob>> m_jobs;
+    QTimer *m_progressTimer = nullptr;
 
     QQuickView *m_chartView    = nullptr;
     QWidget *m_chartContainer  = nullptr;
@@ -69,5 +77,7 @@ private:
     QLabel *m_warningLabel     = nullptr;
     QComboBox *m_spectrumCombo = nullptr;
     QPushButton *m_computeButton = nullptr;
+    QProgressBar *m_progressBar  = nullptr;
+    QLabel *m_progressLabel      = nullptr;
     bool m_plotLoaded          = false;
 };
