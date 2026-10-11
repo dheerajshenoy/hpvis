@@ -1169,7 +1169,33 @@ OpenGLWidget::updateRotation(const QPointF &pos)
 {
     QVector3D v1;
     if (!viewDirectionAt(pos, v1))
-        return; // cursor left the shape: keep the last rotation
+    {
+        // The cursor left the shape. Orthographic keeps following it like a
+        // trackball: past the limb the surface carries on over the horizon,
+        // so the further out the cursor goes the more the globe tilts away.
+        // Other projections keep the last rotation.
+        if (m_projection != Projection::ORTHOGRAPHIC)
+            return;
+        const QVector2D p = toNdc(pos) / m_camera->zoom + m_camera->panOffset;
+        const float r     = p.length();
+        if (r < 1e-6f)
+            return;
+
+        double colat, phi;
+        if (!projectionmath::inverse(m_projection, p * (0.9999f / r), colat,
+                                     phi))
+            return;
+        const QVector3D limb = directionFromAngles(colat, phi); // on the edge
+        if (!projectionmath::inverse(m_projection, QVector2D(0, 0), colat, phi))
+            return;
+        const QVector3D front = directionFromAngles(colat, phi); // disc center
+
+        // Angle from the view axis: 90 deg at the limb, growing with the
+        // distance outside it (one globe radius out = one more radian),
+        // capped at the far pole
+        const float theta = std::min(float(M_PI), float(M_PI_2) + (r - 1.0f));
+        v1 = limb * std::sin(theta) + front * std::cos(theta);
+    }
 
     setRotation((m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
                     .normalized());
