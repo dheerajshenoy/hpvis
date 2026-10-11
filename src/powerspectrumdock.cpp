@@ -15,6 +15,7 @@
 #include <QColorDialog>
 #include <QComboBox>
 #include <QDir>
+#include <QInputDialog>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -28,6 +29,7 @@
 #include <QLabel>
 #include <QLineSeries>
 #include <QProgressBar>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QPushButton>
 #include <QTimer>
@@ -40,6 +42,7 @@
 #include <QValueAxis>
 #include <QVariantList>
 #include <QtConcurrent>
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <memory>
@@ -302,12 +305,7 @@ PowerSpectrumDock::initUI()
     m_spectrumCombo = new QComboBox();
     m_spectrumCombo->setVisible(false); // filled once the spectra are known
     connect(m_spectrumCombo, &QComboBox::currentIndexChanged, this,
-            [this](int)
-    {
-        const auto it = m_results.constFind(m_view.data());
-        if (it != m_results.constEnd())
-            updatePlot(it->spectra);
-    });
+            [this](int) { replot(); });
 
     m_warningLabel = new QLabel();
     m_warningLabel->setWordWrap(true);
@@ -395,20 +393,19 @@ PowerSpectrumDock::initUI()
         m_logYCheck->setChecked(
             settings.value("powerspectrum/logY", false).toBool());
     }
-    auto replot = [this]()
+    auto onPlotOption = [this]()
     {
         QSettings settings;
         settings.setValue("powerspectrum/quantity",
                           m_quantityCombo->currentData());
         settings.setValue("powerspectrum/logX", m_logXCheck->isChecked());
         settings.setValue("powerspectrum/logY", m_logYCheck->isChecked());
-        const auto it = m_results.constFind(m_view.data());
-        if (it != m_results.constEnd())
-            updatePlot(it->spectra);
+        this->replot();
     };
-    connect(m_quantityCombo, &QComboBox::currentIndexChanged, this, replot);
-    connect(m_logXCheck, &QCheckBox::toggled, this, replot);
-    connect(m_logYCheck, &QCheckBox::toggled, this, replot);
+    connect(m_quantityCombo, &QComboBox::currentIndexChanged, this,
+            onPlotOption);
+    connect(m_logXCheck, &QCheckBox::toggled, this, onPlotOption);
+    connect(m_logYCheck, &QCheckBox::toggled, this, onPlotOption);
 
     // Plot colors: background, foreground (text and axes) and the line
     {
@@ -435,6 +432,28 @@ PowerSpectrumDock::initUI()
     makeColorButton(m_lineButton, m_plotLine, "Plot line", "Plot Line");
     m_chartView->setColor(m_plotBackground);
 
+    // Comparison with other maps and with curves loaded from files
+    m_modeCombo = new QComboBox();
+    m_modeCombo->addItem("Overlay", 0);
+    m_modeCombo->addItem("Ratio to this map", 1);
+    m_modeCombo->addItem("Difference from this map", 2);
+    m_modeCombo->setToolTip("How the compared spectra are shown relative to "
+                            "the spectrum of the current map");
+    m_compareButton = new QToolButton();
+    m_compareButton->setText("Compare");
+    m_compareButton->setPopupMode(QToolButton::InstantPopup);
+    auto *compareMenu = new QMenu(m_compareButton);
+    connect(compareMenu, &QMenu::aboutToShow, this,
+            &PowerSpectrumDock::buildCompareMenu);
+    m_compareButton->setMenu(compareMenu);
+    connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
+            [this]() { replot(); });
+
+    auto *compareOptions = new QHBoxLayout();
+    compareOptions->addWidget(m_compareButton);
+    compareOptions->addWidget(m_modeCombo);
+    compareOptions->addStretch();
+
     auto *plotOptions = new QHBoxLayout();
     plotOptions->addWidget(new QLabel("y:"));
     plotOptions->addWidget(m_quantityCombo);
@@ -458,6 +477,7 @@ PowerSpectrumDock::initUI()
     layout->addWidget(m_progressBar);
     layout->addWidget(m_progressLabel);
     layout->addWidget(m_statusLabel);
+    layout->addLayout(compareOptions);
     layout->addLayout(plotOptions);
     layout->addWidget(m_chartContainer, 1);
     setWidget(content);
@@ -474,6 +494,7 @@ void
 PowerSpectrumDock::forget(const View *view)
 {
     m_results.remove(view);
+    m_compareViews.remove(view);
     if (auto job = m_jobs.take(view))
         job->cancelled = true; // let the worker stop early
     m_busy.remove(view);
@@ -753,6 +774,7 @@ PowerSpectrumDock::applyPlotColors()
         root->setProperty("fgColor", m_plotForeground);
         root->setProperty("lineColor", m_plotLine);
     }
+    replot(true);
 }
 
 void
@@ -799,44 +821,382 @@ spectrumByName(const Spectra &spectra, const QString &name)
                           : &spectra.EB;
 }
 
+// The title the tab of a view carries
+QString
+PowerSpectrumDock::titleOf(const View *view) const
+{
+    if (m_openMaps)
+        for (const OpenMap &m : m_openMaps())
+            if (m.view.data() == view)
+                return m.title;
+    return view ? view->displayName() : QString("This map");
+}
+
+// Redraws from the results of the current map (when there is one)
 void
-PowerSpectrumDock::updatePlot(const Spectra &spectra)
+PowerSpectrumDock::replot(bool keepRange)
+{
+    const auto it = m_results.constFind(m_view.data());
+    if (it != m_results.constEnd())
+        updatePlot(it->spectra, keepRange);
+}
+
+// One curve of values for l = 2.. from C_l, as the plot wants them
+static QVariantMap
+makeCurve(const QString &name, const QColor &color,
+          const std::vector<double> &values, const std::vector<double> *ref,
+          int mode, int quantity)
+{
+    QVariantList ell, y;
+    const size_t n = ref ? std::min(values.size(), ref->size()) : values.size();
+    for (size_t l = 2; l < n; ++l)
+    {
+        const double ll = double(l);
+        const double c  = values[l];
+        double v;
+        if (mode == 1) // ratio to the reference
+            v = ((*ref)[l] != 0.0) ? c / (*ref)[l] : std::nan("");
+        else
+        {
+            const double d = (mode == 2) ? c - (*ref)[l] : c;
+            v = quantity == 0   ? ll * (ll + 1.0) * d / (2.0 * M_PI)
+                : quantity == 1 ? d
+                                : ll * ll * d;
+        }
+        ell.append(ll);
+        y.append(v);
+    }
+    QVariantMap curve;
+    curve["name"]   = name;
+    curve["color"]  = color.name();
+    curve["ell"]    = ell;
+    curve["values"] = y;
+    return curve;
+}
+
+void
+PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
 {
     QQuickItem *root = m_chartView->rootObject();
     if (!root)
         return;
 
-    const QString name              = m_spectrumCombo->currentText();
-    const std::vector<double> *data = spectrumByName(spectra, name);
-
-    // The y quantity, as flat lists QML can read (l = 2 onwards)
+    const QString name = m_spectrumCombo->currentText();
     const int quantity = m_quantityCombo->currentData().toInt();
-    QVariantList ell, values;
-    for (size_t l = 2; l < data->size(); ++l)
+    int mode           = m_modeCombo->currentData().toInt();
+
+    const std::vector<double> &current = *spectrumByName(spectra, name);
+
+    // The spectrum of every map / curve to compare, under the same name
+    struct Other
     {
-        const double c  = (*data)[l];
-        const double ll = double(l);
-        ell.append(ll);
-        values.append(quantity == 0   ? ll * (ll + 1.0) * c / (2.0 * M_PI)
-                      : quantity == 1 ? c
-                                      : ll * ll * c);
+        QString name;
+        const std::vector<double> *data;
+    };
+    QList<Other> others;
+    for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
+    {
+        if (!m.view || m.view.data() == m_view.data()
+            || !m_compareViews.contains(m.view.data()))
+            continue;
+        const auto r = m_results.constFind(m.view.data());
+        if (r == m_results.constEnd())
+            continue;
+        const std::vector<double> *d = spectrumByName(r->spectra, name);
+        if (!d->empty())
+            others.append({m.title, d});
+    }
+    for (const External &e : m_external)
+        if (e.enabled)
+        {
+            const std::vector<double> *d = spectrumByName(e.spectra, name);
+            if (!d->empty())
+                others.append({e.name, d});
+        }
+
+    // Ratio and difference need something to compare with
+    if (others.isEmpty())
+        mode = 0;
+
+    // Colors: the line color for this map, a color-blind friendly set for
+    // the others
+    static const QStringList palette
+        = {"#e69f00", "#009e73", "#cc79a7", "#d55e00",
+           "#f0e442", "#0072b2", "#999999", "#56b4e9"};
+    QVariantList curves;
+    const QString thisName = titleOf(m_view.data());
+    if (mode == 0)
+        curves.append(makeCurve(thisName, m_plotLine, current, nullptr, 0,
+                                quantity));
+    int next = 0;
+    for (const Other &o : others)
+    {
+        QColor c(palette[next++ % palette.size()]);
+        if (c == m_plotLine)
+            c = QColor(palette[next++ % palette.size()]);
+        curves.append(makeCurve(o.name, c, *o.data, &current, mode, quantity));
     }
 
     const QString symbol = quantity == 0   ? QString("D\u2113")
                            : quantity == 1 ? QString("C\u2113")
                                            : QString("\u2113\u00b2 C\u2113");
-    const QString title  = quantity == 0
-                               ? QString("D\u2113 (%1) = \u2113(\u2113+1) C\u2113 / 2\u03c0").arg(name)
-                               : QString("%1 (%2)").arg(symbol, name);
-    const QString shortName = QString("%1 (%2)").arg(symbol, name);
+    QString title;
+    if (mode == 1)
+        title = QString("%1 spectrum / %2 (%3)").arg("C\u2113", thisName, name);
+    else if (mode == 2)
+        title = QString("%1 \u2212 %2 (%3)").arg(symbol, thisName, name);
+    else if (quantity == 0)
+        title = QString("D\u2113 (%1) = \u2113(\u2113+1) C\u2113 / 2\u03c0")
+                    .arg(name);
+    else
+        title = QString("%1 (%2)").arg(symbol, name);
 
     QMetaObject::invokeMethod(root, "setScales",
                               Q_ARG(QVariant, m_logXCheck->isChecked()),
                               Q_ARG(QVariant, m_logYCheck->isChecked()));
-    QMetaObject::invokeMethod(root, "setData", Q_ARG(QVariant, ell),
-                              Q_ARG(QVariant, values),
+    QMetaObject::invokeMethod(root, "setCurves", Q_ARG(QVariant, curves),
                               Q_ARG(QVariant, title),
-                              Q_ARG(QVariant, shortName));
+                              Q_ARG(QVariant, keepRange));
+}
+
+// The Compare menu: the other open maps, the curves loaded from files, and
+// loading one
+void
+PowerSpectrumDock::buildCompareMenu()
+{
+    auto *menu = qobject_cast<QMenu *>(m_compareButton->menu());
+    menu->clear();
+
+    int shown = 0;
+    for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
+    {
+        if (!m.view || m.view.data() == m_view.data())
+            continue;
+        const View *v   = m.view.data();
+        const bool done = m_results.contains(v);
+        QAction *a      = menu->addAction(done ? m.title
+                                               : m.title + "  (not computed)");
+        a->setCheckable(true);
+        a->setEnabled(done);
+        a->setChecked(done && m_compareViews.contains(v));
+        connect(a, &QAction::toggled, this, [this, v](bool on)
+        {
+            if (on)
+                m_compareViews.insert(v);
+            else
+                m_compareViews.remove(v);
+            replot();
+        });
+        ++shown;
+    }
+    if (shown == 0)
+        menu->addAction("No other map is open")->setEnabled(false);
+
+    if (!m_external.isEmpty())
+    {
+        menu->addSeparator();
+        for (int i = 0; i < m_external.size(); ++i)
+        {
+            QAction *a = menu->addAction(m_external[i].name);
+            a->setCheckable(true);
+            a->setChecked(m_external[i].enabled);
+            connect(a, &QAction::toggled, this, [this, i](bool on)
+            {
+                if (i < m_external.size())
+                    m_external[i].enabled = on;
+                replot();
+            });
+        }
+    }
+
+    menu->addSeparator();
+    menu->addAction("Load a &curve from a file...", this,
+                    [this]() { loadExternalCurve(); });
+    QAction *clear = menu->addAction("&Remove loaded curves", this, [this]()
+    {
+        m_external.clear();
+        replot();
+    });
+    clear->setEnabled(!m_external.isEmpty());
+}
+
+// Reads a spectrum from a text file: l in the first column, then one column per
+// spectrum. A header names them (TT, EE, BB, TE, TB, EB; "C_l_TT" / "D_l_TT"
+// as in the CSV export); without one the second column is TT. Values are C_l or
+// D_l = l(l+1)C_l/2pi, asked unless the header says which.
+void
+PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
+{
+    QString path = givenPath;
+    if (path.isEmpty())
+    {
+        const QString dir
+            = QSettings().value("general/lastDirectory").toString();
+        path = QFileDialog::getOpenFileName(
+            this, "Load Spectrum", dir.isEmpty() ? QDir::homePath() : dir,
+            "Text files (*.csv *.txt *.dat);;All Files (*)");
+        if (path.isEmpty())
+            return;
+        QSettings().setValue("general/lastDirectory",
+                             QFileInfo(path).absolutePath());
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        QMessageBox::critical(this, "Load Spectrum",
+                              QString("Cannot read %1").arg(path));
+        return;
+    }
+
+    static const QRegularExpression separator("[,;\\s]+");
+    static const QStringList names = {"TT", "EE", "BB", "TE", "TB", "EB"};
+
+    struct Col
+    {
+        int spectrum = 0;      // index into `names`
+        int kind     = 0;      // 0 = generic, 1 = C_l, 2 = D_l
+        int index    = 0;      // column in the file
+    };
+    QList<Col> cols;
+    QList<QList<double>> rows;
+    bool haveHeader = false;
+
+    while (!file.atEnd())
+    {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty())
+            continue;
+        const QString body = line.startsWith('#') ? line.mid(1).trimmed() : line;
+        const QStringList parts = body.split(separator, Qt::SkipEmptyParts);
+        if (parts.isEmpty())
+            continue;
+
+        bool numeric = true;
+        QList<double> values;
+        for (const QString &p : parts)
+        {
+            bool ok        = false;
+            const double v = p.toDouble(&ok);
+            numeric &= ok;
+            values << v;
+        }
+
+        if (!numeric)
+        {
+            // A header: find the spectra in the column names
+            if (haveHeader || !rows.isEmpty())
+                continue;
+            for (int i = 1; i < parts.size(); ++i)
+            {
+                const QString t = parts[i].toUpper();
+                for (int s = 0; s < names.size(); ++s)
+                    if (t.contains(names[s]))
+                    {
+                        Col c;
+                        c.spectrum = s;
+                        c.index    = i;
+                        c.kind     = t.startsWith("D_L") || t.startsWith("DL")
+                                         ? 2
+                                         : (t.startsWith("C_L") || t.startsWith("CL"))
+                                               ? 1
+                                               : 0;
+                        cols << c;
+                        break;
+                    }
+            }
+            haveHeader = !cols.isEmpty();
+            continue;
+        }
+        if (!line.startsWith('#'))
+            rows << values;
+    }
+
+    if (rows.isEmpty())
+    {
+        QMessageBox::critical(this, "Load Spectrum",
+                              "No numeric rows found (expected l in the first "
+                              "column).");
+        return;
+    }
+    if (cols.isEmpty())
+        cols << Col{0, 0, 1};
+
+    // Our own CSV has both C_l and D_l for a spectrum: use C_l
+    for (int i = cols.size() - 1; i >= 0; --i)
+        if (cols[i].kind == 2)
+            for (const Col &o : cols)
+                if (o.spectrum == cols[i].spectrum && o.kind == 1)
+                {
+                    cols.removeAt(i);
+                    break;
+                }
+
+    bool needUnit = false;
+    for (const Col &c : cols)
+        needUnit |= c.kind == 0;
+    bool dl = unit == 1;
+    if (needUnit && unit < 0)
+    {
+        bool ok = false;
+        const QString choice = QInputDialog::getItem(
+            this, "Load Spectrum", "The values in the file are:",
+            {"D\u2113 = \u2113(\u2113+1) C\u2113 / 2\u03c0 (theory spectra "
+             "usually)",
+             "C\u2113"},
+            0, false, &ok);
+        if (!ok)
+            return;
+        dl = choice.startsWith("D");
+    }
+
+    External ext;
+    ext.name = QFileInfo(path).completeBaseName();
+    long lmax = 0;
+    for (const auto &r : rows)
+        lmax = std::max(lmax, long(std::lround(r[0])));
+    if (lmax < 2)
+    {
+        QMessageBox::critical(this, "Load Spectrum",
+                              "The file has no multipoles above 1.");
+        return;
+    }
+
+    auto target = [&ext](int spectrum) -> std::vector<double> &
+    {
+        switch (spectrum)
+        {
+            case 0: return ext.spectra.TT;
+            case 1: return ext.spectra.EE;
+            case 2: return ext.spectra.BB;
+            case 3: return ext.spectra.TE;
+            case 4: return ext.spectra.TB;
+            default: return ext.spectra.EB;
+        }
+    };
+    for (const Col &c : cols)
+        target(c.spectrum).assign(size_t(lmax) + 1, std::nan(""));
+
+    for (const auto &r : rows)
+    {
+        const long l = std::lround(r[0]);
+        if (l < 0)
+            continue;
+        for (const Col &c : cols)
+        {
+            if (c.index >= r.size())
+                continue;
+            const bool isD = c.kind == 2 || (c.kind == 0 && dl);
+            double v       = r[c.index];
+            if (isD)
+                v = (l >= 1) ? v * 2.0 * M_PI / (double(l) * double(l + 1))
+                             : 0.0;
+            target(c.spectrum)[size_t(l)] = v;
+        }
+    }
+
+    m_external.append(ext);
+    replot();
 }
 
 static QString

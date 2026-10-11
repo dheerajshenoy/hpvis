@@ -182,6 +182,7 @@ HpVis::initUI()
     m_toolBar   = new ViewToolBar();
     m_statsDock = new StatisticsDock(this);
     m_powerDock = new PowerSpectrumDock(this);
+    m_powerDock->setOpenMapsProvider([this]() { return openMaps(); });
     m_statusBar = new StatusBar();
     m_toolBar->setEnabled(false);
     initMenubar();
@@ -1320,22 +1321,25 @@ HpVis::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
+// The maps in the tabs, for the tools that combine or compare them
+QList<OpenMap>
+HpVis::openMaps() const
+{
+    QList<OpenMap> maps;
+    for (int i = 0; i < m_tabWidget->count(); ++i)
+        if (auto *v = qobject_cast<View *>(m_tabWidget->widget(i)))
+            maps.append({m_tabWidget->tabText(i), v});
+    return maps;
+}
+
 // The Operate dialog: kept so it can stay open while the results are examined
 void
 HpVis::onOperateTriggered()
 {
     if (!m_operateDialog)
     {
-        m_operateDialog = new MapOperationDialog(
-            [this]()
-        {
-            QList<OpenMap> maps;
-            for (int i = 0; i < m_tabWidget->count(); ++i)
-                if (auto *v = qobject_cast<View *>(m_tabWidget->widget(i)))
-                    maps.append({m_tabWidget->tabText(i), v});
-            return maps;
-        },
-            this);
+        m_operateDialog
+            = new MapOperationDialog([this]() { return openMaps(); }, this);
         connect(m_operateDialog, &MapOperationDialog::mapReady, this,
                 &HpVis::openComputedMap);
     }

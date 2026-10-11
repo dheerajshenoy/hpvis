@@ -141,6 +141,15 @@ First development release.
   the result. The result opens as a new tab that works like any other map
   (statistics, power spectrum, masks, export), and File > Save Map As...
   writes any map, including a computed one, to a FITS file.
+- The power spectrum dock can compare spectra. Its Compare menu overlays the
+  spectra of other open maps (once computed there) and curves loaded from text
+  files, such as a theory spectrum; the files have l in the first column and
+  one column per spectrum (header names TT, EE, BB, TE, TB, EB, or C_l_TT /
+  D_l_TT as in the CSV export; without a header the second column is TT), with
+  values as C_l or D_l (asked). The plot gets a legend and the hover readout
+  lists every curve at that multipole. The mode picks Overlay, Ratio to this
+  map or Difference from this map, and all of it follows the chosen spectrum,
+  y quantity and axis scales.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are
   computed once on load and whenever masks change, so switching tabs with

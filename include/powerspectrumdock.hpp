@@ -2,12 +2,15 @@
 
 #include "healpix_map.h"
 
+#include "openmap.hpp"
+
 #include <QColor>
 #include <QDockWidget>
 #include <QHash>
 #include <QPointer>
 #include <QSet>
 #include <QString>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -46,6 +49,12 @@ public:
 
     // The map the dock shows (null when there is none)
     void setView(View *view);
+    // The open maps, to compare their spectra with the current one
+    void setOpenMapsProvider(std::function<QList<OpenMap>()> provider)
+    {
+        m_openMaps = std::move(provider);
+    }
+
     // Plot colors (also set from the settings dialog)
     void setPlotColors(const QColor &background, const QColor &foreground,
                        const QColor &line);
@@ -76,8 +85,14 @@ private:
     void cancel();
     void updateProgress();
     void refresh();
-    void updatePlot(const Spectra &spectra);
+    void updatePlot(const Spectra &spectra, bool keepRange = false);
     void applyPlotColors();
+    void replot(bool keepRange = false);
+    void buildCompareMenu();
+    // Without a path the user is asked for the file; `unit` (0 = C_l, 1 = D_l,
+    // -1 = ask) answers the question of what the values are
+    void loadExternalCurve(const QString &path = QString(), int unit = -1);
+    QString titleOf(const View *view) const;
     void pickPlotColor(QPushButton *button, QColor &color, const QString &title);
     void showColorOnButton(QPushButton *button, const QColor &color);
     void exportCsv();
@@ -86,6 +101,19 @@ private:
 private:
     QPointer<View> m_view;
     QHash<const View *, Result> m_results;
+
+    // Comparison: other open maps (by view) and curves loaded from files
+    struct External
+    {
+        QString name;
+        Spectra spectra; // C_l, NaN where the file has no value
+        bool enabled = true;
+    };
+    std::function<QList<OpenMap>()> m_openMaps;
+    QSet<const View *> m_compareViews;
+    QList<External> m_external;
+    QComboBox *m_modeCombo       = nullptr;
+    QToolButton *m_compareButton = nullptr;
     QSet<const View *> m_busy;
     // The running computation of each busy view (progress, cancel flag)
     QHash<const View *, std::shared_ptr<PowerSpectrumJob>> m_jobs;

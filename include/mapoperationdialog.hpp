@@ -3,6 +3,7 @@
 #include "fitsinfo.hpp"
 #include "healpix_map.h"
 #include "mapoperation.hpp"
+#include "openmap.hpp"
 
 #include <QDialog>
 #include <QPointer>
@@ -16,13 +17,6 @@ class QProgressBar;
 class QPushButton;
 class QTableWidget;
 class View;
-
-// A map that is open in a tab, which can be used as an input
-struct OpenMap
-{
-    QString title;
-    QPointer<View> view;
-};
 
 // Combines several maps pixel by pixel with an expression (A - B, (A + B) / 2,
 // ...) into a new map. The inputs are open tabs and/or FITS files.

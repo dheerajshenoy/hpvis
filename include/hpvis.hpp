@@ -5,6 +5,7 @@
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
+#include "openmap.hpp"
 #include "powerspectrumdock.hpp"
 #include "recentfiles.hpp"
 #include "statisticsdock.hpp"
@@ -96,6 +97,7 @@ private slots:
     void onGraticuleToggled(bool enabled);
     void onRotationActionTriggered();
     void onOperateTriggered();
+    QList<OpenMap> openMaps() const;
     void onSaveMapTriggered();
     void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
                          const QString &title, SkyFrame frame);
