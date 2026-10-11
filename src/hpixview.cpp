@@ -825,7 +825,20 @@ HpixView::initShortcuts()
 void
 HpixView::onPowerSpectrumActionTriggered()
 {
-    PowerSpectrumDialog dialog(m_view->glWidget()->healpixMap(), this);
+    OpenGLWidget *gl = m_view->glWidget();
+    const Healpix_Map<float> *map = gl->healpixMap();
+    if (!map)
+        return;
+
+    PowerSpectrumInput input;
+    input.path = m_view->filePath();
+    input.hdu  = m_view->hdu();
+    // A copy keeps the worker safe if the map is replaced meanwhile
+    input.map = std::make_shared<Healpix_Map<float>>(*map);
+    for (int i = 0; i < gl->maskCount(); ++i)
+        input.maskActive |= gl->maskEnabled(i);
+
+    PowerSpectrumDialog dialog(input, this);
     dialog.exec();
 }
 
