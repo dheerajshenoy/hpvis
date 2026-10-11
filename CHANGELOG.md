@@ -52,6 +52,15 @@ First development release.
   Center latitude / Roll boxes that apply live and can be typed into, and
   View > Reset Rotation restores the orientation. The cursor readout and
   graticule labels follow the rotation.
+- Orientation (View > Orientation, Settings > Appearance, `--orientation`):
+  Free shows the map in its own frame, and dragging also rolls the view like a
+  trackball. Galactic, Ecliptic and Equatorial (J2000) show the sky in that
+  frame, converted on the GPU from the map's `COORDSYS` keyword (Galactic when
+  absent), with the graticule in that frame and its north pole kept up while
+  dragging. Switching resets the rotation. The status bar shows the cursor in
+  the displayed frame (l, b / λ, β / RA, Dec) along with RA / Dec, which now
+  also respects the map's frame instead of assuming Galactic. The roll box in
+  Set Rotation is disabled when the north is locked.
 - Perspective: every projection can be drawn as the sky seen from the inside
   (longitude increasing to the left, the default) or from the outside like a
   globe (the mirror image). Switch it in View > Perspective, set the default in
@@ -94,8 +103,8 @@ First development release.
 ### Interface
 - Tabbed interface: open several maps at once, each with its own view and
   settings.
-- A toolbar with the frequently used controls: HDU, Column, Projection and
-  Colormap. Everything else is in the menus: View (pixel ordering, colors,
+- A toolbar with the frequently used controls: HDU, Column, Projection,
+  Orientation and Colormap. Everything else is in the menus: View (pixel ordering, colors,
   color scale, reverse colormap, color bar range, graticule, rotation), Masks
   and Tools.
 - Toolbar and menu controls follow the current tab when you switch tabs.

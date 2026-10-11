@@ -45,7 +45,7 @@ SettingsDialog::initUI()
     m_pageKeywords = {
         "general files recent history list folder directory remember last "
         "interface toolbar status bar show hide",
-        "appearance new maps defaults projection perspective inside outside sky globe mirror mollweide orthographic "
+        "appearance new maps defaults projection perspective inside outside sky globe mirror orientation free galactic ecliptic equatorial frame coordinates mollweide orthographic "
         "colormap animate "
         "color scale linear log reverse background unseen globe shadow limb "
         "darkening",
@@ -122,6 +122,7 @@ SettingsDialog::initConnections()
     connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_projectionCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_perspectiveCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_orientationCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_maskModeCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_maskOpacitySlider, &QSlider::valueChanged, this, changed);
     connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
@@ -210,6 +211,7 @@ SettingsDialog::currentSettings() const
     a.showStatusBar      = m_showStatusBarCheck->isChecked();
     a.projection         = Projection(m_projectionCombo->currentIndex());
     a.viewFromOutside    = m_perspectiveCombo->currentIndex() == 1;
+    a.orientation        = Orientation(m_orientationCombo->currentIndex());
     a.graticuleColor     = m_graticuleColor;
     a.maskMode           = m_maskModeCombo->currentIndex();
     a.maskOpacityPercent = m_maskOpacitySlider->value();
@@ -252,6 +254,7 @@ SettingsDialog::loadSettings()
     m_showStatusBarCheck->setChecked(a.showStatusBar);
     m_projectionCombo->setCurrentIndex(int(a.projection));
     m_perspectiveCombo->setCurrentIndex(a.viewFromOutside ? 1 : 0);
+    m_orientationCombo->setCurrentIndex(int(a.orientation));
     m_graticuleColor = a.graticuleColor;
     setColorButton(m_graticuleColorButton, m_graticuleColor);
     m_maskModeCombo->setCurrentIndex(a.maskMode);
@@ -368,6 +371,14 @@ SettingsDialog::createAppearanceSettingsPage()
         "left.\nOutside: the mirror image, like a globe, longitude "
         "increasing to the right.");
     projForm->addRow("Perspective:", m_perspectiveCombo);
+
+    m_orientationCombo = new QComboBox();
+    m_orientationCombo->addItems({"Free", "Galactic", "Ecliptic", "Equatorial"});
+    m_orientationCombo->setToolTip(
+        "Free: the map's own frame, dragging also rolls the view.\n"
+        "Galactic, Ecliptic, Equatorial: show the sky in that frame and keep "
+        "its north up while dragging.");
+    projForm->addRow("Orientation:", m_orientationCombo);
     outer->addWidget(projBox);
 
     // --- Color ---

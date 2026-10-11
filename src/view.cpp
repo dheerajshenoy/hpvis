@@ -34,6 +34,7 @@ struct LoadResult
     FitsInfo info;
     int hdu    = 0;
     int column = 0;
+    QString coordsys; // FITS COORDSYS, empty when absent
     QString error;
 };
 } // namespace
@@ -68,6 +69,7 @@ View::startLoad(int hdu, int column, bool initial)
             m_fitsInfo = result.info;
         m_hdu    = result.hdu;
         m_column = result.column;
+        m_glWidget->setMapFrame(skyframe::fromCoordSys(result.coordsys));
         m_glWidget->setMap(std::move(*result.map));
 
         if (initial)
@@ -98,6 +100,9 @@ View::startLoad(int hdu, int column, bool initial)
             }
 
             file.goto_hdu(useHdu);
+            if (file.key_present("COORDSYS")) // else assume Galactic
+                result.coordsys = QString::fromStdString(
+                    file.get_key<std::string>("COORDSYS"));
 
             // Check the header before reading gigabytes of pixels
             const int nside = file.get_key<int>("NSIDE");

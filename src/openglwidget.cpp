@@ -34,43 +34,6 @@
 #include <qsurfaceformat.h>
 #include <vector>
 
-// Converts Galactic coordinates (l, b) in degrees to Equatorial (RA, Dec) in
-// J2000 degrees
-static QPointF
-galacticToEquatorial(double l_deg, double b_deg)
-{
-    // 1. Convert to radians
-    double l = l_deg * M_PI / 180.0;
-    double b = b_deg * M_PI / 180.0;
-
-    // 2. North Galactic Pole (NGP) J2000 coordinates in equatorial system:
-    // RA_NGP = 192.85948 degrees, Dec_NGP = 27.12825 degrees
-    // Ascending node of galactic plane on celestial equator: l_omega = 32.93192
-    // degrees
-    const double ra_ngp  = 192.85948 * M_PI / 180.0;
-    const double dec_ngp = 27.12825 * M_PI / 180.0;
-    const double l_omega = 32.93192 * M_PI / 180.0;
-
-    double cb = std::cos(b);
-    double sb = std::sin(b);
-    double sl = std::sin(l - l_omega);
-    double cl = std::cos(l - l_omega);
-
-    // 3. Transformation via spherical trigonometry / rotation matrix
-    double sd  = sb * std::sin(dec_ngp) + cb * std::cos(dec_ngp) * cl;
-    double dec = std::asin(sd);
-
-    double y = cb * std::sin(dec_ngp) * cl - sb * std::cos(dec_ngp);
-    double x = cb * sl;
-
-    double ra = ra_ngp + std::atan2(y, x);
-
-    // Normalize RA to [0, 2pi) and convert both to degrees
-    ra = std::fmod(ra + 2.0 * M_PI, 2.0 * M_PI);
-
-    return {ra * 180.0 / M_PI, dec * 180.0 / M_PI};
-}
-
 static QVector<double>
 niceTicks(double lo, double hi, int count)
 {
@@ -509,6 +472,8 @@ OpenGLWidget::paintGL()
                                     static_cast<int>(m_projection));
     m_shaderProgram.setUniformValue("globe_rotation",
                                     m_rotation.toRotationMatrix());
+    m_shaderProgram.setUniformValue(
+        "frame_to_native", skyframe::rotation(displayFrame(), m_mapFrame));
 
     m_vao.bind();
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1061,24 +1026,39 @@ OpenGLWidget::emitCursorData()
         emit cursorPosChanged(QPointF(), QPointF(), std::nan(""), -1);
         return;
     }
-    // View frame -> sky (same rotation the shader applies)
+    // View frame -> the displayed frame (the same rotation the shader applies)
+    const QVector3D shown
+        = m_rotation.rotatedVector(directionFromAngles(colat, phi));
+    double shownColat, shownPhi;
+    anglesFromDirection(shown, shownColat, shownPhi);
+
+    // The pixel is looked up in the frame the map is stored in
+    double mapColat, mapPhi;
     anglesFromDirection(
-        m_rotation.rotatedVector(directionFromAngles(colat, phi)), colat, phi);
+        skyframe::apply(
+            skyframe::rotation(displayFrame(), m_mapFrame), shown),
+        mapColat, mapPhi);
 
     const Healpix_Base base(
         static_cast<int>(m_nside),
         m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING, SET_NSIDE);
-    const qlonglong idx = base.ang2pix(pointing(colat, phi));
+    const qlonglong idx = base.ang2pix(pointing(mapColat, mapPhi));
     float v             = m_pendingMap.Map()[idx];
     if (v < -1.0e30f || !std::isfinite(v))
         v = std::nanf("");
 
-    double lon = phi * 180.0 / M_PI;
+    double lon = shownPhi * 180.0 / M_PI;
     if (lon > 180.0)
         lon -= 360.0;
+    auto lonlat = QPointF(lon, 90.0 - shownColat * 180.0 / M_PI);
 
-    auto lonlat = QPointF(lon, 90.0 - colat * 180.0 / M_PI);
-    auto radec  = galacticToEquatorial(lonlat.y(), lonlat.x());
+    // RA / Dec of the same direction
+    double raColat, raPhi;
+    anglesFromDirection(
+        skyframe::apply(
+            skyframe::rotation(displayFrame(), SkyFrame::Equatorial), shown),
+        raColat, raPhi);
+    auto radec = QPointF(raPhi * 180.0 / M_PI, 90.0 - raColat * 180.0 / M_PI);
     emit cursorPosChanged(lonlat, radec, v, idx);
 }
 
@@ -1256,8 +1236,12 @@ OpenGLWidget::updateRotation(const QPointF &pos)
     }
 
     const QQuaternion previous = m_rotation;
-    setRotation((m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
-                    .normalized());
+    QQuaternion next
+        = (m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
+              .normalized();
+    if (orientationLocked())
+        next = withoutRoll(next);
+    setRotation(next);
 
     // Angular velocity of this step (in the globe's own frame), smoothed
     if (globeAnimates() && m_dragClock.isValid())
@@ -1343,10 +1327,12 @@ OpenGLWidget::tickGlobeAnimation()
             stopGlobeAnimation();
             return;
         }
-        setRotation((m_rotation
-                     * QQuaternion::fromAxisAndAngle(m_spinVelocity / speed,
-                                                     float(speed * dt)))
-                        .normalized());
+        QQuaternion next
+            = (m_rotation
+               * QQuaternion::fromAxisAndAngle(m_spinVelocity / speed,
+                                               float(speed * dt)))
+                  .normalized();
+        setRotation(orientationLocked() ? withoutRoll(next) : next);
     }
 }
 
@@ -1670,6 +1656,43 @@ OpenGLWidget::setViewFromOutside(bool outside)
     m_viewOutside = outside;
     emitCursorData();
     update();
+}
+
+void
+OpenGLWidget::setMapFrame(SkyFrame frame)
+{
+    if (m_mapFrame == frame)
+        return;
+    m_mapFrame = frame;
+    emitCursorData();
+    update();
+}
+
+void
+OpenGLWidget::setOrientation(Orientation orientation)
+{
+    if (m_orientation == orientation)
+        return;
+    m_orientation = orientation;
+    // The old rotation means something else in the new frame
+    stopGlobeAnimation();
+    setRotation(QQuaternion());
+    emitCursorData();
+    update();
+}
+
+// Removes the roll about the view axis, so the frame's north pole stays up
+QQuaternion
+OpenGLWidget::withoutRoll(const QQuaternion &q) const
+{
+    const QVector3D c = q.rotatedVector(QVector3D(1, 0, 0));
+    const double lon  = std::atan2(double(c.y()), double(c.x()));
+    const double lat  = std::asin(std::clamp(double(c.z()), -1.0, 1.0));
+    const QQuaternion rz
+        = QQuaternion::fromAxisAndAngle(0, 0, 1, float(qRadiansToDegrees(lon)));
+    const QQuaternion ry = QQuaternion::fromAxisAndAngle(
+        0, 1, 0, float(-qRadiansToDegrees(lat)));
+    return (rz * ry).normalized();
 }
 
 void

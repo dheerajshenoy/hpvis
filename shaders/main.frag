@@ -57,8 +57,15 @@ void main() {
     phi   = mod(atan(dir.y, dir.x), 2.0 * PI);
 
 
-    int pixIdx = (pixel_ordering == 0) ? ang2pix_ring(nside, colat, phi)
-                                       : ang2pix_nest(nside, colat, phi);
+    // colat / phi are in the displayed frame (the graticule uses them); the
+    // map is looked up in its own frame
+    vec3 ndir = frame_to_native * vec3(sin(colat) * cos(phi),
+                                       sin(colat) * sin(phi), cos(colat));
+    float ncolat = atan(length(ndir.xy), ndir.z);
+    float nphi   = mod(atan(ndir.y, ndir.x), 2.0 * PI);
+
+    int pixIdx = (pixel_ordering == 0) ? ang2pix_ring(nside, ncolat, nphi)
+                                       : ang2pix_nest(nside, ncolat, nphi);
 
     // The map is packed into a 2D texture (1D textures are size-limited).
     // Integer math + texelFetch keeps indices exact for large nside.

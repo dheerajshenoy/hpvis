@@ -70,8 +70,10 @@ StatusBar::setCursorData(QPointF lonLat, QPointF raDec, double value,
         m_pixelValueLabel->clear();
         return;
     }
-    m_cursorPosLabel->setText(QString("Lon: %1°  Lat: %2° RA: %3°  Dec: %4°")
+    m_cursorPosLabel->setText(QString("%1: %2°  %3: %4°  RA: %5°  Dec: %6°")
+                                  .arg(m_lonName)
                                   .arg(lonLat.x(), 0, 'f', 2)
+                                  .arg(m_latName)
                                   .arg(lonLat.y(), 0, 'f', 2)
                                   .arg(raDec.x(), 0, 'f', 2)
                                   .arg(raDec.y(), 0, 'f', 2));
@@ -79,6 +81,13 @@ StatusBar::setCursorData(QPointF lonLat, QPointF raDec, double value,
     m_pixelValueLabel->setText(std::isfinite(value)
                                    ? QString("Value: %1").arg(value, 0, 'g', 6)
                                    : QString("Value: UNSEEN"));
+}
+
+void
+StatusBar::setCoordinateNames(const QString &lon, const QString &lat)
+{
+    m_lonName = lon;
+    m_latName = lat;
 }
 
 void

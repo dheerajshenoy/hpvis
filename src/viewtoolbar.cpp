@@ -50,6 +50,17 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
     m_projectionCombo->addItem("Gnomonic",
                                static_cast<int>(Projection::GNOMONIC));
     addLabeled("Projection", m_projectionCombo);
+
+    // --- Orientation ---
+    m_orientationCombo = new QComboBox();
+    m_orientationCombo->addItems({"Free", "Galactic", "Ecliptic", "Equatorial"});
+    m_orientationCombo->setToolTip(
+        "Free: the map's own frame, dragging also rolls the view.\n"
+        "Galactic, Ecliptic, Equatorial: show the sky in that frame, north up.");
+    addLabeled("Orientation", m_orientationCombo);
+    connect(m_orientationCombo, &QComboBox::currentIndexChanged, this,
+            [this](int index)
+    { emit orientationChanged(Orientation(index)); });
     connect(m_projectionCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     {
@@ -92,6 +103,13 @@ ViewToolBar::setProjection(Projection projection)
     const int i = m_projectionCombo->findData(static_cast<int>(projection));
     if (i >= 0)
         m_projectionCombo->setCurrentIndex(i);
+}
+
+void
+ViewToolBar::setOrientation(Orientation orientation)
+{
+    QSignalBlocker blocker(m_orientationCombo);
+    m_orientationCombo->setCurrentIndex(int(orientation));
 }
 
 // Items carry the real (1-based) HDU / column numbers as data

@@ -5,6 +5,7 @@
 #include "mapcamera.hpp"
 #include "pixelordering.hpp"
 #include "projection.hpp"
+#include "skyframe.hpp"
 
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
@@ -210,6 +211,28 @@ public:
     void setGraticuleEnabled(bool enabled);
     void setGraticuleStep(double degrees);
     void setGlobeShadow(bool enabled);
+
+    // The frame the map is stored in (FITS COORDSYS)
+    void setMapFrame(SkyFrame frame);
+    SkyFrame mapFrame() const
+    {
+        return m_mapFrame;
+    }
+    // Frame shown (and, unless Free, kept north-up while dragging). Resets
+    // the rotation.
+    void setOrientation(Orientation orientation);
+    Orientation orientation() const
+    {
+        return m_orientation;
+    }
+    bool orientationLocked() const
+    {
+        return m_orientation != Orientation::Free;
+    }
+    SkyFrame displayFrame() const
+    {
+        return skyframe::displayFrame(m_orientation, m_mapFrame);
+    }
     // false: the sky seen from the inside (longitude increases to the left);
     // true: seen from the outside like a globe (the mirror image)
     void setViewFromOutside(bool outside);
@@ -291,6 +314,7 @@ private:
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
+    QQuaternion withoutRoll(const QQuaternion &q) const;
     bool globeAnimates() const;
     void stopGlobeAnimation();
     void rotateTo(const QQuaternion &target);
@@ -364,6 +388,8 @@ private:
     bool m_graticuleEnabled             = false;
     bool m_globeShadow                  = true;
     bool m_viewOutside                  = false;
+    SkyFrame m_mapFrame                 = SkyFrame::Galactic;
+    Orientation m_orientation           = Orientation::Free;
     bool m_limbDarkening                = true;
     double m_graticuleStepDeg           = 30.0;
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);

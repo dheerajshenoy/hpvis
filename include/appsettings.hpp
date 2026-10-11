@@ -2,6 +2,7 @@
 
 #include "colormap.hpp"
 #include "projection.hpp"
+#include "skyframe.hpp"
 
 #include <QColor>
 
@@ -21,6 +22,7 @@ struct AppSettings
     ColormapScale scale    = ColormapScale::LINEAR;
     QColor background      = QColor(10, 10, 15);
     QColor unseen          = QColor(0, 0, 0);
+    Orientation orientation = Orientation::Free;
     bool viewFromOutside   = false; // false: sky seen from the inside
     Projection projection  = Projection::MOLLWEIDE;
     QColor graticuleColor  = QColor(255, 255, 255);

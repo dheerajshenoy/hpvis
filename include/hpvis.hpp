@@ -43,6 +43,7 @@ private:
         std::optional<ColormapScale> scale;
         std::optional<Projection> projection;
         std::optional<bool> viewFromOutside;
+        std::optional<Orientation> orientation;
         std::optional<double> min, max;
         bool reverse   = false;
         bool graticule = false;
@@ -63,6 +64,8 @@ private:
     void updateMaskListFromView(const View *view);
     void updateControlsFromView(const View *view);
     void updateDocks();
+    void updateCoordinateNames();
+    void setOrientation(Orientation orientation);
     void rebuildMasksMenu(const View *view);
     void initShortcuts();
     void applyInterfaceSettings();
@@ -110,6 +113,8 @@ private:
     QAction *m_viewMinimapAction   = nullptr;
     QAction *m_headerAction        = nullptr;
     QAction *m_viewColorBarAction  = nullptr;
+    QMenu *m_orientationMenu       = nullptr;
+    QList<QAction *> m_orientationActions; // indexed by Orientation
     QMenu *m_perspectiveMenu       = nullptr;
     QAction *m_insideAction        = nullptr;
     QAction *m_outsideAction       = nullptr;

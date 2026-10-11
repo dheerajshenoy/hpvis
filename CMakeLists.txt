@@ -121,6 +121,7 @@ add_executable(${PROJECT_NAME}
     src/projectionmath.cpp
     src/appsettings.cpp
     src/colormapregistry.cpp
+    src/skyframe.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
     src/tabbar.cpp
@@ -142,6 +143,7 @@ add_executable(${PROJECT_NAME}
     include/view.hpp
     include/hpvis.hpp
     include/colormapregistry.hpp
+    include/skyframe.hpp
     include/openglwidget.hpp
     include/argparse.hpp
     include/tabwidget.hpp

@@ -6,6 +6,8 @@ shader, so large maps (nside 2048 and above) stay responsive.
 
 ## Features
 
+- Galactic, Ecliptic and Equatorial orientations (converted on the GPU from
+  the map's own `COORDSYS`), or a free trackball.
 - Five projections: Mollweide, Plate Carrée, Orthographic, Azimuthal
   equidistant and Gnomonic, with interactive sky rotation, seen from the
   inside (the sky) or the outside (like a globe).
@@ -58,6 +60,7 @@ hpvis [options] [FILE...]
 | `-s, --scale linear\|log` | Color scale |
 | `--min V`, `--max V` | Color range |
 | `-p, --projection P` | `mollweide`, `plate_carree`, `orthographic`, `azimuthal_equidistant`, `gnomonic` |
+| `-o, --orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial`: the frame to show the sky in |
 | `--view inside\|outside` | Perspective: the sky seen from the inside (longitude increases to the left, the default) or from the outside like a globe (mirrored) |
 | `-g, --graticule` | Show the coordinate grid |
 | `--mask FILE` | Apply a mask (repeatable) |

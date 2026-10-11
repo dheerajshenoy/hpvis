@@ -52,6 +52,12 @@ addArguments(argparse::ArgumentParser &parser)
         .help("Projection: mollweide, plate_carree, orthographic, "
               "azimuthal_equidistant or gnomonic");
 
+    parser.add_argument("-o", "--orientation")
+        .choices("free", "galactic", "ecliptic", "equatorial")
+        .metavar("ORIENTATION")
+        .help("Frame to show the sky in: galactic, ecliptic or equatorial "
+              "(north stays up), or free (the map's own frame, default)");
+
     parser.add_argument("--view")
         .choices("inside", "outside")
         .metavar("VIEW")

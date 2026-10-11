@@ -91,6 +91,15 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
             m_cli.projection = Projection(i);
     }
 
+    if (auto ori = parser.present<std::string>("--orientation"))
+    {
+        static const QStringList names
+            = {"free", "galactic", "ecliptic", "equatorial"};
+        const int i = names.indexOf(QString::fromStdString(*ori));
+        if (i >= 0)
+            m_cli.orientation = Orientation(i);
+    }
+
     if (auto view = parser.present<std::string>("--view"))
         m_cli.viewFromOutside = (*view == "outside");
 
@@ -132,6 +141,8 @@ HpVis::applyCliOptions(View *view)
         gl->setColormapScale(*m_cli.scale);
     if (m_cli.projection)
         gl->setProjection(*m_cli.projection);
+    if (m_cli.orientation)
+        gl->setOrientation(*m_cli.orientation);
     if (m_cli.viewFromOutside)
         gl->setViewFromOutside(*m_cli.viewFromOutside);
     if (m_cli.graticule)
@@ -200,6 +211,9 @@ HpVis::initConnections()
         if (m_view)
             m_view->glWidget()->setProjection(projection);
     });
+
+    connect(m_toolBar, &ViewToolBar::orientationChanged, this,
+            &HpVis::setOrientation);
 
     connect(m_toolBar, &ViewToolBar::fitsSelectionChanged, this,
             [this](int hdu, int column)
@@ -282,6 +296,28 @@ HpVis::initMenubar()
     m_viewColorBarAction->setChecked(true);
 
     m_viewMenu->addSeparator();
+
+    // Orientation (radio items: Free / Galactic / Ecliptic / Equatorial)
+    m_orientationMenu = m_viewMenu->addMenu("&Orientation");
+    auto *orientationGroup = new QActionGroup(this);
+    const QStringList orientationNames
+        = {"&Free", "&Galactic", "&Ecliptic", "E&quatorial"};
+    const QStringList orientationTips
+        = {"The map's own frame; dragging also rolls the view",
+           "Show the sky in Galactic coordinates, north up",
+           "Show the sky in Ecliptic coordinates, north up",
+           "Show the sky in Equatorial (J2000) coordinates, north up"};
+    for (int i = 0; i < orientationNames.size(); ++i)
+    {
+        QAction *a = m_orientationMenu->addAction(orientationNames[i]);
+        a->setStatusTip(orientationTips[i]);
+        a->setCheckable(true);
+        orientationGroup->addAction(a);
+        m_orientationActions << a;
+        connect(a, &QAction::triggered, this,
+                [this, i]() { setOrientation(Orientation(i)); });
+    }
+    m_orientationActions[0]->setChecked(true);
 
     // Perspective (radio items: Inside / Outside)
     m_perspectiveMenu = m_viewMenu->addMenu("&Perspective");
@@ -638,6 +674,9 @@ HpVis::updateControlsFromView(const View *view)
 
     (gl->viewFromOutside() ? m_outsideAction : m_insideAction)
         ->setChecked(true);
+    m_orientationActions[int(gl->orientation())]->setChecked(true);
+    m_toolBar->setOrientation(gl->orientation());
+    updateCoordinateNames();
     (gl->pixelOrdering() == PixelOrdering::NESTED ? m_nestedAction
                                                   : m_ringAction)
         ->setChecked(true);
@@ -646,6 +685,29 @@ HpVis::updateControlsFromView(const View *view)
 
     updateMaskListFromView(view);
     updateDocks();
+}
+
+// Applies an orientation from the toolbar or the menu to the current tab and
+// keeps both in step
+void
+HpVis::setOrientation(Orientation orientation)
+{
+    if (m_view)
+        m_view->glWidget()->setOrientation(orientation);
+    m_orientationActions[int(orientation)]->setChecked(true);
+    m_toolBar->setOrientation(orientation);
+    updateCoordinateNames();
+}
+
+// The status bar names the coordinates of the frame being shown
+void
+HpVis::updateCoordinateNames()
+{
+    if (!m_view)
+        return;
+    const SkyFrame frame = m_view->glWidget()->displayFrame();
+    m_statusBar->setCoordinateNames(skyframe::lonName(frame),
+                                    skyframe::latName(frame));
 }
 
 // Points the dockable tools at the current tab
@@ -972,6 +1034,9 @@ HpVis::applySavedSettings()
         if (s.animateOrthoGlobe != previous.animateOrthoGlobe)
             gl->setAnimateGlobe(s.animateOrthoGlobe);
 
+        if (s.orientation != previous.orientation)
+            gl->setOrientation(s.orientation);
+
         if (s.viewFromOutside != previous.viewFromOutside)
             gl->setViewFromOutside(s.viewFromOutside);
 
@@ -1040,6 +1105,7 @@ HpVis::applyDefaults(View *view)
     gl->setLimbDarkening(m_settings.limbDarkening);
     gl->setProjection(m_settings.projection);
     gl->setViewFromOutside(m_settings.viewFromOutside);
+    gl->setOrientation(m_settings.orientation);
     gl->setAnimateGlobe(m_settings.animateOrthoGlobe);
     gl->setGraticuleColor(m_settings.graticuleColor);
     gl->setMaskMode(m_settings.maskMode);
@@ -1115,6 +1181,7 @@ HpVis::onRotationActionTriggered()
     layout->addRow("Center longitude:", lonSpin);
     layout->addRow("Center latitude:", latSpin);
     layout->addRow("Roll:", rollSpin);
+    rollSpin->setEnabled(!gl->orientationLocked()); // north stays up
 
     // Applied live
     for (auto *spin : {lonSpin, latSpin, rollSpin})

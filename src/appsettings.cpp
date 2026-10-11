@@ -21,6 +21,10 @@ AppSettings::load()
     a.showStatusBar
         = s.value("general/showStatusBar", d.showStatusBar).toBool();
 
+    const int ori = s.value("view/orientation", int(d.orientation)).toInt();
+    a.orientation = (ori >= 0 && ori <= int(Orientation::Equatorial))
+                        ? Orientation(ori)
+                        : d.orientation;
     a.viewFromOutside
         = s.value("view/fromOutside", d.viewFromOutside).toBool();
 
@@ -79,6 +83,7 @@ AppSettings::save() const
 
     s.setValue("view/projection", int(projection));
     s.setValue("view/fromOutside", viewFromOutside);
+    s.setValue("view/orientation", int(orientation));
     s.setValue("view/graticuleColor", graticuleColor.name());
     s.setValue("view/maskMode", maskMode);
     s.setValue("view/maskOpacity", maskOpacityPercent);

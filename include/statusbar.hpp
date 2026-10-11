@@ -12,6 +12,8 @@ public:
     void showMessage(const QString &message, int timeout = 0);
 
     void setZoom(float zoom);
+    // Names of the longitude / latitude shown (e.g. "l", "b")
+    void setCoordinateNames(const QString &lon, const QString &lat);
     void setFilename(const QString &filename);
     void setCursorData(QPointF lonLat, QPointF raDec, double value,
                        qlonglong index);
@@ -29,4 +31,7 @@ private:
     QLabel *m_pixelIndexLabel = nullptr;
     QLabel *m_pixelValueLabel = nullptr;
     QLabel *m_fileSizeLabel   = nullptr;
+
+    QString m_lonName = "Lon";
+    QString m_latName = "Lat";
 };

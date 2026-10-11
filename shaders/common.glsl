@@ -26,6 +26,7 @@ uniform float zoom;
 uniform vec2 panOffset;
 uniform vec3 unseen_color;
 uniform bool globe_shadow;   // orthographic: soft shadow outside the globe
+uniform mat3 frame_to_native; // displayed frame -> the frame the map is in
 uniform bool view_outside;   // seen from the outside: mirror left-right
 uniform bool limb_darkening; // orthographic: darken towards the limb
 

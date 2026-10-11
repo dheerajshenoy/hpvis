@@ -67,6 +67,7 @@ private:
     QCheckBox *m_showStatusBarCheck = nullptr;
 
     // Appearance (defaults for new maps)
+    QComboBox *m_orientationCombo       = nullptr;
     QComboBox *m_perspectiveCombo       = nullptr;
     QComboBox *m_projectionCombo        = nullptr;
     QPushButton *m_graticuleColorButton = nullptr;

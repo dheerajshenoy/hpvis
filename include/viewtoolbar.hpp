@@ -3,6 +3,7 @@
 #include "colormap.hpp"
 #include "fitsinfo.hpp"
 #include "projection.hpp"
+#include "skyframe.hpp"
 
 #include <QAction>
 #include <QCheckBox>
@@ -21,6 +22,7 @@ public:
 
     void setColormap(Colormap colormap);
     void setProjection(Projection projection);
+    void setOrientation(Orientation orientation);
 
     // Lists the file's table HDUs and their columns, selecting `hdu`/`column`
     // (both 1-based) without emitting fitsSelectionChanged
@@ -29,6 +31,7 @@ public:
 signals:
     void fitsSelectionChanged(int hdu, int column);
     void projectionChanged(Projection projection);
+    void orientationChanged(Orientation orientation);
     void colormapChanged(Colormap colormap);
 
 private:
@@ -36,6 +39,7 @@ private:
 
     QComboBox *m_hduCombo             = nullptr;
     QComboBox *m_columnCombo          = nullptr;
+    QComboBox *m_orientationCombo     = nullptr;
     QComboBox *m_projectionCombo      = nullptr;
     QComboBox *m_colormapCombo        = nullptr;
     FitsInfo m_fitsInfo;
