@@ -70,6 +70,13 @@ HpixView::initUI()
 void
 HpixView::initConnections()
 {
+    connect(m_sidePanel, &SidePanel::projectionChanged, this,
+            [this](Projection projection)
+    {
+        if (m_view)
+            m_view->glWidget()->setProjection(projection);
+    });
+
     connect(m_sidePanel, &SidePanel::graticuleToggled, this,
             &HpixView::onGraticuleToggled);
 

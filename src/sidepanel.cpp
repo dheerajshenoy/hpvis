@@ -14,12 +14,12 @@
 
 SidePanel::SidePanel(QWidget *parent) : QDockWidget(parent)
 {
-    setupUI();
+    initUI();
     initConnections();
 }
 
 void
-SidePanel::setupUI()
+SidePanel::initUI()
 {
     // setMinimumWidth(150);
     setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
@@ -34,6 +34,7 @@ SidePanel::setupUI()
         new CollapsibleSection("Pixel Ordering", pixelOrderingWidget()));
     layout->addWidget(new CollapsibleSection("Color", colormapWidget()));
     layout->addWidget(new CollapsibleSection("Overlays", overlaysWidget()));
+    layout->addWidget(new CollapsibleSection("Projection", projectionWidget()));
     layout->addStretch();
 
     QScrollArea *scrollArea = new QScrollArea();
@@ -548,4 +549,33 @@ SidePanel::onGraticuleColorButtonClicked()
                 .arg(graticuleColor, 6, 16, QChar('0')));
         emit graticuleColorChanged(graticuleColor);
     }
+}
+
+QWidget *
+SidePanel::projectionWidget()
+{
+    QWidget *widget     = new QWidget();
+    QFormLayout *layout = new QFormLayout(widget);
+
+    m_projectionCombo = new QComboBox();
+    m_projectionCombo->addItem("Mollweide",
+                               static_cast<int>(Projection::MOLLWEIDE));
+    m_projectionCombo->addItem("Plate Carrée",
+                               static_cast<int>(Projection::PLATE_CARREE));
+    m_projectionCombo->addItem("Orthographic",
+                               static_cast<int>(Projection::ORTHOGRAPHIC));
+    m_projectionCombo->addItem(
+        "Azimuthal Equidistant",
+        static_cast<int>(Projection::AZIMUTHAL_EQUIDISTANT));
+
+    layout->addRow("Projection:", m_projectionCombo);
+
+    connect(m_projectionCombo, &QComboBox::currentIndexChanged, this,
+            [this](int index)
+    {
+        emit projectionChanged(static_cast<Projection>(
+            m_projectionCombo->itemData(index).toInt()));
+    });
+
+    return widget;
 }

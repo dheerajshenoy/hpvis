@@ -3,6 +3,7 @@
 #include "colormap.hpp"
 #include "fitsinfo.hpp"
 #include "pixelordering.hpp"
+#include "projection.hpp"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -111,9 +112,10 @@ signals:
     void graticuleToggled(bool enabled);
     void graticuleColorChanged(uint32_t color);
     void graticuleStepChanged(double degrees);
+    void projectionChanged(Projection index);
 
 private:
-    void setupUI();
+    void initUI();
     void initConnections();
     void onBackgroundColorButtonClicked();
     void onUnseenColorButtonClicked();
@@ -123,6 +125,7 @@ private:
     QWidget *colormapWidget();
     QWidget *overlaysWidget();
     QWidget *mapInfoWidget();
+    QWidget *projectionWidget();
     void fillColumnCombo(int hdu, int column);
     void updateGraticuleRowVisibility();
     void onGraticuleColorButtonClicked();

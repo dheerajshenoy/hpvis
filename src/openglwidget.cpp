@@ -475,6 +475,8 @@ OpenGLWidget::paintGL()
         "colorbar_rect",
         QVector4D(colorbar_rect.left(), colorbar_rect.top(),
                   colorbar_rect.right(), colorbar_rect.bottom()));
+    m_shaderProgram.setUniformValue("projection_type",
+                                    static_cast<int>(m_projection));
 
     m_vao.bind();
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -1411,5 +1413,12 @@ void
 OpenGLWidget::setGraticuleColor(const QColor &color)
 {
     m_graticuleColor = color;
+    update();
+}
+
+void
+OpenGLWidget::setProjection(Projection projection)
+{
+    m_projection = projection;
     update();
 }

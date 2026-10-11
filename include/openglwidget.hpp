@@ -4,6 +4,7 @@
 #include "exportoptions.hpp"
 #include "mapcamera.hpp"
 #include "pixelordering.hpp"
+#include "projection.hpp"
 
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
@@ -33,6 +34,13 @@ public:
     }
 
     void setPixelOrdering(PixelOrdering ordering);
+
+    void setProjection(Projection projection);
+
+    inline Projection projection() const
+    {
+        return m_projection;
+    }
 
     inline Colormap colormap() const
     {
@@ -314,4 +322,5 @@ private:
     bool m_graticuleEnabled             = false;
     double m_graticuleStepDeg           = 30.0;
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);
+    Projection m_projection             = Projection::MOLLWEIDE;
 };

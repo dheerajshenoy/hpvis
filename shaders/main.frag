@@ -37,10 +37,12 @@ void main() {
     vec2 p = ndc / zoom + panOffset;
     vec2 viewUV = p * 0.5 + 0.5;
 
-    if (!inverseMollweide(viewUV, colat, phi)) {
+    // if (!inverseMollweide(viewUV, colat, phi)) {
+    if (!inverseProjection(viewUV, colat, phi)) {
         FragColor = vec4(bg_color, 1.0); // background outside
         return;
     }
+
 
     int pixIdx = (pixel_ordering == 0) ? ang2pix_ring(nside, colat, phi)
                                        : ang2pix_nest(nside, colat, phi);
