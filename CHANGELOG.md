@@ -92,6 +92,11 @@ First development release.
 - Toolbar and menu controls follow the current tab when you switch tabs.
 - Clicking the map takes keyboard focus from the toolbar, so the shortcuts
   keep working.
+- Statistics and Power Spectrum are dockable panels (Tools > Analysis): dock
+  them to any edge, float them, or close them, and the layout is remembered.
+  They follow the current tab. The power spectrum keeps a result per map and
+  only recomputes when you press Compute / Recompute, and warns when the map's
+  HDU, column or masks changed since.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are
   computed once on load and whenever masks change, so switching tabs with

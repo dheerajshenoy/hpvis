@@ -7,6 +7,8 @@
 #include "openglwidget.hpp"
 #include "recentfiles.hpp"
 #include "statusbar.hpp"
+#include "powerspectrumdock.hpp"
+#include "statisticsdock.hpp"
 #include "tabwidget.hpp"
 #include "view.hpp"
 #include "viewtoolbar.hpp"
@@ -30,6 +32,7 @@ public:
 protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     // Command-line overrides of the saved settings, applied to every map
@@ -58,6 +61,7 @@ private:
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
     void updateControlsFromView(const View *view);
+    void updateDocks();
     void rebuildMasksMenu(const View *view);
     void initShortcuts();
     void applyInterfaceSettings();
@@ -83,8 +87,6 @@ private slots:
     void onSettingsActionTriggered();
     void applySavedSettings();
     void onGraticuleToggled(bool enabled);
-    void onPowerSpectrumActionTriggered();
-    void onStatisticsActionTriggered();
     void onRotationActionTriggered();
     void onLoadColormapTriggered();
     void onColormapRangeActionTriggered();
@@ -127,5 +129,7 @@ private:
     View *m_view           = nullptr;
     TabWidget *m_tabWidget = nullptr;
     ViewToolBar *m_toolBar = nullptr;
+    StatisticsDock *m_statsDock   = nullptr;
+    PowerSpectrumDock *m_powerDock = nullptr;
     StatusBar *m_statusBar = nullptr;
 };

@@ -3,7 +3,8 @@
 #include "colormapregistry.hpp"
 #include "fitsheaderdialog.hpp"
 #include "pixelordering.hpp"
-#include "powerspectrumdialog.hpp"
+#include "powerspectrumdock.hpp"
+#include "statisticsdock.hpp"
 #include "settingsdialog.hpp"
 #include "view.hpp"
 #include "viewtoolbar.hpp"
@@ -41,6 +42,7 @@ HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
     initUI();
     parseArgs(parser);
     initShortcuts();
+    restoreState(QSettings().value("window/state").toByteArray());
     this->show();
 }
 
@@ -161,6 +163,8 @@ HpVis::initUI()
     m_tabWidget = new TabWidget();
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_toolBar   = new ViewToolBar();
+    m_statsDock = new StatisticsDock(this);
+    m_powerDock = new PowerSpectrumDock(this);
     m_statusBar = new StatusBar();
     m_toolBar->setEnabled(false);
     initMenubar();
@@ -168,6 +172,10 @@ HpVis::initUI()
     setCentralWidget(widget);
 
     addToolBar(Qt::TopToolBarArea, m_toolBar);
+    addDockWidget(Qt::RightDockWidgetArea, m_statsDock);
+    addDockWidget(Qt::RightDockWidgetArea, m_powerDock);
+    m_statsDock->hide();
+    m_powerDock->hide();
 
     // QMainWindow's own status bar sits below the dock areas and spans the
     // full window width; our widget fills it.
@@ -419,11 +427,11 @@ HpVis::initMenubar()
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
-    m_toolsAnalysisMenu->addAction("&Power Spectrum", this,
-                                   &HpVis::onPowerSpectrumActionTriggered);
+    // The docks provide checkable actions that stay in sync with their
+    // visibility (including their own close buttons)
+    m_toolsAnalysisMenu->addAction(m_powerDock->toggleViewAction());
 
-    m_toolsAnalysisMenu->addAction("&Statistics", this,
-                                   &HpVis::onStatisticsActionTriggered);
+    m_toolsAnalysisMenu->addAction(m_statsDock->toggleViewAction());
 
     m_toolsSettingsAction = m_toolsMenu->addAction(
         "&Settings", this, &HpVis::onSettingsActionTriggered);
@@ -564,14 +572,20 @@ HpVis::initViewConnections(const View *view)
                                      3000);
         // Show what is really loaded (the previous selection after an error)
         if (view == m_view)
+        {
             m_toolBar->setFitsInfo(view->fitsInfo(), view->hdu(),
                                    view->column());
+            updateDocks();
+        }
     });
 
     connect(view, &View::masksChanged, this, [this, view]()
     {
         if (view == m_view)
+        {
             updateMaskListFromView(view);
+            updateDocks();
+        }
     });
 }
 
@@ -598,6 +612,15 @@ HpVis::updateControlsFromView(const View *view)
         a->setChecked(a->data().toDouble() == gl->graticuleStep());
 
     updateMaskListFromView(view);
+    updateDocks();
+}
+
+// Points the dockable tools at the current tab
+void
+HpVis::updateDocks()
+{
+    m_statsDock->setView(m_view);
+    m_powerDock->setView(m_view);
 }
 
 void
@@ -619,6 +642,7 @@ HpVis::onTabChanged(int index)
     m_view          = qobject_cast<View *>(widget);
 
     updateControlsFromView(m_view);
+    updateDocks();
     updateStatusBarFromView(m_view);
     if (m_view)
     {
@@ -742,11 +766,14 @@ HpVis::onTabCloseRequested(int index)
         return;
 
     QWidget *widget = m_tabWidget->widget(index);
+    m_powerDock->forget(qobject_cast<View *>(widget));
     m_tabWidget->removeTab(index);
     delete widget;
 
     if (m_tabWidget->count() == 0)
     {
+        m_view = nullptr;
+        updateDocks();
         m_toolBar->setEnabled(false);
         rebuildMasksMenu(nullptr);
         m_statusBar->clear();
@@ -1017,68 +1044,6 @@ HpVis::initShortcuts()
 }
 
 void
-HpVis::onPowerSpectrumActionTriggered()
-{
-    if (!m_view)
-        return;
-    OpenGLWidget *gl              = m_view->glWidget();
-    const Healpix_Map<float> *map = gl->healpixMap();
-    if (!map)
-        return;
-
-    PowerSpectrumInput input;
-    input.path = m_view->filePath();
-    input.hdu  = m_view->hdu();
-    // A copy keeps the worker safe if the map is replaced meanwhile
-    input.map  = std::make_shared<Healpix_Map<float>>(*map);
-    for (int i = 0; i < gl->maskCount(); ++i)
-        input.maskActive |= gl->maskEnabled(i);
-
-    PowerSpectrumDialog dialog(input, this);
-    dialog.exec();
-}
-
-void
-HpVis::onStatisticsActionTriggered()
-{
-    if (!m_view || !m_view->glWidget()->healpixMap())
-    {
-        QMessageBox::information(this, "Statistics", "Open a file first.");
-        return;
-    }
-    const OpenGLWidget *gl = m_view->glWidget();
-
-    QDialog dialog(this);
-    dialog.setWindowTitle("Statistics");
-    auto *layout = new QFormLayout(&dialog);
-
-    auto add = [&](const QString &name, const QString &value)
-    {
-        auto *label = new QLabel(value);
-        label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        layout->addRow(name, label);
-    };
-    auto num = [](double v)
-    {
-        return QString::number(v, 'g', 6);
-    };
-
-    add("Nside:", QString::number(gl->healpixMap()->Nside()));
-    add("Npix:", QString::number(gl->healpixMap()->Npix()));
-    add("Min:", num(gl->mapMin()));
-    add("Max:", num(gl->mapMax()));
-    add("Average:", num(gl->mapAverage()));
-    add("RMS:", num(gl->mapRms()));
-    add("Std dev:", num(gl->mapStd()));
-    add("Sky fraction:", QString::number(gl->fsky(), 'f', 6));
-
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    layout->addRow(buttons);
-    dialog.exec();
-}
-
-void
 HpVis::onRotationActionTriggered()
 {
     if (!m_view)
@@ -1209,4 +1174,12 @@ HpVis::onLoadColormapTriggered()
         m_view->glWidget()->setColormap(Colormap(last));
         m_toolBar->setColormap(Colormap(last));
     }
+}
+
+void
+HpVis::closeEvent(QCloseEvent *event)
+{
+    // Remembers which tools are docked, floating or hidden
+    QSettings().setValue("window/state", saveState());
+    QMainWindow::closeEvent(event);
 }

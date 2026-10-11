@@ -130,7 +130,8 @@ add_executable(${PROJECT_NAME}
     src/shaderloader.cpp
     src/statusbar.cpp
     src/settingsdialog.cpp
-    src/powerspectrumdialog.cpp
+    src/powerspectrumdock.cpp
+    src/statisticsdock.cpp
 
     src/qml/powerspectrumplot.qml
 
@@ -156,7 +157,8 @@ add_executable(${PROJECT_NAME}
     include/appsettings.hpp
     include/fitsheaderdialog.hpp
     include/statusbar.hpp
-    include/powerspectrumdialog.hpp
+    include/powerspectrumdock.hpp
+    include/statisticsdock.hpp
 )
 
 # So the executable finds the vendored .so at runtime
