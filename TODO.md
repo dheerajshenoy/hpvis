@@ -3,12 +3,10 @@
 ## Rendering
 - [ ] Tiled rendering for large maps (nside > 2048)
 - [ ] Smooth/bilinear interpolation option
+- [ ] HDR
 
 ## Color scale
 - [ ] Percentile clipping (1%/99%) and auto-range button
-
-## Projections & navigation
-- [ ] Coordinate system conversion (Galactic / Equatorial / Ecliptic)
 
 ## Interaction
 - [ ] Measure angular distance between two points
@@ -38,8 +36,6 @@
 
 ### Projection & view
 - [ ] Projection combo (Mollweide, Hammer, Gnomonic, Orthographic)
-- [ ] View center lon/lat spinboxes and rotation slider
-- [ ] Coordinate system combo (Galactic, Equatorial, Ecliptic)
 - [ ] Flip longitude toggle
 
 ### Data

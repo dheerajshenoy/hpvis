@@ -5,10 +5,10 @@
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
-#include "recentfiles.hpp"
-#include "statusbar.hpp"
 #include "powerspectrumdock.hpp"
+#include "recentfiles.hpp"
 #include "statisticsdock.hpp"
+#include "statusbar.hpp"
 #include "tabwidget.hpp"
 #include "view.hpp"
 #include "viewtoolbar.hpp"
@@ -23,7 +23,7 @@ class HpVis : public QMainWindow
     Q_OBJECT
 public:
     explicit HpVis(const argparse::ArgumentParser &parser,
-                      QWidget *parent = nullptr);
+                   QWidget *parent = nullptr);
 
     // hdu / column are 1-based; 0 picks the first map HDU / column
     void OpenFile(const QString &filePath = QString(), int hdu = 0,
@@ -94,12 +94,16 @@ private slots:
     void onRotationActionTriggered();
     void onLoadColormapTriggered();
     void onColormapRangeActionTriggered();
+    void onCopyParamsActionTriggered();
+    void onPasteParamsActionTriggered();
 
 private:
     CliOptions m_cli;
     QSet<QString> m_cliPaths; // files opened from the command line
 
-    QMenu *m_editMenu = nullptr;
+    QMenu *m_editMenu                = nullptr;
+    QAction *m_editCopyParamsAction  = nullptr;
+    QAction *m_editPasteParamsAction = nullptr;
 
     QMenu *m_fileMenu           = nullptr;
     QAction *m_fileOpenAction   = nullptr;
@@ -109,36 +113,36 @@ private:
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
 
-    QMenu *m_viewMenu              = nullptr;
-    QAction *m_viewMinimapAction   = nullptr;
-    QAction *m_headerAction        = nullptr;
-    QAction *m_viewColorBarAction  = nullptr;
-    QMenu *m_orientationMenu       = nullptr;
+    QMenu *m_viewMenu             = nullptr;
+    QAction *m_viewMinimapAction  = nullptr;
+    QAction *m_headerAction       = nullptr;
+    QAction *m_viewColorBarAction = nullptr;
+    QMenu *m_orientationMenu      = nullptr;
     QList<QAction *> m_orientationActions; // indexed by Orientation
-    QMenu *m_perspectiveMenu       = nullptr;
-    QAction *m_insideAction        = nullptr;
-    QAction *m_outsideAction       = nullptr;
-    QMenu *m_pixelOrderingMenu     = nullptr;
-    QAction *m_nestedAction        = nullptr;
-    QAction *m_ringAction          = nullptr;
-    QMenu *m_graticuleMenu         = nullptr;
-    QAction *m_graticuleShowAction = nullptr;
-    QMenu *m_graticuleStepMenu     = nullptr;
+    QMenu *m_perspectiveMenu         = nullptr;
+    QAction *m_insideAction          = nullptr;
+    QAction *m_outsideAction         = nullptr;
+    QMenu *m_pixelOrderingMenu       = nullptr;
+    QAction *m_nestedAction          = nullptr;
+    QAction *m_ringAction            = nullptr;
+    QMenu *m_graticuleMenu           = nullptr;
+    QAction *m_graticuleShowAction   = nullptr;
+    QMenu *m_graticuleStepMenu       = nullptr;
     QAction *m_reverseColormapAction = nullptr;
-    QAction *m_scaleLinearAction   = nullptr;
-    QAction *m_scaleLogAction      = nullptr;
-    QMenu *m_masksMenu             = nullptr;
-    QAction *m_viewResetViewAction = nullptr;
-    QMenu *m_viewZoomMenu          = nullptr;
+    QAction *m_scaleLinearAction     = nullptr;
+    QAction *m_scaleLogAction        = nullptr;
+    QMenu *m_masksMenu               = nullptr;
+    QAction *m_viewResetViewAction   = nullptr;
+    QMenu *m_viewZoomMenu            = nullptr;
 
     QMenu *m_toolsMenu             = nullptr;
     QMenu *m_toolsAnalysisMenu     = nullptr;
     QAction *m_toolsSettingsAction = nullptr;
 
-    View *m_view           = nullptr;
-    TabWidget *m_tabWidget = nullptr;
-    ViewToolBar *m_toolBar = nullptr;
-    StatisticsDock *m_statsDock   = nullptr;
+    View *m_view                   = nullptr;
+    TabWidget *m_tabWidget         = nullptr;
+    ViewToolBar *m_toolBar         = nullptr;
+    StatisticsDock *m_statsDock    = nullptr;
     PowerSpectrumDock *m_powerDock = nullptr;
-    StatusBar *m_statusBar = nullptr;
+    StatusBar *m_statusBar         = nullptr;
 };
