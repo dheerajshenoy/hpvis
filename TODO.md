@@ -51,7 +51,7 @@
 ## UI / App
 - [ ] Close tabs, tab context menu (duplicate, close others)
 - [ ] Side-by-side / linked views (synced zoom, rotation, color range)
-- [ ] Settings persistence (QSettings: last dir, colormap, window geometry)
+- [x] Settings persistence (QSettings: last dir, colormap, window geometry)
 - [ ] Keyboard shortcuts
 - [ ] Wire up Edit and View menus (currently empty)
 - [ ] Fix `~` expansion and relative paths for command-line files

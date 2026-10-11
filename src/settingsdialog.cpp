@@ -236,8 +236,8 @@ SettingsDialog::createAppearanceSettingsPage()
     QVBoxLayout *outer = new QVBoxLayout(page);
 
     outer->addWidget(new QLabel(
-        "Defaults for maps you open from now on. Maps that are already open "
-        "keep their settings."));
+        "Changes here apply to all open maps and to maps you open later. Only "
+        "the options you change are applied, so other per-map tweaks are kept."));
 
     // --- Color ---
     auto *colorBox = new QGroupBox("Color");

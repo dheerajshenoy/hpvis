@@ -659,11 +659,44 @@ HpixView::onSettingsActionTriggered()
     if (dialog.exec() != QDialog::Accepted)
         return;
 
-    // View options apply to maps opened from now on; the recent list changes
-    // right away
-    m_settings = AppSettings::load();
+    const AppSettings previous = m_settings;
+    m_settings                 = AppSettings::load();
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     updateRecentMenu();
+
+    // Apply what changed to the maps that are already open too. Only the
+    // changed options are touched, so per-map tweaks to the others survive.
+    const AppSettings &s = m_settings;
+    for (int i = 0; i < m_tabWidget->count(); ++i)
+    {
+        auto *view = qobject_cast<View *>(m_tabWidget->widget(i));
+        if (!view)
+            continue;
+        OpenGLWidget *gl = view->glWidget();
+
+        if (s.colormap != previous.colormap)
+            gl->setColormap(s.colormap);
+        if (s.reverseColormap != previous.reverseColormap)
+            gl->setColormapInvert(s.reverseColormap);
+        if (s.scale != previous.scale)
+            gl->setColormapScale(s.scale);
+        if (s.background != previous.background)
+            gl->setBackgroundColor(s.background);
+        if (s.unseen != previous.unseen)
+            gl->setUnseenColor(s.unseen);
+        if (s.colorBar != previous.colorBar)
+            gl->setColorBarVisible(s.colorBar);
+        if (s.minimap != previous.minimap)
+            gl->setMinimapEnabled(s.minimap);
+        if (s.graticule != previous.graticule)
+            gl->setGraticuleEnabled(s.graticule);
+        if (s.graticuleStep != previous.graticuleStep)
+            gl->setGraticuleStep(s.graticuleStep);
+    }
+
+    // Refresh the side panel and menu check marks for the current tab
+    if (m_view)
+        onTabChanged(m_tabWidget->currentIndex());
 }
 
 // Gives a newly loaded map the user's default view options

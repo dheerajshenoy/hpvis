@@ -91,8 +91,9 @@ First development release.
   and a Copy button.
 - Settings dialog (Tools > Settings) with General, Appearance and About pages
   and a search box. It stores the number of recent files and the defaults for
-  newly opened maps (colormap, reverse, scale, background and unseen colors,
-  color bar, minimap, graticule and its spacing) with `QSettings`.
+  all maps (colormap, reverse, scale, background and unseen colors,
+  color bar, minimap, graticule and its spacing) with `QSettings`. Changes also
+  apply to maps that are already open.
 - Maps and masks are read on background threads, so the window stays
   responsive while large files load (the status bar shows "Loading...").
   Several files opened together load in parallel.
