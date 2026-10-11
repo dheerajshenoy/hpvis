@@ -9,7 +9,7 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Five projections: Mollweide, Plate Carrée, Orthographic, Azimuthal
   equidistant and Gnomonic, with interactive sky rotation.
 - RING and NESTED pixel ordering.
-- 15 colormaps, linear and logarithmic scales, an adjustable color range and a
+- 15 colormaps plus your own (CSV or JSON), linear and logarithmic scales, an adjustable color range and a
   color bar.
 - Masks: load several, toggle, invert, and hide or dim the masked pixels.
 - Graticule, minimap, zoom, pan and touchpad gestures.
@@ -52,7 +52,7 @@ hpvis [options] [FILE...]
 | --- | --- |
 | `-H, --hdu N` | HDU to show (1-based, default: first map HDU) |
 | `-c, --column N` | Column to show (1-based, default: first) |
-| `-m, --colormap NAME` | e.g. `viridis`, `inferno`, `jet` |
+| `-m, --colormap NAME` | e.g. `viridis`, `inferno`, `jet`, a custom colormap name, or a colormap file |
 | `-r, --reverse` | Reverse the colormap |
 | `-s, --scale linear\|log` | Color scale |
 | `--min V`, `--max V` | Color range |
@@ -86,6 +86,45 @@ Files can also be opened from File > Open or by dropping them on the window.
 | Toggle minimap | `M` |
 | Toggle color bar | `C` |
 | Open / close tab | `Ctrl+O` / `Ctrl+W` |
+
+## Custom colormaps
+
+Add your own colormaps as CSV or JSON files, either with
+**View > Custom Colormaps > Load Colormap...** (the file is copied into the
+colormaps folder) or by putting them in that folder yourself
+(**View > Custom Colormaps > Open Colormaps Folder**, `colormaps/` in the
+app's config directory). They are picked up at startup and appear after the
+built-in ones in the toolbar and in Settings. `--colormap` takes their name or
+a file path. You can have up to 64.
+
+CSV: one color per line, as `r,g,b` (0-1 or 0-255) or `#rrggbb`. A header line
+and `#` comments are ignored. Colors are spread evenly over the range.
+
+```csv
+r,g,b
+0,0,0
+255,0,0
+255,255,0
+255,255,255
+```
+
+JSON: a name and a list of colors, each a `"#rrggbb"` string, an `[r, g, b]`
+array, or `{"position": 0-1, "color": ...}` for uneven spacing (all or none
+of the colors need a position).
+
+```json
+{
+  "name": "Ice",
+  "colors": [
+    {"position": 0.0, "color": "#000020"},
+    {"position": 0.3, "color": [0.0, 0.5, 1.0]},
+    {"position": 1.0, "color": "#ffffff"}
+  ]
+}
+```
+
+Colors between the entries are interpolated linearly. At least two colors are
+needed.
 
 ## Samples
 

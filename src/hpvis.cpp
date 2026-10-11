@@ -1,5 +1,6 @@
 #include "hpvis.hpp"
 
+#include "colormapregistry.hpp"
 #include "fitsheaderdialog.hpp"
 #include "pixelordering.hpp"
 #include "powerspectrumdialog.hpp"
@@ -10,6 +11,7 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QColorDialog>
+#include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -27,9 +29,10 @@
 #include <QSettings>
 #include <QStatusBar>
 #include <QTimer>
-#include <iostream>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <cmath>
+#include <iostream>
 
 HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
@@ -51,24 +54,30 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
 
     if (auto name = parser.present<std::string>("--colormap"))
     {
-        static const QStringList names
-            = {"grayscale", "inferno", "magma",  "plasma", "viridis",
-               "cubehelix", "jet",     "hsv",    "hot",    "cool",
-               "spring",    "summer",  "autumn", "winter", "rainbow"};
-        QString n = QString::fromStdString(*name).toLower();
-        if (n == "gray" || n == "grey")
+        auto &registry = ColormapRegistry::instance();
+        QString n      = QString::fromStdString(*name);
+        if (n.compare("gray", Qt::CaseInsensitive) == 0
+            || n.compare("grey", Qt::CaseInsensitive) == 0)
             n = "grayscale";
-        const int i = names.indexOf(n);
-        if (i >= 0)
-            m_cli.colormap = Colormap(i);
-        else
+
+        int id = registry.indexOf(n);
+        if (id < 0 && QFileInfo::exists(n)) // a colormap file
+        {
+            QString error;
+            id = registry.addFile(n, false, &error);
+            if (id < 0)
+                fail("Colormap " + *name + ": " + error.toStdString());
+        }
+        else if (id < 0)
             fail("Unknown colormap '" + *name + "' (choose from "
-                 + names.join(", ").toStdString() + ")");
+                 + registry.names().join(", ").toStdString() + ")");
+        if (id >= 0)
+            m_cli.colormap = Colormap(id);
     }
 
     if (auto scale = parser.present<std::string>("--scale"))
-        m_cli.scale = (*scale == "log") ? ColormapScale::LOG
-                                        : ColormapScale::LINEAR;
+        m_cli.scale
+            = (*scale == "log") ? ColormapScale::LOG : ColormapScale::LINEAR;
 
     if (auto proj = parser.present<std::string>("--projection"))
     {
@@ -326,6 +335,15 @@ HpVis::initMenubar()
             m_view->glWidget()->setGraticuleColor(c);
     });
 
+    QMenu *customMenu = m_viewMenu->addMenu("Custom Colormaps");
+    customMenu->addAction("&Load Colormap...", this,
+                          &HpVis::onLoadColormapTriggered);
+    customMenu->addAction("&Open Colormaps Folder", this, []()
+    {
+        QDesktopServices::openUrl(
+            QUrl::fromLocalFile(ColormapRegistry::instance().directory()));
+    });
+
     m_reverseColormapAction = m_viewMenu->addAction(
         "Re&verse Colormap", this, &HpVis::onColormapInvertChanged);
     m_reverseColormapAction->setCheckable(true);
@@ -482,7 +500,8 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column)
     view->hide();
 
     connect(view, &View::loadFinished, this,
-            [this, view, filename, resolvedPath, fromCli](bool ok, const QString &error)
+            [this, view, filename, resolvedPath, fromCli](bool ok,
+                                                          const QString &error)
     {
         if (!ok)
         {
@@ -1158,4 +1177,36 @@ HpVis::onColormapRangeActionTriggered()
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addRow(buttons);
     dialog.exec();
+}
+
+// Picks CSV / JSON colormap files, adds them to the colormaps folder and
+// selects the last one in the current view
+void
+HpVis::onLoadColormapTriggered()
+{
+    const QStringList files = QFileDialog::getOpenFileNames(
+        this, "Load Colormap", startDirectory(),
+        "Colormaps (*.csv *.txt *.json);;All Files (*)");
+    if (files.isEmpty())
+        return;
+    rememberDirectory(files.first());
+
+    int last = -1;
+    for (const QString &file : files)
+    {
+        QString error;
+        const int id = ColormapRegistry::instance().addFile(file, true, &error);
+        if (id < 0)
+            QMessageBox::warning(
+                this, "Load Colormap",
+                QString("%1:\n%2").arg(QFileInfo(file).fileName(), error));
+        else
+            last = id;
+    }
+
+    if (last >= 0 && m_view)
+    {
+        m_view->glWidget()->setColormap(Colormap(last));
+        m_toolBar->setColormap(Colormap(last));
+    }
 }

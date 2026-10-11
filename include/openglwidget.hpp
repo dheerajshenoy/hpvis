@@ -276,6 +276,7 @@ private:
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
+    void uploadColormapLut();
     void recomputeDataRange();
     void applyMaskChange(bool texturesChanged);
     int maskBits(bool inverted = false) const;
@@ -286,6 +287,9 @@ private:
 private:
     PixelOrdering m_pixelOrdering = PixelOrdering::RING;
     Colormap m_colormap           = Colormap::VIRIDIS;
+    unsigned int m_lutTexture     = 0; // custom colormaps, one row each
+    int m_lutRows                 = 1;
+    bool m_lutDirty               = true;
     ColormapScale m_colormapScale = ColormapScale::LINEAR;
     long m_nside                  = 0;
     long m_npix                   = 0;

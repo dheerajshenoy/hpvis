@@ -9,6 +9,9 @@ uniform int pixel_ordering;
 uniform int colormap;
 uniform int colormap_scale; // 0 = linear, 1 = log
 uniform bool invert_colormap;
+// User colormaps: one 256-entry row each; ids >= 15 select row (id - 15)
+uniform sampler2D colormapLut;
+uniform int lut_rows;
 uniform vec3 bg_color;
 // Up to 16 masks, packed 4 per RGBA8 texture (one mask per channel)
 uniform sampler2D maskTex0;

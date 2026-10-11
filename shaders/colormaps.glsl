@@ -144,6 +144,13 @@ vec3 applyColormap(float t, int type, bool invert) {
         case 12: return sampleAutumn(val);
         case 13: return sampleWinter(val);
         case 14: return sampleRainbow(val);
-        default: return sampleGrayscale(val);
+        default:
+            if (type >= 15 && type - 15 < lut_rows) {
+                // Centre on texel centres so 0 and 1 hit the end colors
+                float u = (val * 255.0 + 0.5) / 256.0;
+                float v = (float(type - 15) + 0.5) / float(lut_rows);
+                return texture(colormapLut, vec2(u, v)).rgb;
+            }
+            return sampleGrayscale(val);
     }
 }

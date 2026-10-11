@@ -120,6 +120,7 @@ add_executable(${PROJECT_NAME}
     src/recentfiles.cpp
     src/projectionmath.cpp
     src/appsettings.cpp
+    src/colormapregistry.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
     src/tabbar.cpp
@@ -139,6 +140,7 @@ add_executable(${PROJECT_NAME}
     include/exportoptions.hpp
     include/view.hpp
     include/hpvis.hpp
+    include/colormapregistry.hpp
     include/openglwidget.hpp
     include/argparse.hpp
     include/tabwidget.hpp

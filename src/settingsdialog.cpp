@@ -1,5 +1,7 @@
 #include "settingsdialog.hpp"
 
+#include "colormapregistry.hpp"
+
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QColorDialog>
@@ -360,10 +362,7 @@ SettingsDialog::createAppearanceSettingsPage()
     auto *form     = new QFormLayout(colorBox);
 
     m_colormapCombo = new QComboBox();
-    m_colormapCombo->addItems({"Grayscale", "Inferno", "Magma", "Plasma",
-                               "Viridis", "Cubehelix", "Jet", "HSV", "Hot",
-                               "Cool", "Spring", "Summer", "Autumn", "Winter",
-                               "Rainbow"});
+    m_colormapCombo->addItems(ColormapRegistry::instance().names());
     form->addRow("Colormap:", m_colormapCombo);
 
     m_reverseCheck = new QCheckBox("Reverse");

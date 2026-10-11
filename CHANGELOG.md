@@ -28,6 +28,14 @@ First development release.
 ### Color
 - 15 colormaps: grayscale, inferno, magma, plasma, viridis, cubehelix, jet,
   HSV, hot, cool, spring, summer, autumn, winter and rainbow.
+- Custom colormaps from CSV (`r,g,b` or `#rrggbb` per line) or JSON (a name and
+  a list of colors, optionally with positions) files. Load them from
+  View > Custom Colormaps > Load Colormap..., or put them in the `colormaps/`
+  folder of the app's config directory. They are stored as rows of a 256-entry
+  lookup texture, appear after the built-in colormaps in the toolbar and in
+  Settings, and work with `--colormap` (by name or file path). Up to 64.
+- The default colormap is saved by name, so custom colormaps can be the
+  default.
 - Reverse colormap option.
 - Adjustable color range (min/max) with a "Reset Range" button that restores
   the range of the data.

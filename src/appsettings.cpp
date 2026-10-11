@@ -1,5 +1,7 @@
 #include "appsettings.hpp"
 
+#include "colormapregistry.hpp"
+
 #include <QSettings>
 #include <algorithm>
 
@@ -32,9 +34,12 @@ AppSettings::load()
         s.value("view/maskOpacity", d.maskOpacityPercent).toInt(), 0, 100);
 
     // Out-of-range values (e.g. from a newer version) fall back to the default
-    const int cm = s.value("view/colormap", int(d.colormap)).toInt();
-    a.colormap   = (cm >= 0 && cm <= int(Colormap::RAINBOW)) ? Colormap(cm)
-                                                              : d.colormap;
+    // Stored by name so custom colormaps survive being added or removed
+    const auto &registry = ColormapRegistry::instance();
+    int cm = registry.indexOf(s.value("view/colormapName").toString());
+    if (cm < 0)
+        cm = s.value("view/colormap", int(d.colormap)).toInt(); // older files
+    a.colormap = (cm >= 0 && cm < registry.count()) ? Colormap(cm) : d.colormap;
     const int sc = s.value("view/scale", int(d.scale)).toInt();
     a.scale      = (sc == int(ColormapScale::LOG)) ? ColormapScale::LOG
                                                    : ColormapScale::LINEAR;
@@ -73,6 +78,8 @@ AppSettings::save() const
     s.setValue("view/maskOpacity", maskOpacityPercent);
 
     s.setValue("view/colormap", int(colormap));
+    s.setValue("view/colormapName",
+               ColormapRegistry::instance().name(int(colormap)));
     s.setValue("view/reverseColormap", reverseColormap);
     s.setValue("view/scale", int(scale));
     s.setValue("view/background", background.name());

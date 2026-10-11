@@ -1,5 +1,7 @@
 #include "viewtoolbar.hpp"
 
+#include "colormapregistry.hpp"
+
 #include <QLabel>
 
 ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
@@ -58,12 +60,19 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
 
     // --- Colormap ---
     m_colormapCombo = new QComboBox();
-    m_colormapCombo->addItems({"Grayscale", "Inferno", "Magma",  "Plasma",
-                               "Viridis",   "Cubehelix", "Jet",  "HSV",
-                               "Hot",       "Cool",    "Spring", "Summer",
-                               "Autumn",    "Winter",  "Rainbow"});
+    m_colormapCombo->addItems(ColormapRegistry::instance().names());
     m_colormapCombo->setCurrentIndex(static_cast<int>(Colormap::VIRIDIS));
     addLabeled("Colormap", m_colormapCombo);
+    // Custom colormaps added or loaded at run time
+    connect(&ColormapRegistry::instance(), &ColormapRegistry::changed, this,
+            [this]()
+    {
+        QSignalBlocker blocker(m_colormapCombo);
+        const int current = m_colormapCombo->currentIndex();
+        m_colormapCombo->clear();
+        m_colormapCombo->addItems(ColormapRegistry::instance().names());
+        m_colormapCombo->setCurrentIndex(current);
+    });
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });

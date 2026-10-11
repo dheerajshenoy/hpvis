@@ -86,6 +86,7 @@ private slots:
     void onPowerSpectrumActionTriggered();
     void onStatisticsActionTriggered();
     void onRotationActionTriggered();
+    void onLoadColormapTriggered();
     void onColormapRangeActionTriggered();
 
 private:

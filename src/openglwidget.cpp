@@ -1,5 +1,7 @@
 #include "openglwidget.hpp"
 
+#include "colormapregistry.hpp"
+
 #include "fitsinfo.hpp"
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
@@ -111,6 +113,12 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
     m_camera = new MapCamera();
     setMouseTracking(true);
     setFocusPolicy(Qt::ClickFocus);
+    connect(&ColormapRegistry::instance(), &ColormapRegistry::changed, this,
+            [this]()
+    {
+        m_lutDirty = true;
+        update();
+    });
     m_cursorPos = QPointF(width() / 2.0, height() / 2.0);
     setCursor(Qt::CrossCursor);
     emitCursorData();
@@ -123,6 +131,13 @@ OpenGLWidget::~OpenGLWidget()
         makeCurrent();
         glDeleteTextures(1, &m_mapTexture);
         m_mapTexture = 0;
+        doneCurrent();
+    }
+    if (m_lutTexture)
+    {
+        makeCurrent();
+        glDeleteTextures(1, &m_lutTexture);
+        m_lutTexture = 0;
         doneCurrent();
     }
     if (m_maskTextures[0] || m_maskTextures[1] || m_maskTextures[2]
@@ -418,6 +433,8 @@ OpenGLWidget::paintGL()
 
     if (m_maskDirty)
         uploadMaskToGPU();
+    if (m_lutDirty)
+        uploadColormapLut();
 
     m_shaderProgram.bind();
 
@@ -437,6 +454,11 @@ OpenGLWidget::paintGL()
         m_shaderProgram.setUniformValue(
             QByteArray("maskTex" + QByteArray::number(g)).constData(), 1 + g);
     }
+    // Custom colormaps on unit 5
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, m_lutTexture);
+    m_shaderProgram.setUniformValue("colormapLut", 5);
+    m_shaderProgram.setUniformValue("lut_rows", m_lutRows);
     glActiveTexture(GL_TEXTURE0);
     m_shaderProgram.setUniformValue("viewport_size",
                                     QVector2D(width() * devicePixelRatioF(),
@@ -850,6 +872,33 @@ OpenGLWidget::applyMaskChange(bool texturesChanged)
 }
 
 // Packs the masks 4 per RGBA8 texture (mask i -> texture i/4, channel i%4)
+// Rebuilds the texture of user colormaps (a row per colormap; one dummy row
+// when there are none, so the sampler is always valid)
+void
+OpenGLWidget::uploadColormapLut()
+{
+    m_lutDirty = false;
+
+    const auto &registry = ColormapRegistry::instance();
+    QByteArray data      = registry.lutData();
+    m_lutRows            = std::max(1, registry.customCount());
+    if (data.isEmpty())
+        data = QByteArray(ColormapRegistry::kLutSize * 3, '\0');
+
+    if (!m_lutTexture)
+        glGenTextures(1, &m_lutTexture);
+    glBindTexture(GL_TEXTURE_2D, m_lutTexture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, ColormapRegistry::kLutSize,
+                 m_lutRows, 0, GL_RGB, GL_UNSIGNED_BYTE, data.constData());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void
 OpenGLWidget::uploadMaskToGPU()
 {
