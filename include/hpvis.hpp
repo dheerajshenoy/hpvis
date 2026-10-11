@@ -94,8 +94,6 @@ private slots:
     void onRotationActionTriggered();
     void onLoadColormapTriggered();
     void onColormapRangeActionTriggered();
-    void onCopyParamsActionTriggered();
-    void onPasteParamsActionTriggered();
 
 private:
     CliOptions m_cli;
