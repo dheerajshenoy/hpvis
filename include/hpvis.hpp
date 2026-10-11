@@ -14,9 +14,12 @@
 #include "viewtoolbar.hpp"
 
 #include <QMainWindow>
+#include <memory>
 #include <QSet>
 #include <QTabWidget>
 #include <optional>
+
+class MapOperationDialog;
 
 class HpVis : public QMainWindow
 {
@@ -92,6 +95,10 @@ private slots:
     void applySavedSettings();
     void onGraticuleToggled(bool enabled);
     void onRotationActionTriggered();
+    void onOperateTriggered();
+    void onSaveMapTriggered();
+    void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
+                         const QString &title, SkyFrame frame);
     void onLoadColormapTriggered();
     void onColormapRangeActionTriggered();
 
@@ -108,6 +115,7 @@ private:
     QMenu *m_fileOpenRecentMenu = nullptr;
     RecentFiles m_recentFiles;
     AppSettings m_settings        = AppSettings::load();
+    QAction *m_fileSaveMapAction  = nullptr;
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
 
@@ -140,6 +148,7 @@ private:
     View *m_view                   = nullptr;
     TabWidget *m_tabWidget         = nullptr;
     ViewToolBar *m_toolBar         = nullptr;
+    MapOperationDialog *m_operateDialog = nullptr;
     StatisticsDock *m_statsDock    = nullptr;
     PowerSpectrumDock *m_powerDock = nullptr;
     StatusBar *m_statusBar         = nullptr;

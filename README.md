@@ -18,6 +18,8 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Graticule, minimap, zoom, pan and touchpad gestures.
 - Several maps open at once in tabs, with a toolbar for HDU, column,
   projection and colormap.
+- Operations on maps: add, subtract, multiply, divide or any expression of
+  several maps, with the result opened as a new map and saved as FITS.
 - Map statistics, a FITS header viewer, power spectrum (via NaMaster) and
   image export.
 - Settings dialog for the defaults of new maps.

@@ -46,6 +46,20 @@ public:
 
     void setHduIndex(int index);
 
+    // A map that was computed rather than read from a file: shown like any
+    // other (no file, HDU or column)
+    void setComputedMap(Healpix_Map<float> &&map, const QString &title,
+                        SkyFrame frame);
+    bool isComputed() const
+    {
+        return m_computed;
+    }
+    // Name for the tab and status bar: the file name, or the computed map's
+    QString displayName() const;
+
+    // Writes the map to a new FITS file (HDU 2, one float column)
+    bool saveMap(const QString &path, QString *error) const;
+
     // Asynchronous: reads the file in the background and emits loadFinished
     // hdu / column are 1-based; 0 picks the first map HDU / column
     void loadMap(const QString &filename, int hdu = 0, int column = 0);
@@ -88,6 +102,8 @@ private:
     fitshandle m_fitsHandle;
     OpenGLWidget *m_glWidget = nullptr;
     QString m_filePath;
+    QString m_title;        // of a computed map
+    bool m_computed = false;
     FitsInfo m_fitsInfo;
     int m_hdu     = 0;
     int m_column  = 0;

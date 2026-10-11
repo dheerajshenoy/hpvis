@@ -2,6 +2,7 @@
 
 #include "colormapregistry.hpp"
 #include "fitsheaderdialog.hpp"
+#include "mapoperationdialog.hpp"
 #include "pixelordering.hpp"
 #include "powerspectrumdock.hpp"
 #include "statisticsdock.hpp"
@@ -275,9 +276,20 @@ HpVis::initMenubar()
             QMessageBox::information(this, "FITS Header", "Open a file first.");
             return;
         }
+        if (m_view->isComputed())
+        {
+            QMessageBox::information(
+                this, "FITS Header",
+                "This map was computed, so it has no FITS header. Save it "
+                "with File > Save Map As... to make a FITS file.");
+            return;
+        }
         FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
         dialog.exec();
     });
+
+    m_fileSaveMapAction = m_fileMenu->addAction(
+        "&Save Map As...", this, &HpVis::onSaveMapTriggered);
 
     m_fileCloseTabAction = m_fileMenu->addAction("&Close Tab", this, [this]()
     {
@@ -500,6 +512,9 @@ HpVis::initMenubar()
     rebuildMasksMenu(nullptr);
 
     m_toolsMenu = menuBar->addMenu("&Tools");
+
+    m_toolsMenu->addAction("&Operate on Maps...", this,
+                           &HpVis::onOperateTriggered);
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
@@ -856,8 +871,10 @@ HpVis::updateStatusBarFromView(const View *view)
         return;
 
     const QFileInfo info(view->filePath());
-    m_statusBar->setFilename(info.fileName());
-    m_statusBar->setFilesize(QLocale().formattedDataSize(info.size()));
+    m_statusBar->setFilename(view->displayName());
+    m_statusBar->setFilesize(view->isComputed()
+                                 ? QString("computed")
+                                 : QLocale().formattedDataSize(info.size()));
     m_statusBar->setZoom(view->glWidget()->zoom());
     m_statusBar->setCursorData(QPointF(), QPointF(), std::nan(""),
                                -1); // clear stale
@@ -1301,4 +1318,78 @@ HpVis::closeEvent(QCloseEvent *event)
     // Remembers which tools are docked, floating or hidden
     QSettings().setValue("window/state", saveState());
     QMainWindow::closeEvent(event);
+}
+
+// The Operate dialog: kept so it can stay open while the results are examined
+void
+HpVis::onOperateTriggered()
+{
+    if (!m_operateDialog)
+    {
+        m_operateDialog = new MapOperationDialog(
+            [this]()
+        {
+            QList<OpenMap> maps;
+            for (int i = 0; i < m_tabWidget->count(); ++i)
+                if (auto *v = qobject_cast<View *>(m_tabWidget->widget(i)))
+                    maps.append({m_tabWidget->tabText(i), v});
+            return maps;
+        },
+            this);
+        connect(m_operateDialog, &MapOperationDialog::mapReady, this,
+                &HpVis::openComputedMap);
+    }
+    m_operateDialog->show();
+    m_operateDialog->raise();
+    m_operateDialog->activateWindow();
+}
+
+// Opens a map that was computed from other maps as a new tab
+void
+HpVis::openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
+                       const QString &title, SkyFrame frame)
+{
+    View *view = new View(this);
+    view->hide();
+    view->setComputedMap(std::move(*map), title, frame);
+
+    applyDefaults(view);
+    m_tabWidget->addTab(view, title);
+    m_tabWidget->setCurrentIndex(m_tabWidget->indexOf(view));
+    initViewConnections(view);
+    if (m_view == view)
+    {
+        updateControlsFromView(view);
+        updateStatusBarFromView(view);
+    }
+    m_toolBar->setEnabled(true);
+    m_statusBar->showMessage(QString("Opened %1").arg(title), 3000);
+}
+
+void
+HpVis::onSaveMapTriggered()
+{
+    if (!m_view || !m_view->healpixMap())
+    {
+        QMessageBox::information(this, "Save Map", "Open a map first.");
+        return;
+    }
+
+    QString suggestion = m_view->isComputed()
+                             ? QString("result.fits")
+                             : QFileInfo(m_view->filePath()).completeBaseName()
+                                   + "_copy.fits";
+    const QString path = QFileDialog::getSaveFileName(
+        this, "Save Map As", startDirectory() + "/" + suggestion,
+        "FITS Files (*.fits);;All Files (*)");
+    if (path.isEmpty())
+        return;
+    rememberDirectory(path);
+
+    QString error;
+    if (m_view->saveMap(path, &error))
+        m_statusBar->showMessage(QString("Saved %1").arg(path), 4000);
+    else
+        QMessageBox::critical(this, "Save Map",
+                              QString("Failed to save %1: %2").arg(path, error));
 }

@@ -130,6 +130,17 @@ First development release.
   ℓ = 0..lmax, with nside, lmax and the refinement rounds in a header line) as
   CSV. The plot's background, foreground (text and axes) and line colors can
   be picked in the dock or in Settings > Appearance, and are remembered.
+- Tools > Operate on Maps... combines maps pixel by pixel into a new map.
+  Inputs are open maps and/or FITS files (each with its own HDU and column),
+  named A, B, C, ...; the operation is a preset (add, subtract, multiply,
+  divide, mean, absolute difference, maximum, minimum) or any expression such
+  as `(A - B) / sqrt(C)` with + - * / ^, parentheses, abs, sqrt, log, log10,
+  exp, sin, cos, tan, min, max, pow and pi. Maps with different nsides are
+  brought to the highest, lowest or first nside, and orderings are matched.
+  Unseen pixels, divisions by zero and other undefined values stay unseen in
+  the result. The result opens as a new tab that works like any other map
+  (statistics, power spectrum, masks, export), and File > Save Map As...
+  writes any map, including a computed one, to a FITS file.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are
   computed once on load and whenever masks change, so switching tabs with

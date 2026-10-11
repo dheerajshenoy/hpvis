@@ -111,6 +111,21 @@ displayFrame(Orientation orientation, SkyFrame mapFrame)
 }
 
 QString
+fitsCode(SkyFrame f)
+{
+    switch (f)
+    {
+        case SkyFrame::Galactic:
+            return "G";
+        case SkyFrame::Ecliptic:
+            return "E";
+        case SkyFrame::Equatorial:
+            return "C";
+    }
+    return "G";
+}
+
+QString
 name(SkyFrame f)
 {
     switch (f)

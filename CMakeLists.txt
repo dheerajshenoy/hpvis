@@ -131,6 +131,9 @@ add_executable(${PROJECT_NAME}
     src/appsettings.cpp
     src/colormapregistry.cpp
     src/skyframe.cpp
+    src/mapexpression.cpp
+    src/mapoperation.cpp
+    src/mapoperationdialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
     src/tabbar.cpp
@@ -153,6 +156,9 @@ add_executable(${PROJECT_NAME}
     include/hpvis.hpp
     include/colormapregistry.hpp
     include/skyframe.hpp
+    include/mapexpression.hpp
+    include/mapoperation.hpp
+    include/mapoperationdialog.hpp
     include/openglwidget.hpp
     include/argparse.hpp
     include/tabwidget.hpp

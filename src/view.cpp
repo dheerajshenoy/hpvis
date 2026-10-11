@@ -5,6 +5,7 @@
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 
+#include <QFileInfo>
 #include <QFutureWatcher>
 #include <QtConcurrent>
 #include <cmath>
@@ -183,4 +184,52 @@ void
 View::setHduIndex(int index)
 {
     m_hduIndex = index;
+}
+
+void
+View::setComputedMap(Healpix_Map<float> &&map, const QString &title,
+                     SkyFrame frame)
+{
+    m_computed = true;
+    m_title    = title;
+    m_filePath.clear();
+    m_hdu    = 0;
+    m_column = 0;
+    m_fitsInfo = FitsInfo();
+    m_glWidget->setMapFrame(frame);
+    m_glWidget->setMap(std::move(map));
+}
+
+QString
+View::displayName() const
+{
+    return m_computed ? m_title : QFileInfo(m_filePath).fileName();
+}
+
+bool
+View::saveMap(const QString &path, QString *error) const
+{
+    const Healpix_Map<float> *map = m_glWidget->healpixMap();
+    if (!map)
+    {
+        if (error)
+            *error = "there is no map";
+        return false;
+    }
+    try
+    {
+        fitshandle out;
+        out.create("!" + path.toStdString()); // "!" overwrites
+        write_Healpix_map_to_fits(out, *map, PLANCK_FLOAT32);
+        out.set_key("COORDSYS",
+                    skyframe::fitsCode(m_glWidget->mapFrame()).toStdString(),
+                    "Coordinate system");
+    }
+    catch (const std::exception &e)
+    {
+        if (error)
+            *error = e.what();
+        return false;
+    }
+    return true;
 }

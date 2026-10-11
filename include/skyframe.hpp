@@ -37,6 +37,9 @@ SkyFrame fromCoordSys(const QString &coordsys);
 // The frame an orientation shows, given the map's own frame
 SkyFrame displayFrame(Orientation orientation, SkyFrame mapFrame);
 
+// FITS COORDSYS code: "G", "E" or "C"
+QString fitsCode(SkyFrame frame);
+
 QString name(SkyFrame frame);
 // Names of the longitude / latitude pair, e.g. "l", "b"
 QString lonName(SkyFrame frame);
