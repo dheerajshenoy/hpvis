@@ -28,6 +28,7 @@
 - [ ] Pixel picking via CPU `ang2pix` on mouse click
 - [ ] Measure angular distance between two points
 - [ ] Region selection with stats (mean, std, min, max)
+- [ ] Drag and drop map as images to other apps
 
 ## Overlays
 - [x] Mask overlay
