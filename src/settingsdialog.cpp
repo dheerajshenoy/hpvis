@@ -46,7 +46,7 @@ SettingsDialog::initUI()
         "general files recent history list folder directory remember last "
         "interface toolbar status bar show hide",
         "appearance new maps defaults projection mollweide orthographic "
-        "colormap "
+        "colormap animate "
         "color scale linear log reverse background unseen globe shadow limb "
         "darkening",
         "overlays color bar minimap graticule grid spacing color masks mask "
@@ -128,7 +128,7 @@ SettingsDialog::initConnections()
     for (QCheckBox *box :
          {m_rememberDirCheck, m_showToolbarCheck, m_showStatusBarCheck,
           m_reverseCheck, m_colorBarCheck, m_minimapCheck, m_graticuleCheck,
-          m_globeShadowCheck, m_limbDarkeningCheck})
+          m_globeShadowCheck, m_limbDarkeningCheck, m_animateCheck})
         connect(box, &QCheckBox::toggled, this, changed);
 }
 
@@ -222,6 +222,7 @@ SettingsDialog::currentSettings() const
     a.graticuleStep      = m_graticuleStepCombo->currentData().toDouble();
     a.globeShadow        = m_globeShadowCheck->isChecked();
     a.limbDarkening      = m_limbDarkeningCheck->isChecked();
+    a.animateOrthoGlobe  = m_animateCheck->isChecked();
     return a;
 }
 
@@ -267,6 +268,7 @@ SettingsDialog::loadSettings()
     m_graticuleStepCombo->setCurrentIndex(step >= 0 ? step : 3);
     m_globeShadowCheck->setChecked(a.globeShadow);
     m_limbDarkeningCheck->setChecked(a.limbDarkening);
+    m_animateCheck->setChecked(a.animateOrthoGlobe);
 
     m_saved = currentSettings(); // normalised by the widgets (e.g. step)
     updateSaveEnabled();
@@ -396,7 +398,14 @@ SettingsDialog::createAppearanceSettingsPage()
     m_limbDarkeningCheck = new QCheckBox("Limb darkening");
     orthoForm->addRow(m_limbDarkeningCheck);
 
+    auto *animationBox  = new QGroupBox("Animation");
+    auto *animationForm = new QFormLayout(animationBox);
+    m_animateCheck      = new QCheckBox("Enable Ortho Sphere Animation");
+    animationForm->addRow(m_animateCheck);
+
     outer->addWidget(orthoBox);
+    outer->addWidget(animationBox);
+
     outer->addStretch();
     return page;
 }

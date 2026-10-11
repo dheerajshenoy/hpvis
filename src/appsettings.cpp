@@ -12,19 +12,18 @@ AppSettings::load()
     QSettings s;
     AppSettings a;
 
-    a.recentFilesMax
-        = std::clamp(s.value("general/recentFilesMax", d.recentFilesMax).toInt(),
-                     0, 50);
+    a.recentFilesMax = std::clamp(
+        s.value("general/recentFilesMax", d.recentFilesMax).toInt(), 0, 50);
 
     a.rememberLastDir
         = s.value("general/rememberLastDir", d.rememberLastDir).toBool();
-    a.showToolbar   = s.value("general/showToolbar", d.showToolbar).toBool();
-    a.showStatusBar = s.value("general/showStatusBar", d.showStatusBar).toBool();
+    a.showToolbar = s.value("general/showToolbar", d.showToolbar).toBool();
+    a.showStatusBar
+        = s.value("general/showStatusBar", d.showStatusBar).toBool();
 
     const int pj = s.value("view/projection", int(d.projection)).toInt();
-    a.projection = (pj >= 0 && pj <= int(Projection::GNOMONIC))
-                       ? Projection(pj)
-                       : d.projection;
+    a.projection = (pj >= 0 && pj <= int(Projection::GNOMONIC)) ? Projection(pj)
+                                                                : d.projection;
     a.graticuleColor = QColor(
         s.value("view/graticuleColor", d.graticuleColor.name()).toString());
     if (!a.graticuleColor.isValid())
@@ -44,22 +43,25 @@ AppSettings::load()
     a.scale      = (sc == int(ColormapScale::LOG)) ? ColormapScale::LOG
                                                    : ColormapScale::LINEAR;
 
-    a.reverseColormap = s.value("view/reverseColormap", d.reverseColormap).toBool();
-    a.background      = QColor(s.value("view/background", d.background.name()).toString());
-    a.unseen          = QColor(s.value("view/unseen", d.unseen.name()).toString());
+    a.reverseColormap
+        = s.value("view/reverseColormap", d.reverseColormap).toBool();
+    a.background
+        = QColor(s.value("view/background", d.background.name()).toString());
+    a.unseen = QColor(s.value("view/unseen", d.unseen.name()).toString());
     if (!a.background.isValid())
         a.background = d.background;
     if (!a.unseen.isValid())
         a.unseen = d.unseen;
 
-    a.colorBar  = s.value("view/colorBar", d.colorBar).toBool();
-    a.minimap   = s.value("view/minimap", d.minimap).toBool();
-    a.graticule = s.value("view/graticule", d.graticule).toBool();
-    a.graticuleStep
-        = std::clamp(s.value("view/graticuleStep", d.graticuleStep).toDouble(),
-                     1.0, 90.0);
+    a.colorBar      = s.value("view/colorBar", d.colorBar).toBool();
+    a.minimap       = s.value("view/minimap", d.minimap).toBool();
+    a.graticule     = s.value("view/graticule", d.graticule).toBool();
+    a.graticuleStep = std::clamp(
+        s.value("view/graticuleStep", d.graticuleStep).toDouble(), 1.0, 90.0);
     a.globeShadow   = s.value("view/globeShadow", d.globeShadow).toBool();
     a.limbDarkening = s.value("view/limbDarkening", d.limbDarkening).toBool();
+    a.animateOrthoGlobe
+        = s.value("view/animateOrthoGlobe", d.animateOrthoGlobe).toBool();
     return a;
 }
 
@@ -90,5 +92,6 @@ AppSettings::save() const
     s.setValue("view/graticuleStep", graticuleStep);
     s.setValue("view/globeShadow", globeShadow);
     s.setValue("view/limbDarkening", limbDarkening);
+    s.setValue("view/animateOrthoGlobe", animateOrthoGlobe);
     s.sync();
 }

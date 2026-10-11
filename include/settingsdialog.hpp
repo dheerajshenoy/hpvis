@@ -53,7 +53,7 @@ private:
     QStringListModel *m_listModel   = nullptr;
     QLineEdit *m_searchLineEdit     = nullptr;
     QPushButton *m_saveButton       = nullptr;
-    QPushButton *m_closeButton     = nullptr;
+    QPushButton *m_closeButton      = nullptr;
     QListView *m_listView           = nullptr;
     QStackedWidget *m_stackedWidget = nullptr;
 
@@ -67,22 +67,23 @@ private:
     QCheckBox *m_showStatusBarCheck = nullptr;
 
     // Appearance (defaults for new maps)
-    QComboBox *m_projectionCombo     = nullptr;
+    QComboBox *m_projectionCombo        = nullptr;
     QPushButton *m_graticuleColorButton = nullptr;
-    QComboBox *m_maskModeCombo       = nullptr;
-    QSlider *m_maskOpacitySlider     = nullptr;
+    QComboBox *m_maskModeCombo          = nullptr;
+    QSlider *m_maskOpacitySlider        = nullptr;
     QColor m_graticuleColor;
-    QComboBox *m_colormapCombo       = nullptr;
-    QCheckBox *m_reverseCheck        = nullptr;
-    QComboBox *m_scaleCombo          = nullptr;
-    QPushButton *m_backgroundButton  = nullptr;
-    QPushButton *m_unseenButton      = nullptr;
-    QCheckBox *m_colorBarCheck       = nullptr;
-    QCheckBox *m_minimapCheck        = nullptr;
-    QCheckBox *m_graticuleCheck      = nullptr;
-    QComboBox *m_graticuleStepCombo  = nullptr;
-    QCheckBox *m_globeShadowCheck    = nullptr;
-    QCheckBox *m_limbDarkeningCheck  = nullptr;
+    QComboBox *m_colormapCombo      = nullptr;
+    QCheckBox *m_reverseCheck       = nullptr;
+    QComboBox *m_scaleCombo         = nullptr;
+    QPushButton *m_backgroundButton = nullptr;
+    QPushButton *m_unseenButton     = nullptr;
+    QCheckBox *m_colorBarCheck      = nullptr;
+    QCheckBox *m_minimapCheck       = nullptr;
+    QCheckBox *m_graticuleCheck     = nullptr;
+    QComboBox *m_graticuleStepCombo = nullptr;
+    QCheckBox *m_globeShadowCheck   = nullptr;
+    QCheckBox *m_limbDarkeningCheck = nullptr;
+    QCheckBox *m_animateCheck       = nullptr;
     QColor m_background;
     QColor m_unseen;
 

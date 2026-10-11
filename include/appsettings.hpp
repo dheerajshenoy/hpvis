@@ -10,27 +10,28 @@
 struct AppSettings
 {
     // General
-    int recentFilesMax    = 10;
-    bool rememberLastDir  = true; // file dialogs start in the last used folder
-    bool showToolbar      = true;
-    bool showStatusBar    = true;
+    int recentFilesMax   = 10;
+    bool rememberLastDir = true; // file dialogs start in the last used folder
+    bool showToolbar     = true;
+    bool showStatusBar   = true;
 
     // New maps
-    Colormap colormap         = Colormap::VIRIDIS;
-    bool reverseColormap      = false;
-    ColormapScale scale       = ColormapScale::LINEAR;
-    QColor background         = QColor(10, 10, 15);
-    QColor unseen             = QColor(0, 0, 0);
-    Projection projection     = Projection::MOLLWEIDE;
-    QColor graticuleColor     = QColor(255, 255, 255);
-    int maskMode              = 0;  // 0 = hide, 1 = dim
-    int maskOpacityPercent    = 80; // dim strength
-    bool colorBar             = true;
-    bool minimap              = false;
-    bool graticule            = false;
-    double graticuleStep      = 30.0; // degrees
-    bool globeShadow          = true; // orthographic outer shadow
-    bool limbDarkening        = true; // orthographic limb darkening
+    Colormap colormap      = Colormap::VIRIDIS;
+    bool reverseColormap   = false;
+    ColormapScale scale    = ColormapScale::LINEAR;
+    QColor background      = QColor(10, 10, 15);
+    QColor unseen          = QColor(0, 0, 0);
+    Projection projection  = Projection::MOLLWEIDE;
+    QColor graticuleColor  = QColor(255, 255, 255);
+    int maskMode           = 0;  // 0 = hide, 1 = dim
+    int maskOpacityPercent = 80; // dim strength
+    bool colorBar          = true;
+    bool minimap           = false;
+    bool graticule         = false;
+    double graticuleStep   = 30.0; // degrees
+    bool globeShadow       = true; // orthographic outer shadow
+    bool limbDarkening     = true; // orthographic limb darkening
+    bool animateOrthoGlobe = true; // orthographic globe rotation animation
 
     bool operator==(const AppSettings &) const = default;
 
