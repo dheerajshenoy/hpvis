@@ -16,6 +16,7 @@ public:
     void add(const QString &path);
     void remove(const QString &path);
     void clear();
+    void setMaxCount(int maxCount); // 0 disables the list
 
     // Where the list is stored
     static QString storagePath();

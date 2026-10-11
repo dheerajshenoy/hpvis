@@ -58,8 +58,11 @@ scanFits(fitshandle &file)
 
         try
         {
-            entry.name
-                = QString::fromStdString(file.get_key<std::string>("EXTNAME"));
+            // Check first: a failed get_key() prints an error to stderr even
+            // when it is caught
+            if (file.key_present("EXTNAME"))
+                entry.name = QString::fromStdString(
+                    file.get_key<std::string>("EXTNAME"));
         }
         catch (const PlanckError &)
         {

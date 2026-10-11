@@ -6,6 +6,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QTextStream>
+#include <algorithm>
 
 RecentFiles::RecentFiles(int maxCount) : m_maxCount(maxCount)
 {
@@ -32,6 +33,8 @@ RecentFiles::files() const
 void
 RecentFiles::add(const QString &path)
 {
+    if (m_maxCount == 0)
+        return;
     const QString abs = QFileInfo(path).absoluteFilePath();
     m_files.removeAll(abs);
     m_files.prepend(abs);
@@ -45,6 +48,17 @@ RecentFiles::remove(const QString &path)
 {
     if (m_files.removeAll(QFileInfo(path).absoluteFilePath()) > 0)
         save();
+}
+
+void
+RecentFiles::setMaxCount(int maxCount)
+{
+    m_maxCount = std::max(0, maxCount);
+    if (m_files.size() > m_maxCount)
+    {
+        m_files = m_files.mid(0, m_maxCount);
+        save();
+    }
 }
 
 void

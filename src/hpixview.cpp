@@ -2,6 +2,7 @@
 
 #include "fitsheaderdialog.hpp"
 #include "pixelordering.hpp"
+#include "settingsdialog.hpp"
 #include "sidepanel.hpp"
 #include "view.hpp"
 
@@ -20,6 +21,7 @@
 HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
 {
+    m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     initUI();
     parseArgs(parser);
     this->show();
@@ -67,7 +69,6 @@ HpixView::initUI()
     statusBar()->addWidget(m_statusBar, 1);
 
     initConnections();
-    populateRecentFilesMenu();
 }
 
 void
@@ -94,9 +95,8 @@ HpixView::initConnections()
                                      m_view->column());
             return;
         }
-        m_statusBar->showMessage(QString("Loading HDU %1, column %2...")
-                                     .arg(hdu)
-                                     .arg(column));
+        m_statusBar->showMessage(
+            QString("Loading HDU %1, column %2...").arg(hdu).arg(column));
         m_view->loadHdu(hdu, column);
     });
 
@@ -275,8 +275,7 @@ HpixView::initMenubar()
     {
         if (!m_view)
         {
-            QMessageBox::information(this, "FITS Header",
-                                     "Open a file first.");
+            QMessageBox::information(this, "FITS Header", "Open a file first.");
             return;
         }
         FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
@@ -309,8 +308,8 @@ HpixView::updateRecentMenu()
     for (const QString &path : files)
     {
         QAction *action = m_fileOpenRecentMenu->addAction(
-            QString("&%1  %2").arg(n++).arg(QFileInfo(path).fileName()),
-            this, [this, path]() { OpenFile(path); });
+            QString("&%1  %2").arg(n++).arg(QFileInfo(path).fileName()), this,
+            [this, path]() { OpenFile(path); });
         action->setToolTip(path);
         action->setStatusTip(path);
     }
@@ -369,6 +368,7 @@ HpixView::OpenFile(const QString &filePath)
             return;
         }
 
+        applyDefaults(view);
         m_tabWidget->addTab(view, filename);
         // Show it now so the GPU upload happens at open time, not on the
         // first tab switch
@@ -414,11 +414,10 @@ HpixView::initViewConnections(const View *view)
             QMessageBox::critical(this, "Error",
                                   QString("Failed to load map: %1").arg(error));
         else
-            m_statusBar->showMessage(
-                QString("Loaded HDU %1, column %2")
-                    .arg(view->hdu())
-                    .arg(view->column()),
-                3000);
+            m_statusBar->showMessage(QString("Loaded HDU %1, column %2")
+                                         .arg(view->hdu())
+                                         .arg(view->column()),
+                                     3000);
         // Show what is really loaded (the previous selection after an error)
         if (view == m_view)
             m_sidePanel->setFitsInfo(view->fitsInfo(), view->hdu(),
@@ -654,15 +653,33 @@ HpixView::onExportActionTriggered()
 }
 
 void
-HpixView::populateRecentFilesMenu()
-{
-    // TODO: Implement recent files functionality
-}
-
-void
 HpixView::onSettingsActionTriggered()
 {
-    // TODO: Implement settings dialog
+    SettingsDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    // View options apply to maps opened from now on; the recent list changes
+    // right away
+    m_settings = AppSettings::load();
+    m_recentFiles.setMaxCount(m_settings.recentFilesMax);
+    updateRecentMenu();
+}
+
+// Gives a newly loaded map the user's default view options
+void
+HpixView::applyDefaults(View *view)
+{
+    OpenGLWidget *gl = view->glWidget();
+    gl->setColormap(m_settings.colormap);
+    gl->setColormapInvert(m_settings.reverseColormap);
+    gl->setColormapScale(m_settings.scale);
+    gl->setBackgroundColor(m_settings.background);
+    gl->setUnseenColor(m_settings.unseen);
+    gl->setColorBarVisible(m_settings.colorBar);
+    gl->setMinimapEnabled(m_settings.minimap);
+    gl->setGraticuleEnabled(m_settings.graticule);
+    gl->setGraticuleStep(m_settings.graticuleStep);
 }
 
 void

@@ -1,10 +1,11 @@
 #pragma once
 
-#include "recentfiles.hpp"
 #include "argparse.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
+#include "appsettings.hpp"
+#include "recentfiles.hpp"
 #include "sidepanel.hpp"
 #include "statusbar.hpp"
 #include "tabwidget.hpp"
@@ -34,11 +35,11 @@ private:
     void initViewConnections(const View *view);
     void initMenubar();
     void updateRecentMenu();
+    void applyDefaults(View *view);
     void initCFITSIO();
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
     void updateSidePanelStateFromView(const View *view);
-    void populateRecentFilesMenu();
 
 private slots:
     void onPixelOrderingChanged(PixelOrdering ordering);
@@ -62,10 +63,11 @@ private slots:
 private:
     QMenu *m_editMenu = nullptr;
 
-    QMenu *m_fileMenu             = nullptr;
-    QAction *m_fileOpenAction     = nullptr;
-    QMenu *m_fileOpenRecentMenu   = nullptr;
+    QMenu *m_fileMenu           = nullptr;
+    QAction *m_fileOpenAction   = nullptr;
+    QMenu *m_fileOpenRecentMenu = nullptr;
     RecentFiles m_recentFiles;
+    AppSettings m_settings = AppSettings::load();
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
 
