@@ -45,8 +45,8 @@
 - [ ] Error dialog on failed load (bad path, non-HEALPix FITS)
 
 ## Export
-- [ ] Save current view as PNG/PDF (`grabFramebuffer`)
-- [ ] High-resolution offscreen export
+- [x] Save current view as PNG/PDF (`grabFramebuffer`)
+- [x] High-resolution offscreen export
 - [ ] Copy view to clipboard
 
 ## UI / App
@@ -64,7 +64,7 @@
 - [ ] macOS fallback path (OpenGL 4.1 core profile check)
 
 ## Side panel
-Group into collapsible sections (QGroupBox / toolbox).
+- [x] Group into collapsible sections (QGroupBox / toolbox).
 
 ### Display
 - [x] Bad pixel (`UNSEEN`) color picker
@@ -83,5 +83,5 @@ Group into collapsible sections (QGroupBox / toolbox).
 ### Data
 - [ ] Column/field selector (TT, QQ, UU, ...)
 - [x] Read-only map info: nside, npix, ordering, coord system, min/max/mean/std
-- [ ] Default pixel ordering from FITS header (`ORDERING`) instead of manual choice
+- [x] Default pixel ordering from FITS header (`ORDERING`) instead of manual choice
 - [ ] Smoothing FWHM spinbox

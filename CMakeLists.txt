@@ -47,8 +47,12 @@ add_executable(${PROJECT_NAME}
     src/collapsiblesection.cpp
     src/shaderloader.cpp
     src/statusbar.cpp
+    src/settingsdialog.cpp
+    src/toolbar.cpp
     resources.qrc
 
+    include/toolbar.hpp
+    include/settingsdialog.hpp
     include/exportoptions.hpp
     include/view.hpp
     include/hpixview.hpp

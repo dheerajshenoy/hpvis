@@ -48,9 +48,12 @@ HpixView::initUI()
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_sidePanel = new SidePanel();
     m_statusBar = new StatusBar();
+    m_toolBar   = new ToolBar();
 
     m_statusBar->showMessage("Welcome to HpixView!", 5000);
     initMenubar();
+
+    addToolBar(m_toolBar);
 
     layout->addWidget(m_tabWidget);
     setCentralWidget(widget);
@@ -193,6 +196,11 @@ HpixView::initMenubar()
     m_viewSidePanelAction = m_sidePanel->toggleViewAction();
     m_viewSidePanelAction->setText("&Side Panel");
     m_viewMenu->addAction(m_viewSidePanelAction);
+
+    m_viewToolBarAction = m_toolBar->toggleViewAction();
+    m_viewToolBarAction->setText("&Toolbar");
+    m_viewMenu->addAction(m_viewToolBarAction);
+
     m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
 
     auto zoomLevels
@@ -281,10 +289,9 @@ HpixView::OpenFile(const QString &filePath)
 void
 HpixView::initViewConnections(const View *view)
 {
-    connect(
-        view->glWidget(), &OpenGLWidget::mapLoaded, this,
-        [this, view](long nside, long npix, double avg, double rms, double std,
-                     float min, float max)
+    connect(view->glWidget(), &OpenGLWidget::mapLoaded, this,
+            [this, view](long nside, long npix, double avg, double rms,
+                         double std, float min, float max)
     {
         if (view == m_view)
             m_sidePanel->setMapInfo(nside, npix, avg, rms, std, min, max);
