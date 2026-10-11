@@ -51,6 +51,7 @@ private slots:
     void onMinimapToggled(bool enabled);
     void onExportActionTriggered();
     void onSettingsActionTriggered();
+    void onGraticuleToggled(bool enabled);
 
 private:
     QMenu *m_editMenu = nullptr;

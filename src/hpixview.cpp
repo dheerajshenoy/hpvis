@@ -72,6 +72,15 @@ HpixView::initUI()
 void
 HpixView::initConnections()
 {
+    connect(m_sidePanel, &SidePanel::graticuleToggled, this,
+            &HpixView::onGraticuleToggled);
+
+    connect(m_sidePanel, &SidePanel::graticuleStepChanged, this,
+            [this](double degrees)
+    {
+        if (m_view)
+            m_view->glWidget()->setGraticuleStep(degrees);
+    });
     connect(m_sidePanel, &SidePanel::pixelOrderingChanged, this,
             &HpixView::onPixelOrderingChanged);
 
@@ -341,6 +350,8 @@ HpixView::updateSidePanelStateFromView(const View *view)
                                   view->glWidget()->colormapMax());
     updateMaskListFromView(view);
     m_sidePanel->setColormapScale(view->glWidget()->colormapScale());
+    m_sidePanel->setGraticule(view->glWidget()->graticuleEnabled(),
+                              view->glWidget()->graticuleStep());
     m_sidePanel->setColormapReverse(view->glWidget()->colormapInvert());
     m_sidePanel->setBackgroundColor(view->glWidget()->backgroundColor().rgb()
                                     & 0xFFFFFF);
@@ -537,4 +548,11 @@ void
 HpixView::onSettingsActionTriggered()
 {
     // TODO: Implement settings dialog
+}
+
+void
+HpixView::onGraticuleToggled(bool enabled)
+{
+    if (m_view)
+        m_view->glWidget()->setGraticuleEnabled(enabled);
 }

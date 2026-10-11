@@ -189,6 +189,16 @@ public:
         return m_nside > 0 ? &m_pendingMap : nullptr;
     }
 
+    void setGraticuleEnabled(bool enabled);
+    void setGraticuleStep(double degrees);
+    bool graticuleEnabled() const
+    {
+        return m_graticuleEnabled;
+    }
+    double graticuleStep() const
+    {
+        return m_graticuleStepDeg;
+    }
     void setMaskMode(int mode);
     void setMaskOpacity(float opacity);
     void setMap(const Healpix_Map<float> &map);
@@ -225,6 +235,8 @@ signals:
 private:
     QVector2D toNdc(const QPointF &pos) const;
     QVector2D viewScale() const;
+    QPointF projectToWindow(double latRad, double lonRad) const;
+    void paintGraticuleLabels(QPainter &p);
     static constexpr int kMapPadding = 24; // logical px around the map
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
@@ -292,4 +304,6 @@ private:
     static constexpr int kMinimapH = 100;
     static constexpr int kMinimapMargin = 12;
     bool m_minimapEnabled               = false;
+    bool m_graticuleEnabled             = false;
+    double m_graticuleStepDeg           = 30.0;
 };

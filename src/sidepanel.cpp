@@ -90,6 +90,12 @@ SidePanel::setupConnections()
         emit maskModeChanged(mode);
     });
 
+    connect(m_graticuleCheckBox, &QCheckBox::toggled, this,
+            [this](bool checked) { emit graticuleToggled(checked); });
+
+    connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
+            [this](int) { emit graticuleStepChanged(graticuleStep()); });
+
     connect(m_maskOpacitySlider, &QSlider::valueChanged, this,
             [this](int v) { emit maskOpacityChanged(v / 100.0f); });
 
@@ -189,6 +195,16 @@ SidePanel::overlaysWidget()
 
     m_fskyLabel = new QLabel();
     layout->addRow("Sky fraction", m_fskyLabel);
+
+    m_graticuleCheckBox = new QCheckBox("Show Graticule");
+    layout->addRow(m_graticuleCheckBox);
+
+    m_graticuleStepCombo = new QComboBox();
+    for (double deg : {10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0})
+        m_graticuleStepCombo->addItem(QString("%1°").arg(deg), deg);
+    m_graticuleStepCombo->setCurrentIndex(3); // 30°
+    layout->addRow("Grid spacing", m_graticuleStepCombo);
+
     widget->setLayout(layout);
     return widget;
 }

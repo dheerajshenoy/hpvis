@@ -65,6 +65,22 @@ public:
                   const QList<bool> &enabled, const QList<bool> &inverted,
                   int mode, float opacity);
 
+    double graticuleStep() const
+    {
+        return m_graticuleStepCombo->currentData().toDouble();
+    }
+
+    // Mirror a view's state without emitting signals
+    void setGraticule(bool enabled, double degrees)
+    {
+        QSignalBlocker b1(m_graticuleCheckBox);
+        QSignalBlocker b2(m_graticuleStepCombo);
+        m_graticuleCheckBox->setChecked(enabled);
+        const int i = m_graticuleStepCombo->findData(degrees);
+        if (i >= 0)
+            m_graticuleStepCombo->setCurrentIndex(i);
+    }
+
     void setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
                     double std, double min, double max);
 
@@ -85,6 +101,8 @@ signals:
     void maskRemoveRequested(int index);
     void maskModeChanged(int mode);
     void maskOpacityChanged(float opacity);
+    void graticuleToggled(bool enabled);
+    void graticuleStepChanged(double degrees);
 
 private:
     void setupUI();
@@ -123,14 +141,16 @@ private:
     QSlider *m_maskOpacitySlider     = nullptr;
     QFormLayout *m_overlaysLayout    = nullptr;
     QLabel *m_fskyLabel              = nullptr;
+    QCheckBox *m_graticuleCheckBox   = nullptr;
+    QComboBox *m_graticuleStepCombo  = nullptr;
 
     // Map info controls
     QLineEdit *m_nsideEdit = nullptr;
     QLineEdit *m_npixEdit  = nullptr;
     QLineEdit *m_avgEdit   = nullptr;
     QLineEdit *m_rmsEdit   = nullptr;
-    QLineEdit *m_minEdit  = nullptr;
-    QLineEdit *m_maxEdit  = nullptr;
+    QLineEdit *m_minEdit   = nullptr;
+    QLineEdit *m_maxEdit   = nullptr;
     QLineEdit *m_stdEdit   = nullptr;
 
     // FITS Header info

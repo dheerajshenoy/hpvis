@@ -425,6 +425,11 @@ OpenGLWidget::paintGL()
                                     m_invertColormap ? 1 : 0);
     m_shaderProgram.setUniformValue("view_scale", viewScale());
     m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
+    m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
+    m_shaderProgram.setUniformValue("graticule_step",
+                                    float(qDegreesToRadians(m_graticuleStepDeg)));
+    m_shaderProgram.setUniformValue("graticule_color",
+                                    QVector4D(1.0f, 1.0f, 1.0f, 0.55f));
     m_shaderProgram.setUniformValue(
         "colorbar_rect",
         QVector4D(colorbar_rect.left(), colorbar_rect.top(),
@@ -455,6 +460,7 @@ OpenGLWidget::paintGL()
         m_shaderProgram.setUniformValue("viewport_size",
                                         QVector2D(physW, physH));
         m_shaderProgram.setUniformValue("colorbar_enabled", false);
+        m_shaderProgram.setUniformValue("graticule_enabled", false);
         m_shaderProgram.setUniformValue("view_scale", QVector2D(1.0f, 1.0f));
 
         glActiveTexture(GL_TEXTURE0);
@@ -475,7 +481,8 @@ OpenGLWidget::paintGL()
 
     m_shaderProgram.release();
 
-    if (!m_colorBarVisible && !showMinimap && !m_isRegionSelecting)
+    if (!m_colorBarVisible && !showMinimap && !m_isRegionSelecting
+        && !m_graticuleEnabled)
         return;
 
     QPainter p(this);
@@ -506,6 +513,9 @@ OpenGLWidget::paintGL()
         p.setBrush(Qt::NoBrush);
         p.drawRect(minimapRect.adjusted(0, 0, -1, -1));
     }
+
+    if (m_graticuleEnabled)
+        paintGraticuleLabels(p);
 
     if (m_isRegionSelecting)
     {
@@ -1198,7 +1208,7 @@ OpenGLWidget::processSelectionRegion()
         return;
 
     m_camera->zoomToRect(toNdc(r.topLeft()), toNdc(r.bottomRight()),
-                          viewScale());
+                         viewScale());
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
 }
@@ -1208,4 +1218,80 @@ OpenGLWidget::beginZoomToRegion()
 {
     m_zoomRegionArmed = true;
     setCursor(Qt::CrossCursor);
+}
+
+void
+OpenGLWidget::setGraticuleEnabled(bool enabled)
+{
+    m_graticuleEnabled = enabled;
+    update();
+}
+
+void
+OpenGLWidget::setGraticuleStep(double degrees)
+{
+    m_graticuleStepDeg = degrees;
+    update();
+}
+
+// Forward Mollweide: (lat, lon) in radians -> window pixels (logical, y down).
+// Inverse of inverseMollweide() above: lon 0 is the center, increasing left.
+QPointF
+OpenGLWidget::projectToWindow(double lat, double lon) const
+{
+    // Solve 2t + sin(2t) = pi * sin(lat) by Newton iteration
+    double t = lat;
+    for (int i = 0; i < 30; ++i)
+    {
+        const double d = 2.0 + 2.0 * std::cos(2.0 * t);
+        if (std::abs(d) < 1e-9)
+            break;
+        t -= (2.0 * t + std::sin(2.0 * t) - M_PI * std::sin(lat)) / d;
+    }
+    // lon wrapped to (-pi, pi]
+    lon = std::remainder(lon, 2.0 * M_PI);
+    const QVector2D plane(float(-lon * std::cos(t) / M_PI), float(std::sin(t)));
+
+    // Inverse of the camera and of toNdc()
+    const QVector2D ndc = (plane - m_camera->panOffset) * m_camera->zoom;
+    const QVector2D s   = viewScale();
+    return QPointF((ndc.x() / s.x() + 1.0f) * 0.5f * width(),
+                   (1.0f - ndc.y() / s.y()) * 0.5f * height());
+}
+
+void
+OpenGLWidget::paintGraticuleLabels(QPainter &p)
+{
+    const double step = qDegreesToRadians(m_graticuleStepDeg);
+    const QRectF bounds(6, 6, width() - 12, height() - 12);
+    const QFontMetrics fm = p.fontMetrics();
+
+    auto draw = [&](const QPointF &at, const QString &text, bool alignRight)
+    {
+        const QPointF origin(at.x() - (alignRight ? fm.horizontalAdvance(text) : 0),
+                             at.y() + fm.ascent() / 2.0);
+        const QRectF box(origin.x(), origin.y() - fm.ascent(),
+                         fm.horizontalAdvance(text), fm.height());
+        if (!bounds.contains(box))
+            return;
+        p.setPen(QColor(0, 0, 0, 200)); // shadow keeps it readable on any map
+        p.drawText(origin + QPointF(1, 1), text);
+        p.setPen(Qt::white);
+        p.drawText(origin, text);
+    };
+
+    // Longitudes along the equator (0 at the center, increasing to the left)
+    for (double lon = -M_PI + step; lon <= M_PI + 1e-9; lon += step)
+    {
+        const double deg = std::round(qRadiansToDegrees(lon) * 100.0) / 100.0;
+        const QPointF at = projectToWindow(0.0, lon);
+        draw(at + QPointF(0, fm.height() * 0.8), QString("%1°").arg(deg), false);
+    }
+    // Latitudes on the left edge of the ellipse (lon = 180°)
+    for (double lat = -M_PI / 2 + step; lat < M_PI / 2 - 1e-9; lat += step)
+    {
+        const double deg = std::round(qRadiansToDegrees(lat) * 100.0) / 100.0;
+        draw(projectToWindow(lat, M_PI) - QPointF(4, 0), QString("%1°").arg(deg),
+             true);
+    }
 }
