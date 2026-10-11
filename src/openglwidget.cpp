@@ -478,6 +478,8 @@ OpenGLWidget::paintGL()
                   colorbar_rect.right(), colorbar_rect.bottom()));
     m_shaderProgram.setUniformValue("projection_type",
                                     static_cast<int>(m_projection));
+    m_shaderProgram.setUniformValue("globe_rotation",
+                                    m_rotation.toRotationMatrix());
 
     m_vao.bind();
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -972,6 +974,24 @@ OpenGLWidget::setupGeometry()
     m_vao.release();
 }
 
+// Unit vector for a colatitude / longitude pair, and back
+static QVector3D
+directionFromAngles(double colat, double phi)
+{
+    return QVector3D(float(std::sin(colat) * std::cos(phi)),
+                     float(std::sin(colat) * std::sin(phi)),
+                     float(std::cos(colat)));
+}
+
+static void
+anglesFromDirection(const QVector3D &v, double &colat, double &phi)
+{
+    colat = std::atan2(std::hypot(double(v.x()), double(v.y())), double(v.z()));
+    phi   = std::atan2(double(v.y()), double(v.x()));
+    if (phi < 0.0)
+        phi += 2.0 * M_PI;
+}
+
 void
 OpenGLWidget::emitCursorData()
 {
@@ -985,6 +1005,9 @@ OpenGLWidget::emitCursorData()
         emit cursorPosChanged(QPointF(), QPointF(), std::nan(""), -1);
         return;
     }
+    // View frame -> sky (same rotation the shader applies)
+    anglesFromDirection(m_rotation.rotatedVector(directionFromAngles(colat, phi)),
+                        colat, phi);
 
     const Healpix_Base base(
         static_cast<int>(m_nside),
@@ -1021,13 +1044,13 @@ OpenGLWidget::viewScale() const
     // divided by the box's share of the window gives map NDC in [-1, 1]
     // inside the box.
     const float aspect = float(projectionmath::aspect(m_projection));
-    const float w   = float(std::max(width(), 1));
-    const float h   = float(std::max(height(), 1));
-    const float pad = float(kMapPadding);
-    const float aw  = std::max(w - 2.0f * pad, 1.0f);
-    const float ah  = std::max(h - 2.0f * pad, 1.0f);
-    const float bw  = std::min(aw, aspect * ah);
-    const float bh  = bw / aspect;
+    const float w      = float(std::max(width(), 1));
+    const float h      = float(std::max(height(), 1));
+    const float pad    = float(kMapPadding);
+    const float aw     = std::max(w - 2.0f * pad, 1.0f);
+    const float ah     = std::max(h - 2.0f * pad, 1.0f);
+    const float bw     = std::min(aw, aspect * ah);
+    const float bh     = bw / aspect;
     return QVector2D(w / bw, h / bh);
 }
 
@@ -1112,6 +1135,54 @@ OpenGLWidget::panToMinimapPoint(const QPointF &pos)
     update();
 }
 
+// View-frame (unrotated) direction of the sky under a widget position. False
+// outside the projection's shape.
+bool
+OpenGLWidget::viewDirectionAt(const QPointF &pos, QVector3D &dir) const
+{
+    const QVector2D p = toNdc(pos) / m_camera->zoom + m_camera->panOffset;
+    double colat, phi;
+    if (!projectionmath::inverse(m_projection, p, colat, phi))
+        return false;
+    dir = directionFromAngles(colat, phi);
+    return true;
+}
+
+// Drag-to-rotate: remember which sky point is under the cursor...
+bool
+OpenGLWidget::startRotation(const QPointF &pos)
+{
+    if (!viewDirectionAt(pos, m_rotateGrab))
+        return false;
+    m_isRotating    = true;
+    m_rotationStart = m_rotation;
+    setCursor(Qt::ClosedHandCursor);
+    return true;
+}
+
+// ...and keep it there: rotate so the direction now under the cursor (v1)
+// ends up where the grabbed one (v0) was, i.e. R = R0 * rotation(v1 -> v0)
+void
+OpenGLWidget::updateRotation(const QPointF &pos)
+{
+    QVector3D v1;
+    if (!viewDirectionAt(pos, v1))
+        return; // cursor left the shape: keep the last rotation
+
+    m_rotation = (m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
+                     .normalized();
+    emitCursorData();
+    update();
+}
+
+void
+OpenGLWidget::resetRotation()
+{
+    m_rotation = QQuaternion();
+    emitCursorData();
+    update();
+}
+
 void
 OpenGLWidget::mousePressEvent(QMouseEvent *e)
 {
@@ -1135,6 +1206,21 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
         return;
     }
 
+    // Rotate with the middle button or Ctrl + left drag; the globe-like
+    // projections rotate with a plain left drag (panning them is pointless)
+    const bool disk = m_projection == Projection::ORTHOGRAPHIC
+                      || m_projection == Projection::AZIMUTHAL_EQUIDISTANT;
+    const bool wantsRotate
+        = e->button() == Qt::MiddleButton
+          || (e->button() == Qt::LeftButton
+              && ((e->modifiers() & Qt::ControlModifier) || disk));
+    if (wantsRotate)
+    {
+        m_lastMousePos = e->pos();
+        startRotation(e->position()); // ignored when grabbing outside the shape
+        return;
+    }
+
     if (e->button() == Qt::LeftButton)
     {
         m_isPanning    = true;
@@ -1144,55 +1230,15 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
 }
 
 void
-OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
-{
-    if (m_isRegionSelecting && e->button() == Qt::LeftButton)
-    {
-        m_isRegionSelecting = false;
-        m_zoomRegionArmed   = false;
-        setCursor(Qt::CrossCursor);
-        // unsetCursor();
-        processSelectionRegion();
-        update();
-        e->accept();
-        return;
-    }
-
-    if (e->button() == Qt::LeftButton)
-    {
-        m_draggingMinimap = false;
-        m_isPanning       = false;
-        setCursor(Qt::CrossCursor);
-        // unsetCursor();
-    }
-}
-
-void
-OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
-{
-    if (e->button() == Qt::LeftButton && minimapVisible()
-        && minimapRect().contains(e->pos()))
-        return;
-    if (e->button() == Qt::LeftButton)
-    {
-        m_camera->reset();
-        emit zoomChanged(m_camera->zoom);
-        emitCursorData();
-        update();
-    }
-}
-
-void
-OpenGLWidget::enterEvent(QEnterEvent *e)
-{
-    m_cursorPos = e->position();
-    emitCursorData();
-    QOpenGLWidget::enterEvent(e);
-}
-
-void
 OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 {
+    if (m_isRotating)
+    {
+        m_cursorPos = e->position();
+        updateRotation(e->position());
+        return;
+    }
+
     if (m_isRegionSelecting)
     {
         m_regionEnd = e->pos();
@@ -1220,6 +1266,62 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
                               -2.0f * delta.y() / float(height()) * s.y()));
     emitCursorData();
     update();
+}
+
+void
+OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
+{
+    if (m_isRegionSelecting && e->button() == Qt::LeftButton)
+    {
+        m_isRegionSelecting = false;
+        m_zoomRegionArmed   = false;
+        setCursor(Qt::CrossCursor);
+        // unsetCursor();
+        processSelectionRegion();
+        update();
+        e->accept();
+        return;
+    }
+
+    if (m_isRotating
+        && (e->button() == Qt::LeftButton || e->button() == Qt::MiddleButton))
+    {
+        m_isRotating = false;
+        setCursor(Qt::CrossCursor);
+        return;
+    }
+
+    if (e->button() == Qt::LeftButton)
+    {
+        m_draggingMinimap = false;
+        m_isPanning       = false;
+        setCursor(Qt::CrossCursor);
+        // unsetCursor();
+    }
+}
+
+void
+OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
+{
+    if (e->button() == Qt::LeftButton && minimapVisible()
+        && minimapRect().contains(e->pos()))
+        return;
+    if (e->button() == Qt::LeftButton)
+    {
+        m_camera->reset();
+        m_rotation = QQuaternion();
+        emit zoomChanged(m_camera->zoom);
+        emitCursorData();
+        update();
+    }
+}
+
+void
+OpenGLWidget::enterEvent(QEnterEvent *e)
+{
+    m_cursorPos = e->position();
+    emitCursorData();
+    QOpenGLWidget::enterEvent(e);
 }
 
 void
@@ -1274,6 +1376,7 @@ void
 OpenGLWidget::resetView()
 {
     m_camera->reset();
+    m_rotation = QQuaternion();
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
     update();
@@ -1336,15 +1439,22 @@ OpenGLWidget::setGraticuleStep(double degrees)
 bool
 OpenGLWidget::projectToWindow(double lat, double lon, QPointF &out) const
 {
+    // Sky -> view frame (inverse of the shader's rotation)
+    double colat, phi;
+    anglesFromDirection(
+        m_rotation.inverted().rotatedVector(
+            directionFromAngles(M_PI / 2.0 - lat, lon)),
+        colat, phi);
+
     QVector2D plane;
-    if (!projectionmath::forward(m_projection, lat, lon, plane))
+    if (!projectionmath::forward(m_projection, M_PI / 2.0 - colat, phi, plane))
         return false;
 
     // Inverse of the camera and of toNdc()
     const QVector2D ndc = (plane - m_camera->panOffset) * m_camera->zoom;
     const QVector2D s   = viewScale();
-    out = QPointF((ndc.x() / s.x() + 1.0f) * 0.5f * width(),
-                  (1.0f - ndc.y() / s.y()) * 0.5f * height());
+    out                 = QPointF((ndc.x() / s.x() + 1.0f) * 0.5f * width(),
+                                  (1.0f - ndc.y() / s.y()) * 0.5f * height());
     return true;
 }
 

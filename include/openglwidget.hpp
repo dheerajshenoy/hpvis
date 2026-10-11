@@ -11,9 +11,11 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
+#include <QQuaternion>
 #include <array>
 #include <cstdint>
 #include <healpix_map.h>
+#include <qobject.h>
 #include <vector>
 
 // Largest nside the viewer can show: the map is packed into one 2D texture
@@ -223,6 +225,7 @@ public:
     void exportImage(const QString &filePath,
                      const ExportOptions &options = {});
     void resetView();
+    void resetRotation();
 
 protected:
     void initializeGL() override;
@@ -251,6 +254,9 @@ private:
     QVector2D toNdc(const QPointF &pos) const;
     QVector2D viewScale() const;
     bool projectToWindow(double latRad, double lonRad, QPointF &out) const;
+    bool viewDirectionAt(const QPointF &pos, QVector3D &dir) const;
+    bool startRotation(const QPointF &pos);
+    void updateRotation(const QPointF &pos);
     int minimapWidth() const;
     void paintGraticuleLabels(QPainter &p);
     static constexpr int kMapPadding = 24; // logical px around the map
@@ -323,4 +329,8 @@ private:
     double m_graticuleStepDeg           = 30.0;
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);
     Projection m_projection             = Projection::MOLLWEIDE;
+    bool m_isRotating                   = false;
+    QVector3D m_rotateGrab; // view-frame direction grabbed at drag start
+    QQuaternion m_rotation;      // current rotation quaternion for 3D view
+    QQuaternion m_rotationStart; // rotation at the start of a drag
 };

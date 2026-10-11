@@ -43,6 +43,13 @@ void main() {
         return;
     }
 
+    // Rotate the sky: view-frame direction -> sky direction. atan(length, z)
+    // stays accurate near the poles where acos(z) would not.
+    vec3 dir = vec3(sin(colat) * cos(phi), sin(colat) * sin(phi), cos(colat));
+    dir   = globe_rotation * dir;
+    colat = atan(length(dir.xy), dir.z);
+    phi   = mod(atan(dir.y, dir.x), 2.0 * PI);
+
 
     int pixIdx = (pixel_ordering == 0) ? ang2pix_ring(nside, colat, phi)
                                        : ang2pix_nest(nside, colat, phi);

@@ -37,6 +37,11 @@ First development release.
 
 ### Navigation
 - Zoom (1x to 50x) and pan, always zooming toward the cursor.
+- Interactive sky rotation: Ctrl + left-drag or middle-drag in any projection
+  (plain left-drag in the Orthographic and Azimuthal views) grabs the sky
+  point under the cursor and keeps it there. Double-click or Reset View
+  restores the orientation. The cursor readout and graticule labels follow
+  the rotation.
 - Mouse wheel zoom, left-drag pan, double-click to reset the view.
 - Touchpad support: pinch to zoom, two-finger scroll to pan, Ctrl+scroll to
   zoom, smart-zoom gesture to reset.
