@@ -7,6 +7,10 @@ First development release.
 ### Rendering
 - GPU Mollweide projection of HEALPix maps, computed per pixel in a fragment
   shader (inverse projection plus HEALPix pixel lookup).
+- Four projections (Mollweide, Plate Carree, Orthographic, Azimuthal
+  equidistant), all with north up and longitude increasing to the left. The
+  disk projections are drawn as true circles, and the cursor readout,
+  graticule labels, zoom-to-region and the minimap follow the projection.
 - Support for both RING and NESTED pixel ordering, selectable from the side
   panel.
 - Longitude increases to the left, matching healpy.

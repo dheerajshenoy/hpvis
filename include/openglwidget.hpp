@@ -250,7 +250,8 @@ signals:
 private:
     QVector2D toNdc(const QPointF &pos) const;
     QVector2D viewScale() const;
-    QPointF projectToWindow(double latRad, double lonRad) const;
+    bool projectToWindow(double latRad, double lonRad, QPointF &out) const;
+    int minimapWidth() const;
     void paintGraticuleLabels(QPainter &p);
     static constexpr int kMapPadding = 24; // logical px around the map
     void emitCursorData();
@@ -315,7 +316,6 @@ private:
     int m_maskMode                 = 0;
     float m_maskOpacity            = 0.8f;
     float m_fsky                   = 1.0f; // fraction of sky that is visible
-    static constexpr int kMinimapW = 200;
     static constexpr int kMinimapH = 100;
     static constexpr int kMinimapMargin = 12;
     bool m_minimapEnabled               = false;

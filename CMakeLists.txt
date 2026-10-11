@@ -43,6 +43,7 @@ add_executable(${PROJECT_NAME}
     src/view.cpp
     src/fitsinfo.cpp
     src/recentfiles.cpp
+    src/projectionmath.cpp
     src/appsettings.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
@@ -70,6 +71,7 @@ add_executable(${PROJECT_NAME}
     include/parallel.hpp
     include/fitsinfo.hpp
     include/recentfiles.hpp
+    include/projectionmath.hpp
     include/appsettings.hpp
     include/fitsheaderdialog.hpp
     include/statusbar.hpp

@@ -6,6 +6,7 @@
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "healpix_map.h"
 #include "parallel.hpp"
+#include "projectionmath.hpp"
 #include "shaderloader.hpp"
 
 #include <QEnterEvent>
@@ -491,7 +492,7 @@ OpenGLWidget::paintGL()
     const bool showMinimap  = minimapVisible();
     if (showMinimap)
     {
-        const GLint physW = qRound(kMinimapW * dpr);
+        const GLint physW = qRound(minimapRect.width() * dpr);
         const GLint physH = qRound(kMinimapH * dpr);
         const GLint physX = qRound(minimapRect.left() * dpr);
         // GL origin is bottom-left, Qt's is top-left
@@ -535,7 +536,7 @@ OpenGLWidget::paintGL()
     {
         // The view window spans panOffset +/- 1/zoom on the projection
         // plane [-1, 1]^2, which the minimap shows in full
-        const double hw = 0.5 * kMinimapW;
+        const double hw = 0.5 * minimapRect.width();
         const double hh = 0.5 * kMinimapH;
         const double cx
             = minimapRect.left() + hw + double(m_camera->panOffset.x()) * hw;
@@ -971,32 +972,6 @@ OpenGLWidget::setupGeometry()
     m_vao.release();
 }
 
-// CPU copy of inverseMollweide() in shaders/projections.glsl
-static bool
-inverseMollweide(QVector2D uv, double &colat, double &phi)
-{
-    const double x_range = 2.82842712, y_range = 1.41421356;
-    const double x = -(uv.x() - 0.5) * 2.0 * x_range;
-    const double y = (uv.y() - 0.5) * 2.0 * y_range;
-    if ((x * x / 8.0) + (y * y / 2.0) > 1.0)
-        return false;
-
-    const double theta_aux = std::asin(std::clamp(y / 1.41421356, -1.0, 1.0));
-    const double lat       = std::asin(std::clamp(
-        (2.0 * theta_aux + std::sin(2.0 * theta_aux)) / M_PI, -1.0, 1.0));
-    const double cosTheta  = std::cos(theta_aux);
-    double lon             = 0.0;
-    if (std::abs(cosTheta) > 0.0001)
-        lon = (M_PI * x) / (2.82842712 * cosTheta);
-    lon = std::fmod(lon, 2.0 * M_PI);
-    if (lon < 0.0)
-        lon += 2.0 * M_PI;
-
-    colat = M_PI / 2.0 - lat;
-    phi   = lon;
-    return true;
-}
-
 void
 OpenGLWidget::emitCursorData()
 {
@@ -1005,7 +980,7 @@ OpenGLWidget::emitCursorData()
     const QVector2D p   = ndc / m_camera->zoom + m_camera->panOffset;
     double colat, phi;
     if (m_nside <= 0 || m_pendingMap.Npix() == 0
-        || !inverseMollweide(p * 0.5f + QVector2D(0.5f, 0.5f), colat, phi))
+        || !projectionmath::inverse(m_projection, p, colat, phi))
     {
         emit cursorPosChanged(QPointF(), QPointF(), std::nan(""), -1);
         return;
@@ -1041,16 +1016,18 @@ OpenGLWidget::toNdc(const QPointF &pos) const
 QVector2D
 OpenGLWidget::viewScale() const
 {
-    // Largest 2:1 box (the Mollweide ellipse's aspect) that fits inside the
-    // window minus the padding, centered. Window NDC divided by the box's
-    // share of the window gives map NDC in [-1, 1] inside the box.
+    // Largest box with the projection's aspect (2:1, or 1:1 for the disks)
+    // that fits inside the window minus the padding, centered. Window NDC
+    // divided by the box's share of the window gives map NDC in [-1, 1]
+    // inside the box.
+    const float aspect = float(projectionmath::aspect(m_projection));
     const float w   = float(std::max(width(), 1));
     const float h   = float(std::max(height(), 1));
     const float pad = float(kMapPadding);
     const float aw  = std::max(w - 2.0f * pad, 1.0f);
     const float ah  = std::max(h - 2.0f * pad, 1.0f);
-    const float bw  = std::min(aw, 2.0f * ah);
-    const float bh  = bw * 0.5f;
+    const float bw  = std::min(aw, aspect * ah);
+    const float bh  = bw / aspect;
     return QVector2D(w / bw, h / bh);
 }
 
@@ -1108,11 +1085,19 @@ OpenGLWidget::wheelEvent(QWheelEvent *e)
     e->accept();
 }
 
+// The thumbnail has the projection's aspect (2:1, or square for the disks)
+int
+OpenGLWidget::minimapWidth() const
+{
+    return qRound(kMinimapH * projectionmath::aspect(m_projection));
+}
+
 QRect
 OpenGLWidget::minimapRect() const
 {
-    return QRect(width() - kMinimapW - kMinimapMargin,
-                 height() - kMinimapH - kMinimapMargin, kMinimapW, kMinimapH);
+    const int w = minimapWidth();
+    return QRect(width() - w - kMinimapMargin,
+                 height() - kMinimapH - kMinimapMargin, w, kMinimapH);
 }
 
 void
@@ -1346,29 +1331,21 @@ OpenGLWidget::setGraticuleStep(double degrees)
     update();
 }
 
-// Forward Mollweide: (lat, lon) in radians -> window pixels (logical, y down).
-// Inverse of inverseMollweide() above: lon 0 is the center, increasing left.
-QPointF
-OpenGLWidget::projectToWindow(double lat, double lon) const
+// (lat, lon) in radians -> window pixels (logical, y down) in the current
+// projection. False when the point isn't shown (far side of the globe).
+bool
+OpenGLWidget::projectToWindow(double lat, double lon, QPointF &out) const
 {
-    // Solve 2t + sin(2t) = pi * sin(lat) by Newton iteration
-    double t = lat;
-    for (int i = 0; i < 30; ++i)
-    {
-        const double d = 2.0 + 2.0 * std::cos(2.0 * t);
-        if (std::abs(d) < 1e-9)
-            break;
-        t -= (2.0 * t + std::sin(2.0 * t) - M_PI * std::sin(lat)) / d;
-    }
-    // lon wrapped to (-pi, pi]
-    lon = std::remainder(lon, 2.0 * M_PI);
-    const QVector2D plane(float(-lon * std::cos(t) / M_PI), float(std::sin(t)));
+    QVector2D plane;
+    if (!projectionmath::forward(m_projection, lat, lon, plane))
+        return false;
 
     // Inverse of the camera and of toNdc()
     const QVector2D ndc = (plane - m_camera->panOffset) * m_camera->zoom;
     const QVector2D s   = viewScale();
-    return QPointF((ndc.x() / s.x() + 1.0f) * 0.5f * width(),
-                   (1.0f - ndc.y() / s.y()) * 0.5f * height());
+    out = QPointF((ndc.x() / s.x() + 1.0f) * 0.5f * width(),
+                  (1.0f - ndc.y() / s.y()) * 0.5f * height());
+    return true;
 }
 
 void
@@ -1392,20 +1369,23 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
         drawTextPath(p, origin, text, Qt::white);
     };
 
+    QPointF at;
+
     // Longitudes along the equator (0 at the center, increasing to the left)
     for (double lon = -M_PI + step; lon <= M_PI + 1e-9; lon += step)
     {
         const double deg = std::round(qRadiansToDegrees(lon) * 100.0) / 100.0;
-        const QPointF at = projectToWindow(0.0, lon);
-        draw(at + QPointF(0, fm.height() * 0.8), QString("%1°").arg(deg),
-             false);
+        if (projectToWindow(0.0, lon, at))
+            draw(at + QPointF(0, fm.height() * 0.8), QString("%1°").arg(deg),
+                 false);
     }
-    // Latitudes on the left edge of the ellipse (lon = 180°)
+    // Latitudes along a visible meridian near the left side of the picture
+    const double meridian = projectionmath::labelMeridian(m_projection);
     for (double lat = -M_PI / 2 + step; lat < M_PI / 2 - 1e-9; lat += step)
     {
         const double deg = std::round(qRadiansToDegrees(lat) * 100.0) / 100.0;
-        draw(projectToWindow(lat, M_PI) - QPointF(4, 0),
-             QString("%1°").arg(deg), true);
+        if (projectToWindow(lat, meridian, at))
+            draw(at - QPointF(4, 0), QString("%1°").arg(deg), true);
     }
 }
 
