@@ -60,6 +60,8 @@ private slots:
     void onExportActionTriggered();
     void onSettingsActionTriggered();
     void onGraticuleToggled(bool enabled);
+    void onPowerSpectrumActionTriggered();
+    void onStatisticsActionTriggered();
 
 private:
     QMenu *m_editMenu = nullptr;
@@ -68,7 +70,7 @@ private:
     QAction *m_fileOpenAction   = nullptr;
     QMenu *m_fileOpenRecentMenu = nullptr;
     RecentFiles m_recentFiles;
-    bool m_editingRotation = false;
+    bool m_editingRotation        = false;
     AppSettings m_settings        = AppSettings::load();
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
@@ -82,6 +84,7 @@ private:
     QMenu *m_viewZoomMenu          = nullptr;
 
     QMenu *m_toolsMenu             = nullptr;
+    QMenu *m_toolsAnalysisMenu     = nullptr;
     QAction *m_toolsSettingsAction = nullptr;
 
     View *m_view           = nullptr;

@@ -287,6 +287,14 @@ HpixView::initMenubar()
 
     m_toolsMenu = menuBar->addMenu("&Tools");
 
+    m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
+
+    m_toolsAnalysisMenu->addAction("&Power Spectrum", this,
+                                   &HpixView::onPowerSpectrumActionTriggered);
+
+    m_toolsAnalysisMenu->addAction("&Statistics", this,
+                                   &HpixView::onStatisticsActionTriggered);
+
     m_toolsSettingsAction = m_toolsMenu->addAction(
         "&Settings", this, &HpixView::onSettingsActionTriggered);
 
@@ -796,4 +804,15 @@ HpixView::initShortcuts()
     m_fileOpenAction->setShortcut(QKeySequence("Ctrl+O"));
     m_viewMinimapAction->setShortcut(QKeySequence("M"));
     m_viewColorBarAction->setShortcut(QKeySequence("C"));
+    m_viewResetViewAction->setShortcut(QKeySequence("0"));
+}
+
+void
+HpixView::onPowerSpectrumActionTriggered()
+{
+}
+
+void
+HpixView::onStatisticsActionTriggered()
+{
 }
