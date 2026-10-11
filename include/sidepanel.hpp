@@ -127,7 +127,7 @@ private:
 
 private:
     // Map info controls
-    QComboBox *m_hduCombo  = nullptr;
+    QComboBox *m_hduCombo    = nullptr;
     QComboBox *m_columnCombo = nullptr;
     FitsInfo m_fitsInfo;
     QLineEdit *m_nsideEdit = nullptr;
@@ -137,6 +137,9 @@ private:
     QLineEdit *m_minEdit   = nullptr;
     QLineEdit *m_maxEdit   = nullptr;
     QLineEdit *m_stdEdit   = nullptr;
+
+    // Projection controls
+    QComboBox *m_projectionCombo = nullptr;
 
     // Pixel ordering controls
     QComboBox *m_pixOrdCombo = nullptr;
