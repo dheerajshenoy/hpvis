@@ -15,6 +15,10 @@
 #include <healpix_map.h>
 #include <vector>
 
+// Largest nside the viewer can show: the map is packed into one 2D texture
+// (4096 wide), whose height is limited by the GPU (nside 2048 needs 12288 rows)
+constexpr int kMaxSupportedNside = 2048;
+
 class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
 {
     Q_OBJECT

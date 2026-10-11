@@ -95,6 +95,16 @@ View::startLoad(int hdu, int column, bool initial)
             }
 
             file.goto_hdu(useHdu);
+
+            // Check the header before reading gigabytes of pixels
+            const int nside = file.get_key<int>("NSIDE");
+            if (nside > kMaxSupportedNside)
+                throw PlanckError(
+                    ("nside " + std::to_string(nside)
+                     + " is currently not supported (maximum is "
+                     + std::to_string(kMaxSupportedNside) + ").")
+                        .c_str());
+
             auto map = std::make_shared<Healpix_Map<float>>();
             read_Healpix_map_from_fits(file, *map, useCol);
             result.map    = std::move(map);
