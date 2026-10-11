@@ -1,4 +1,4 @@
-#include "hpixview.hpp"
+#include "hpvis.hpp"
 
 #include "fitsheaderdialog.hpp"
 #include "pixelordering.hpp"
@@ -29,7 +29,7 @@
 #include <QVBoxLayout>
 #include <cmath>
 
-HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
+HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
 {
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
@@ -40,7 +40,7 @@ HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
 }
 
 void
-HpixView::parseArgs(const argparse::ArgumentParser &parser)
+HpVis::parseArgs(const argparse::ArgumentParser &parser)
 {
     if (parser.is_used("files"))
     {
@@ -53,7 +53,7 @@ HpixView::parseArgs(const argparse::ArgumentParser &parser)
 }
 
 void
-HpixView::initUI()
+HpVis::initUI()
 {
     QVBoxLayout *layout = new QVBoxLayout();
     QWidget *widget     = new QWidget();
@@ -82,7 +82,7 @@ HpixView::initUI()
 }
 
 void
-HpixView::initConnections()
+HpVis::initConnections()
 {
     connect(m_toolBar, &ViewToolBar::projectionChanged, this,
             [this](Projection projection)
@@ -109,17 +109,17 @@ HpixView::initConnections()
     });
 
     connect(m_toolBar, &ViewToolBar::colormapChanged, this,
-            &HpixView::onColormapChanged);
+            &HpVis::onColormapChanged);
 
     connect(m_tabWidget, &TabWidget::currentChanged, this,
-            &HpixView::onTabChanged);
+            &HpVis::onTabChanged);
 
     connect(m_tabWidget, &TabWidget::tabCloseRequested, this,
-            &HpixView::onTabCloseRequested);
+            &HpVis::onTabCloseRequested);
 }
 
 void
-HpixView::initMenubar()
+HpVis::initMenubar()
 {
     QMenuBar *menuBar = new QMenuBar(this);
     setMenuBar(menuBar);
@@ -133,7 +133,7 @@ HpixView::initMenubar()
     updateRecentMenu();
 
     m_fileExportAction = m_fileMenu->addAction(
-        "&Export", this, &HpixView::onExportActionTriggered);
+        "&Export", this, &HpVis::onExportActionTriggered);
 
     m_headerAction = m_fileMenu->addAction("FITS &Header...", this, [this]()
     {
@@ -153,13 +153,13 @@ HpixView::initMenubar()
             onTabCloseRequested(index);
     });
 
-    m_fileMenu->addAction("&Exit", this, &HpixView::close);
+    m_fileMenu->addAction("&Exit", this, &HpVis::close);
 
     m_editMenu = menuBar->addMenu("&Edit");
     m_viewMenu = menuBar->addMenu("&View");
 
     m_viewMinimapAction
-        = m_viewMenu->addAction("&Minimap", this, &HpixView::onMinimapToggled);
+        = m_viewMenu->addAction("&Minimap", this, &HpVis::onMinimapToggled);
     m_viewMinimapAction->setCheckable(true);
 
     m_viewColorBarAction
@@ -212,7 +212,7 @@ HpixView::initMenubar()
     // Graticule spacing and color
     m_graticuleMenu       = m_viewMenu->addMenu("&Graticule");
     m_graticuleShowAction = m_graticuleMenu->addAction(
-        "&Show Graticule", this, &HpixView::onGraticuleToggled);
+        "&Show Graticule", this, &HpVis::onGraticuleToggled);
     m_graticuleShowAction->setCheckable(true);
     m_graticuleStepMenu = m_graticuleMenu->addMenu("&Spacing");
     auto *stepGroup     = new QActionGroup(this);
@@ -239,7 +239,7 @@ HpixView::initMenubar()
     });
 
     m_reverseColormapAction = m_viewMenu->addAction(
-        "Re&verse Colormap", this, &HpixView::onColormapInvertChanged);
+        "Re&verse Colormap", this, &HpVis::onColormapInvertChanged);
     m_reverseColormapAction->setCheckable(true);
 
     QMenu *scaleMenu    = m_viewMenu->addMenu("Color S&cale");
@@ -258,12 +258,12 @@ HpixView::initMenubar()
             [this]() { onColormapScaleChanged(ColormapScale::LOG); });
 
     m_viewMenu->addAction("Color Bar &Range...", this,
-                          &HpixView::onColormapRangeActionTriggered);
+                          &HpVis::onColormapRangeActionTriggered);
     m_viewMenu->addAction("Reset Color Bar Ran&ge", this,
-                          &HpixView::onColormapRangeResetRequested);
+                          &HpVis::onColormapRangeResetRequested);
 
     m_viewMenu->addAction("Set &Rotation...", this,
-                          &HpixView::onRotationActionTriggered);
+                          &HpVis::onRotationActionTriggered);
     m_viewMenu->addAction("Reset R&otation", this, [this]()
     {
         if (m_view)
@@ -314,26 +314,26 @@ HpixView::initMenubar()
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
     m_toolsAnalysisMenu->addAction("&Power Spectrum", this,
-                                   &HpixView::onPowerSpectrumActionTriggered);
+                                   &HpVis::onPowerSpectrumActionTriggered);
 
     m_toolsAnalysisMenu->addAction("&Statistics", this,
-                                   &HpixView::onStatisticsActionTriggered);
+                                   &HpVis::onStatisticsActionTriggered);
 
     m_toolsSettingsAction = m_toolsMenu->addAction(
-        "&Settings", this, &HpixView::onSettingsActionTriggered);
+        "&Settings", this, &HpVis::onSettingsActionTriggered);
 
     auto helpMenu = menuBar->addMenu("&Help");
 
     helpMenu->addAction("&About", this, []()
     {
-        QMessageBox::about(nullptr, "About HpixView",
-                           "HpixView is a simple viewer for HEALPix maps.");
+        QMessageBox::about(nullptr, "About hpvis",
+                           "hpvis is a simple viewer for HEALPix maps.");
     });
 }
 
 // Rebuilds File > Open Recent from the saved list
 void
-HpixView::updateRecentMenu()
+HpVis::updateRecentMenu()
 {
     m_fileOpenRecentMenu->clear();
 
@@ -363,7 +363,7 @@ HpixView::updateRecentMenu()
 }
 
 void
-HpixView::OpenFile(const QString &filePath)
+HpVis::OpenFile(const QString &filePath)
 {
     QString resolvedPath;
     if (filePath.isEmpty())
@@ -433,7 +433,7 @@ HpixView::OpenFile(const QString &filePath)
 }
 
 void
-HpixView::initViewConnections(const View *view)
+HpVis::initViewConnections(const View *view)
 {
     connect(view, &View::cursorPosChanged, m_statusBar,
             &StatusBar::setCursorData);
@@ -466,7 +466,7 @@ HpixView::initViewConnections(const View *view)
 }
 
 void
-HpixView::updateControlsFromView(const View *view)
+HpVis::updateControlsFromView(const View *view)
 {
     if (!view || !view->glWidget() || !view->glWidget()->healpixMap())
         return;
@@ -491,7 +491,7 @@ HpixView::updateControlsFromView(const View *view)
 }
 
 void
-HpixView::onPixelOrderingChanged(PixelOrdering ordering)
+HpVis::onPixelOrderingChanged(PixelOrdering ordering)
 {
     if (!m_view)
         return;
@@ -500,7 +500,7 @@ HpixView::onPixelOrderingChanged(PixelOrdering ordering)
 }
 
 void
-HpixView::onTabChanged(int index)
+HpVis::onTabChanged(int index)
 {
     if (index < 0 || index >= m_tabWidget->count())
         return;
@@ -518,14 +518,14 @@ HpixView::onTabChanged(int index)
 }
 
 void
-HpixView::updateMaskListFromView(const View *view)
+HpVis::updateMaskListFromView(const View *view)
 {
     rebuildMasksMenu(view);
 }
 
 // Rebuilds the Masks menu: loading/clearing, mode, and one submenu per mask
 void
-HpixView::rebuildMasksMenu(const View *view)
+HpVis::rebuildMasksMenu(const View *view)
 {
     m_masksMenu->clear();
     OpenGLWidget *gl = view ? view->glWidget() : nullptr;
@@ -540,7 +540,7 @@ HpixView::rebuildMasksMenu(const View *view)
     add->setEnabled(gl);
 
     QAction *clear
-        = m_masksMenu->addAction("&Clear All", this, &HpixView::onMaskCleared);
+        = m_masksMenu->addAction("&Clear All", this, &HpVis::onMaskCleared);
     clear->setEnabled(gl && gl->maskCount() > 0);
 
     if (!gl || gl->maskCount() == 0)
@@ -612,7 +612,7 @@ HpixView::rebuildMasksMenu(const View *view)
 }
 
 void
-HpixView::updateStatusBarFromView(const View *view)
+HpVis::updateStatusBarFromView(const View *view)
 {
     if (!view)
         return;
@@ -626,7 +626,7 @@ HpixView::updateStatusBarFromView(const View *view)
 }
 
 void
-HpixView::onTabCloseRequested(int index)
+HpVis::onTabCloseRequested(int index)
 {
     if (index < 0 || index >= m_tabWidget->count())
         return;
@@ -644,84 +644,84 @@ HpixView::onTabCloseRequested(int index)
 }
 
 void
-HpixView::onColormapChanged(Colormap colormap)
+HpVis::onColormapChanged(Colormap colormap)
 {
     if (m_view)
         m_view->glWidget()->setColormap(colormap);
 }
 
 void
-HpixView::onColormapMaxChanged(double max)
+HpVis::onColormapMaxChanged(double max)
 {
     if (m_view)
         m_view->glWidget()->setColormapMax(max);
 }
 
 void
-HpixView::onColormapMinChanged(double min)
+HpVis::onColormapMinChanged(double min)
 {
     if (m_view)
         m_view->glWidget()->setColormapMin(min);
 }
 
 void
-HpixView::onColormapInvertChanged(bool reversed)
+HpVis::onColormapInvertChanged(bool reversed)
 {
     if (m_view)
         m_view->glWidget()->setColormapInvert(reversed);
 }
 
 void
-HpixView::onColormapScaleChanged(ColormapScale scale)
+HpVis::onColormapScaleChanged(ColormapScale scale)
 {
     if (m_view)
         m_view->glWidget()->setColormapScale(scale);
 }
 
 void
-HpixView::onColormapRangeResetRequested()
+HpVis::onColormapRangeResetRequested()
 {
     if (m_view)
         m_view->glWidget()->resetColormapRange();
 }
 
 void
-HpixView::onBackgroundColorChanged(const QColor &color)
+HpVis::onBackgroundColorChanged(const QColor &color)
 {
     if (m_view)
         m_view->glWidget()->setBackgroundColor(color);
 }
 
 void
-HpixView::onUnseenColorChanged(const QColor &color)
+HpVis::onUnseenColorChanged(const QColor &color)
 {
     if (m_view)
         m_view->glWidget()->setUnseenColor(color);
 }
 
 void
-HpixView::onMaskFilesSelected(const QStringList &files)
+HpVis::onMaskFilesSelected(const QStringList &files)
 {
     if (m_view)
         m_view->glWidget()->addMaskFiles(files);
 }
 
 void
-HpixView::onMaskCleared()
+HpVis::onMaskCleared()
 {
     if (m_view)
         m_view->glWidget()->clearMasks();
 }
 
 void
-HpixView::onMinimapToggled(bool state)
+HpVis::onMinimapToggled(bool state)
 {
     if (m_view)
         m_view->glWidget()->setMinimapEnabled(state);
 }
 
 void
-HpixView::onExportActionTriggered()
+HpVis::onExportActionTriggered()
 {
     if (!m_view)
         return;
@@ -738,17 +738,17 @@ HpixView::onExportActionTriggered()
 }
 
 void
-HpixView::onSettingsActionTriggered()
+HpVis::onSettingsActionTriggered()
 {
     SettingsDialog dialog(this);
     connect(&dialog, &SettingsDialog::settingsSaved, this,
-            &HpixView::applySavedSettings);
+            &HpVis::applySavedSettings);
     dialog.exec();
 }
 
 // Picks up the settings the dialog just saved
 void
-HpixView::applySavedSettings()
+HpVis::applySavedSettings()
 {
     const AppSettings previous = m_settings;
     m_settings                 = AppSettings::load();
@@ -818,7 +818,7 @@ HpixView::applySavedSettings()
 }
 
 void
-HpixView::applyInterfaceSettings()
+HpVis::applyInterfaceSettings()
 {
     m_toolBar->setVisible(m_settings.showToolbar);
     statusBar()->setVisible(m_settings.showStatusBar);
@@ -826,7 +826,7 @@ HpixView::applyInterfaceSettings()
 
 // Folder the file dialogs start in
 QString
-HpixView::startDirectory() const
+HpVis::startDirectory() const
 {
     if (m_settings.rememberLastDir)
     {
@@ -839,7 +839,7 @@ HpixView::startDirectory() const
 }
 
 void
-HpixView::rememberDirectory(const QString &path) const
+HpVis::rememberDirectory(const QString &path) const
 {
     if (m_settings.rememberLastDir && !path.isEmpty())
         QSettings().setValue("general/lastDirectory",
@@ -848,7 +848,7 @@ HpixView::rememberDirectory(const QString &path) const
 
 // Gives a newly loaded map the user's default view options
 void
-HpixView::applyDefaults(View *view)
+HpVis::applyDefaults(View *view)
 {
     OpenGLWidget *gl = view->glWidget();
     gl->setColormap(m_settings.colormap);
@@ -869,20 +869,20 @@ HpixView::applyDefaults(View *view)
 }
 
 void
-HpixView::onGraticuleToggled(bool enabled)
+HpVis::onGraticuleToggled(bool enabled)
 {
     if (m_view)
         m_view->glWidget()->setGraticuleEnabled(enabled);
 }
 
 void
-HpixView::dragEnterEvent(QDragEnterEvent *event)
+HpVis::dragEnterEvent(QDragEnterEvent *event)
 {
     event->acceptProposedAction();
 }
 
 void
-HpixView::dropEvent(QDropEvent *event)
+HpVis::dropEvent(QDropEvent *event)
 {
     const QMimeData *mimeData = event->mimeData();
     if (mimeData->hasUrls())
@@ -895,7 +895,7 @@ HpixView::dropEvent(QDropEvent *event)
 }
 
 void
-HpixView::initShortcuts()
+HpVis::initShortcuts()
 {
     m_fileCloseTabAction->setShortcut(QKeySequence("Ctrl+W"));
     m_fileOpenRecentMenu->menuAction()->setShortcut(
@@ -907,7 +907,7 @@ HpixView::initShortcuts()
 }
 
 void
-HpixView::onPowerSpectrumActionTriggered()
+HpVis::onPowerSpectrumActionTriggered()
 {
     if (!m_view)
         return;
@@ -929,7 +929,7 @@ HpixView::onPowerSpectrumActionTriggered()
 }
 
 void
-HpixView::onStatisticsActionTriggered()
+HpVis::onStatisticsActionTriggered()
 {
     if (!m_view || !m_view->glWidget()->healpixMap())
     {
@@ -969,7 +969,7 @@ HpixView::onStatisticsActionTriggered()
 }
 
 void
-HpixView::onRotationActionTriggered()
+HpVis::onRotationActionTriggered()
 {
     if (!m_view)
         return;
@@ -1026,7 +1026,7 @@ HpixView::onRotationActionTriggered()
 }
 
 void
-HpixView::onColormapRangeActionTriggered()
+HpVis::onColormapRangeActionTriggered()
 {
     if (!m_view)
         return;

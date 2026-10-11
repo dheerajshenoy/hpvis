@@ -43,10 +43,12 @@ SettingsDialog::initUI()
     m_pageKeywords = {
         "general files recent history list folder directory remember last "
         "interface toolbar status bar show hide",
-        "appearance new maps defaults projection mollweide orthographic colormap "
+        "appearance new maps defaults projection mollweide orthographic "
+        "colormap "
         "color scale linear log reverse background unseen globe shadow limb "
         "darkening",
-        "overlays color bar minimap graticule grid spacing color masks mask mode "
+        "overlays color bar minimap graticule grid spacing color masks mask "
+        "mode "
         "hide dim strength opacity",
         "about version author license",
     };
@@ -109,7 +111,10 @@ SettingsDialog::initConnections()
     connect(m_closeButton, &QPushButton::clicked, this,
             &SettingsDialog::onCloseClicked);
 
-    auto changed = [this]() { updateSaveEnabled(); };
+    auto changed = [this]()
+    {
+        updateSaveEnabled();
+    };
     connect(m_recentMaxSpin, &QSpinBox::valueChanged, this, changed);
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
@@ -118,10 +123,10 @@ SettingsDialog::initConnections()
     connect(m_maskOpacitySlider, &QSlider::valueChanged, this, changed);
     connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
             changed);
-    for (QCheckBox *box : {m_rememberDirCheck, m_showToolbarCheck,
-                           m_showStatusBarCheck, m_reverseCheck, m_colorBarCheck, m_minimapCheck,
-                           m_graticuleCheck, m_globeShadowCheck,
-                           m_limbDarkeningCheck})
+    for (QCheckBox *box :
+         {m_rememberDirCheck, m_showToolbarCheck, m_showStatusBarCheck,
+          m_reverseCheck, m_colorBarCheck, m_minimapCheck, m_graticuleCheck,
+          m_globeShadowCheck, m_limbDarkeningCheck})
         connect(box, &QCheckBox::toggled, this, changed);
 }
 
@@ -196,25 +201,25 @@ AppSettings
 SettingsDialog::currentSettings() const
 {
     AppSettings a;
-    a.recentFilesMax  = m_recentMaxSpin->value();
-    a.rememberLastDir = m_rememberDirCheck->isChecked();
-    a.showToolbar     = m_showToolbarCheck->isChecked();
-    a.showStatusBar   = m_showStatusBarCheck->isChecked();
-    a.projection      = Projection(m_projectionCombo->currentIndex());
-    a.graticuleColor  = m_graticuleColor;
-    a.maskMode        = m_maskModeCombo->currentIndex();
+    a.recentFilesMax     = m_recentMaxSpin->value();
+    a.rememberLastDir    = m_rememberDirCheck->isChecked();
+    a.showToolbar        = m_showToolbarCheck->isChecked();
+    a.showStatusBar      = m_showStatusBarCheck->isChecked();
+    a.projection         = Projection(m_projectionCombo->currentIndex());
+    a.graticuleColor     = m_graticuleColor;
+    a.maskMode           = m_maskModeCombo->currentIndex();
     a.maskOpacityPercent = m_maskOpacitySlider->value();
-    a.colormap        = Colormap(m_colormapCombo->currentIndex());
-    a.reverseColormap = m_reverseCheck->isChecked();
-    a.scale           = ColormapScale(m_scaleCombo->currentIndex());
-    a.background      = m_background;
-    a.unseen          = m_unseen;
-    a.colorBar        = m_colorBarCheck->isChecked();
-    a.minimap         = m_minimapCheck->isChecked();
-    a.graticule       = m_graticuleCheck->isChecked();
-    a.graticuleStep   = m_graticuleStepCombo->currentData().toDouble();
-    a.globeShadow     = m_globeShadowCheck->isChecked();
-    a.limbDarkening   = m_limbDarkeningCheck->isChecked();
+    a.colormap           = Colormap(m_colormapCombo->currentIndex());
+    a.reverseColormap    = m_reverseCheck->isChecked();
+    a.scale              = ColormapScale(m_scaleCombo->currentIndex());
+    a.background         = m_background;
+    a.unseen             = m_unseen;
+    a.colorBar           = m_colorBarCheck->isChecked();
+    a.minimap            = m_minimapCheck->isChecked();
+    a.graticule          = m_graticuleCheck->isChecked();
+    a.graticuleStep      = m_graticuleStepCombo->currentData().toDouble();
+    a.globeShadow        = m_globeShadowCheck->isChecked();
+    a.limbDarkening      = m_limbDarkeningCheck->isChecked();
     return a;
 }
 
@@ -337,11 +342,12 @@ SettingsDialog::createAppearanceSettingsPage()
 
     outer->addWidget(new QLabel(
         "Changes here apply to all open maps and to maps you open later. Only "
-        "the options you change are applied, so other per-map tweaks are kept."));
+        "the options you change are applied, so other per-map tweaks are "
+        "kept."));
 
     // --- Projection ---
-    auto *projBox  = new QGroupBox("Projection");
-    auto *projForm = new QFormLayout(projBox);
+    auto *projBox     = new QGroupBox("Projection");
+    auto *projForm    = new QFormLayout(projBox);
     m_projectionCombo = new QComboBox();
     m_projectionCombo->addItems({"Mollweide", "Plate Carr\u00e9e",
                                  "Orthographic", "Azimuthal Equidistant",
@@ -375,8 +381,8 @@ SettingsDialog::createAppearanceSettingsPage()
 
     m_unseenButton = new QPushButton();
     m_unseenButton->setFixedHeight(22);
-    connect(m_unseenButton, &QPushButton::clicked, this, [this]()
-    { pickColor(m_unseenButton, m_unseen, "Unseen Color"); });
+    connect(m_unseenButton, &QPushButton::clicked, this,
+            [this]() { pickColor(m_unseenButton, m_unseen, "Unseen Color"); });
     form->addRow("Unseen:", m_unseenButton);
 
     outer->addWidget(colorBox);
@@ -428,8 +434,9 @@ SettingsDialog::createOverlaysSettingsPage()
 
     m_graticuleColorButton = new QPushButton();
     m_graticuleColorButton->setFixedHeight(22);
-    connect(m_graticuleColorButton, &QPushButton::clicked, this, [this]()
-    { pickColor(m_graticuleColorButton, m_graticuleColor, "Graticule Color"); });
+    connect(m_graticuleColorButton, &QPushButton::clicked, this, [this]() {
+        pickColor(m_graticuleColorButton, m_graticuleColor, "Graticule Color");
+    });
     gratForm->addRow("Color:", m_graticuleColorButton);
 
     // The spacing only matters while the graticule is on
@@ -454,8 +461,8 @@ SettingsDialog::createOverlaysSettingsPage()
     // The strength only applies to "Dim"
     m_maskOpacitySlider->setEnabled(false);
     connect(m_maskModeCombo, &QComboBox::currentIndexChanged,
-            m_maskOpacitySlider, [this](int mode)
-    { m_maskOpacitySlider->setEnabled(mode == 1); });
+            m_maskOpacitySlider,
+            [this](int mode) { m_maskOpacitySlider->setEnabled(mode == 1); });
 
     outer->addWidget(maskBox);
     outer->addStretch();
@@ -470,14 +477,15 @@ SettingsDialog::createAboutPage()
     QVBoxLayout *layout = new QVBoxLayout(page);
     layout->addStretch();
 
-    QLabel *aboutLabel = new QLabel(
-        "<h2>HpixView</h2>"
-        "<p>Version: " PROJECT_VERSION "</p>"
-        "<p>A healpix viewer.</p>"
-        "<p>Developed by Dheeraj Vittal Shenoy.</p>"
-        "<p>Visit <a href='https://dheerajshenoy.github.io/hpixview'>"
-        "https://dheerajshenoy.github.io/hpixview</a> for more "
-        "information.</p>");
+    QLabel *aboutLabel
+        = new QLabel("<h2>hpvis</h2>"
+                     "<p>Version: " PROJECT_VERSION "</p>"
+                     "<p>A healpix viewer.</p>"
+                     "<p>Developed by Dheeraj Vittal Shenoy.</p>"
+                     "<a href=https://github.com/dheerajshenoy/hpvis\">GitHub "
+                     "repository</a>"
+                     "<p>Licensed under the AGPL-3.0 License.</p>"
+                     "information.</p>");
     aboutLabel->setTextFormat(Qt::RichText);
     aboutLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
     aboutLabel->setOpenExternalLinks(true);

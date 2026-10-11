@@ -5,7 +5,7 @@
 
 #include <QColor>
 
-// User preferences, stored with QSettings (~/.config/Hpixview/Hpixview.conf
+// User preferences, stored with QSettings (~/.config/hpvis/hpvis.conf
 // on Linux). The view options are the defaults for newly opened maps.
 struct AppSettings
 {

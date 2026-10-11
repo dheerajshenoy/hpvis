@@ -89,8 +89,8 @@ First development release.
 - File > Open Recent lists the last 10 opened files (newest first, with a
   "Clear Recent Files" entry). The list is saved in
   `recent_files.txt` in the app data directory
-  (`~/.local/share/Hpixview/` on Linux).
-- Open files from the File menu, or from the command line (`Hpixview
+  (`~/.local/share/hpvis/` on Linux).
+- Open files from the File menu, or from the command line (`hpvis
   file.fits ...`).
 - Files are opened with `fitshandle`: every HDU that holds a HEALPix map (NSIDE and
   ORDERING keywords, columns of 12*nside^2 values) is listed in the Map Info section (HDU and Column), and switching either one

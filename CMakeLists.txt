@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Hpixview VERSION 0.1.0 LANGUAGES C CXX)
+project(hpvis VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(WITH_NAMASTER "Build with NaMaster support" ON)
+option(HPVIS_IPO_SUPPORTED "Enable interprocedural optimization (IPO/LTO) if supported" ON)
 
 # Default to a Release build when the user didn't pick a config.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -37,47 +39,53 @@ pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
 # --- NaMaster (libnmt) -------------------------------------------------
 # libnmt needs the HEALPix C library (chealpix), which isn't packaged on
 # most systems, so build it from the vendored HEALPix sources first.
-set(CHEALPIX_SRC_DIR ${CMAKE_SOURCE_DIR}/thirdparty/healpix/src/C/subs)
-add_library(chealpix STATIC ${CHEALPIX_SRC_DIR}/chealpix.c)
-set_target_properties(chealpix PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/chealpix/lib)
-target_include_directories(chealpix PUBLIC ${CHEALPIX_SRC_DIR})
-target_link_libraries(chealpix PUBLIC PkgConfig::CFITSIO)
-target_compile_options(chealpix PRIVATE -w)
+if (WITH_NAMASTER)
+    set(CHEALPIX_SRC_DIR ${CMAKE_SOURCE_DIR}/thirdparty/healpix/src/C/subs)
+    add_library(chealpix STATIC ${CHEALPIX_SRC_DIR}/chealpix.c)
+    set_target_properties(chealpix PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/chealpix/lib)
+    target_include_directories(chealpix PUBLIC ${CHEALPIX_SRC_DIR})
+    target_link_libraries(chealpix PUBLIC PkgConfig::CFITSIO)
+    target_compile_options(chealpix PRIVATE -w)
 
-# libnmt's autotools build only works in-source, so build a copy of the
-# submodule inside the build tree using its own install_libnmt.sh.
-include(ExternalProject)
-set(NMT_PREFIX ${CMAKE_BINARY_DIR}/namaster/src/namaster_ext/_deps)
-file(MAKE_DIRECTORY ${NMT_PREFIX}/include)
-ExternalProject_Add(namaster_ext
-    PREFIX ${CMAKE_BINARY_DIR}/namaster
-    DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E copy_directory
+    # libnmt's autotools build only works in-source, so build a copy of the
+    # submodule inside the build tree using its own install_libnmt.sh.
+    include(ExternalProject)
+    set(NMT_PREFIX ${CMAKE_BINARY_DIR}/namaster/src/namaster_ext/_deps)
+    file(MAKE_DIRECTORY ${NMT_PREFIX}/include)
+    ExternalProject_Add(namaster_ext
+        PREFIX ${CMAKE_BINARY_DIR}/namaster
+        DOWNLOAD_COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/thirdparty/NaMaster
         ${CMAKE_BINARY_DIR}/namaster/src/namaster_ext
-    BUILD_IN_SOURCE TRUE
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${CMAKE_COMMAND} -E env
+        BUILD_IN_SOURCE TRUE
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ${CMAKE_COMMAND} -E env
         "CPPFLAGS=-I${CHEALPIX_SRC_DIR}"
         "LDFLAGS=-L${CMAKE_BINARY_DIR}/chealpix/lib"
         bash scripts/install_libnmt.sh
-    INSTALL_COMMAND ""
-    BUILD_BYPRODUCTS ${NMT_PREFIX}/lib/libnmt.so
-    DEPENDS chealpix)
+        INSTALL_COMMAND ""
+        BUILD_BYPRODUCTS ${NMT_PREFIX}/lib/libnmt.so
+        DEPENDS chealpix)
+endif()
+
 
 add_library(nmt SHARED IMPORTED)
 set_target_properties(nmt PROPERTIES
     IMPORTED_LOCATION ${NMT_PREFIX}/lib/libnmt.so
     INTERFACE_INCLUDE_DIRECTORIES ${NMT_PREFIX}/include)
-add_dependencies(nmt namaster_ext)
+
+if (WITH_NAMASTER)
+    add_dependencies(nmt namaster_ext)
+endif()
 
 include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/include)
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
-    src/hpixview.cpp
+    src/hpvis.cpp
     src/view.cpp
     src/fitsinfo.cpp
     src/recentfiles.cpp
@@ -101,7 +109,7 @@ add_executable(${PROJECT_NAME}
     include/settingsdialog.hpp
     include/exportoptions.hpp
     include/view.hpp
-    include/hpixview.hpp
+    include/hpvis.hpp
     include/openglwidget.hpp
     include/argparse.hpp
     include/tabwidget.hpp
@@ -150,7 +158,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -Wall -Wextra -Wpedantic -Werror -Wno-unused-return-value
     )
 
-    if (HPIXVIEW_IPO_SUPPORTED)
+    if (HPVIS_IPO_SUPPORTED)
 	target_link_options(${PROJECT_NAME} PRIVATE
 		$<$<CONFIG:Release>:-Wl,--gc-sections -Wl,-s>
 		$<$<CONFIG:RelWithDebInfo>:-Wl,--gc-sections>
@@ -163,7 +171,7 @@ elseif(MSVC)
     )
 endif()
 
-if(HPIXVIEW_IPO_SUPPORTED)
+if(HPVIS_IPO_SUPPORTED)
     set_target_properties(${PROJECT_NAME} PROPERTIES
         INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
         INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
@@ -174,7 +182,7 @@ include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(FILES ${CMAKE_SOURCE_DIR}/docs/hpixview.1
+install(FILES ${CMAKE_SOURCE_DIR}/docs/hpvis.1
     DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 install(FILES ${CMAKE_SOURCE_DIR}/example_config.toml

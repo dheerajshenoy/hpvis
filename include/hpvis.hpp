@@ -14,11 +14,11 @@
 #include <QMainWindow>
 #include <QTabWidget>
 
-class HpixView : public QMainWindow
+class HpVis : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit HpixView(const argparse::ArgumentParser &parser,
+    explicit HpVis(const argparse::ArgumentParser &parser,
                       QWidget *parent = nullptr);
 
     void OpenFile(const QString &filePath = QString());

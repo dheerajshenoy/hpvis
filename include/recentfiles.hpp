@@ -4,7 +4,7 @@
 #include <QStringList>
 
 // Most-recently-opened files, kept in a plain text file (one path per line)
-// in the application data directory, e.g. ~/.local/share/Hpixview/ on Linux.
+// in the application data directory, e.g. ~/.local/share/hpvis/ on Linux.
 class RecentFiles
 {
 public:

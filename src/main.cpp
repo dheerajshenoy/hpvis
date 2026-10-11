@@ -1,5 +1,5 @@
 #include "argparse.hpp"
-#include "hpixview.hpp"
+#include "hpvis.hpp"
 
 #include <QApplication>
 
@@ -13,13 +13,14 @@ int
 main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    // Names the per-user data directory (e.g. ~/.local/share/Hpixview)
+    // Names the per-user data directory (e.g. ~/.local/share/hpvis)
     QCoreApplication::setApplicationName(PROJECT_NAME);
-    // QSettings needs both names (config goes to ~/.config/Hpixview/)
+    // QSettings needs both names (config goes to ~/.config/hpvis/)
     QCoreApplication::setOrganizationName(PROJECT_NAME);
     QCoreApplication::setOrganizationName("Dheeraj Shenoy");
-    QCoreApplication::setOrganizationDomain("dheerajshenoy.github.io/hpixview");
-    QCoreApplication::setApplicationName("HpixView");
+    QCoreApplication::setOrganizationDomain(
+        "dheerajshenoy.github.io/" PROJECT_NAME);
+    QCoreApplication::setApplicationName("hpvis");
 
     argparse::ArgumentParser parser(PROJECT_NAME, PROJECT_VERSION,
                                     argparse::default_arguments::all);
@@ -35,7 +36,7 @@ main(int argc, char *argv[])
         exit(1);
     }
 
-    HpixView view(parser);
+    HpVis view(parser);
 
     app.exec();
 }
