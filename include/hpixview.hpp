@@ -59,6 +59,7 @@ private slots:
     void onMinimapToggled(bool enabled);
     void onExportActionTriggered();
     void onSettingsActionTriggered();
+    void applySavedSettings();
     void onGraticuleToggled(bool enabled);
     void onPowerSpectrumActionTriggered();
     void onStatisticsActionTriggered();

@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -70,11 +71,11 @@ SettingsDialog::initUI()
 
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     m_saveButton              = new QPushButton("Save");
-    m_cancelButton            = new QPushButton("Cancel");
+    m_closeButton             = new QPushButton("Close");
 
     buttonLayout->addStretch();
     buttonLayout->addWidget(m_saveButton);
-    buttonLayout->addWidget(m_cancelButton);
+    buttonLayout->addWidget(m_closeButton);
 
     layout->addLayout(buttonLayout);
 
@@ -98,8 +99,19 @@ SettingsDialog::initConnections()
     connect(m_saveButton, &QPushButton::clicked, this,
             &SettingsDialog::onSaveClicked);
 
-    connect(m_cancelButton, &QPushButton::clicked, this,
-            &SettingsDialog::onCancelClicked);
+    connect(m_closeButton, &QPushButton::clicked, this,
+            &SettingsDialog::onCloseClicked);
+
+    auto changed = [this]() { updateSaveEnabled(); };
+    connect(m_recentMaxSpin, &QSpinBox::valueChanged, this, changed);
+    connect(m_colormapCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
+            changed);
+    for (QCheckBox *box : {m_reverseCheck, m_colorBarCheck, m_minimapCheck,
+                           m_graticuleCheck, m_globeShadowCheck,
+                           m_limbDarkeningCheck})
+        connect(box, &QCheckBox::toggled, this, changed);
 }
 
 void
@@ -139,16 +151,65 @@ SettingsDialog::onListViewSelectionChanged(const QModelIndex &current,
 }
 
 void
-SettingsDialog::onCancelClicked()
+SettingsDialog::onCloseClicked()
 {
-    reject(); // Close the dialog with a rejected result
+    reject();
+}
+
+void
+SettingsDialog::reject()
+{
+    if (isModified())
+    {
+        const auto answer = QMessageBox::question(
+            this, "Unsaved changes",
+            "You have unsaved changes. Save them before closing?",
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
+            QMessageBox::Save);
+        if (answer == QMessageBox::Cancel)
+            return;
+        if (answer == QMessageBox::Save)
+            onSaveClicked();
+    }
+    QDialog::reject();
 }
 
 void
 SettingsDialog::onSaveClicked()
 {
     saveSettings();
-    accept(); // Close the dialog with an accepted result
+    emit settingsSaved();
+}
+
+AppSettings
+SettingsDialog::currentSettings() const
+{
+    AppSettings a;
+    a.recentFilesMax  = m_recentMaxSpin->value();
+    a.colormap        = Colormap(m_colormapCombo->currentIndex());
+    a.reverseColormap = m_reverseCheck->isChecked();
+    a.scale           = ColormapScale(m_scaleCombo->currentIndex());
+    a.background      = m_background;
+    a.unseen          = m_unseen;
+    a.colorBar        = m_colorBarCheck->isChecked();
+    a.minimap         = m_minimapCheck->isChecked();
+    a.graticule       = m_graticuleCheck->isChecked();
+    a.graticuleStep   = m_graticuleStepCombo->currentData().toDouble();
+    a.globeShadow     = m_globeShadowCheck->isChecked();
+    a.limbDarkening   = m_limbDarkeningCheck->isChecked();
+    return a;
+}
+
+bool
+SettingsDialog::isModified() const
+{
+    return !(currentSettings() == m_saved);
+}
+
+void
+SettingsDialog::updateSaveEnabled()
+{
+    m_saveButton->setEnabled(isModified());
 }
 
 void
@@ -172,26 +233,17 @@ SettingsDialog::loadSettings()
     m_graticuleStepCombo->setCurrentIndex(step >= 0 ? step : 3);
     m_globeShadowCheck->setChecked(a.globeShadow);
     m_limbDarkeningCheck->setChecked(a.limbDarkening);
+
+    m_saved = currentSettings(); // normalised by the widgets (e.g. step)
+    updateSaveEnabled();
 }
 
 void
 SettingsDialog::saveSettings()
 {
-    AppSettings a;
-    a.recentFilesMax = m_recentMaxSpin->value();
-
-    a.colormap        = Colormap(m_colormapCombo->currentIndex());
-    a.reverseColormap = m_reverseCheck->isChecked();
-    a.scale           = ColormapScale(m_scaleCombo->currentIndex());
-    a.background      = m_background;
-    a.unseen          = m_unseen;
-    a.colorBar        = m_colorBarCheck->isChecked();
-    a.minimap         = m_minimapCheck->isChecked();
-    a.graticule       = m_graticuleCheck->isChecked();
-    a.graticuleStep   = m_graticuleStepCombo->currentData().toDouble();
-    a.globeShadow     = m_globeShadowCheck->isChecked();
-    a.limbDarkening   = m_limbDarkeningCheck->isChecked();
-    a.save();
+    m_saved = currentSettings();
+    m_saved.save();
+    updateSaveEnabled();
 }
 
 void
@@ -211,6 +263,7 @@ SettingsDialog::pickColor(QPushButton *button, QColor &color,
         return;
     color = chosen;
     setColorButton(button, color);
+    updateSaveEnabled();
 }
 
 QWidget *

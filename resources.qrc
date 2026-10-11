@@ -17,6 +17,9 @@
         <!-- Fonts -->
         <file>resources/fonts/Major-Mono-Display.ttf</file>
 
+        <!-- QML -->
+        <file>src/qml/powerspectrumplot.qml</file>
+
     </qresource>
 </RCC>
 

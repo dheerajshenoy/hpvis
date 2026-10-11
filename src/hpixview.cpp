@@ -2,6 +2,7 @@
 
 #include "fitsheaderdialog.hpp"
 #include "pixelordering.hpp"
+#include "powerspectrumdialog.hpp"
 #include "settingsdialog.hpp"
 #include "sidepanel.hpp"
 #include "view.hpp"
@@ -694,9 +695,15 @@ void
 HpixView::onSettingsActionTriggered()
 {
     SettingsDialog dialog(this);
-    if (dialog.exec() != QDialog::Accepted)
-        return;
+    connect(&dialog, &SettingsDialog::settingsSaved, this,
+            &HpixView::applySavedSettings);
+    dialog.exec();
+}
 
+// Picks up the settings the dialog just saved
+void
+HpixView::applySavedSettings()
+{
     const AppSettings previous = m_settings;
     m_settings                 = AppSettings::load();
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
@@ -818,6 +825,8 @@ HpixView::initShortcuts()
 void
 HpixView::onPowerSpectrumActionTriggered()
 {
+    PowerSpectrumDialog dialog(m_view->glWidget()->healpixMap(), this);
+    dialog.exec();
 }
 
 void

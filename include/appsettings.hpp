@@ -24,6 +24,8 @@ struct AppSettings
     bool globeShadow          = true; // orthographic outer shadow
     bool limbDarkening        = true; // orthographic limb darkening
 
+    bool operator==(const AppSettings &) const = default;
+
     static AppSettings load();
     void save() const;
 };

@@ -20,9 +20,14 @@ class SettingsDialog : public QDialog
 public:
     explicit SettingsDialog(QWidget *parent = nullptr);
 
+    void reject() override; // asks first when there are unsaved changes
+
+signals:
+    void settingsSaved();
+
 private slots:
     void onSaveClicked();
-    void onCancelClicked();
+    void onCloseClicked();
     void onSearchTextChanged(const QString &text);
     void onListViewSelectionChanged(const QModelIndex &current,
                                     const QModelIndex &previous);
@@ -32,6 +37,9 @@ private:
     void initConnections();
     void loadSettings();
     void saveSettings();
+    AppSettings currentSettings() const;
+    bool isModified() const;
+    void updateSaveEnabled();
     QWidget *createGeneralSettingsPage();
     QWidget *createAppearanceSettingsPage();
     QWidget *createAboutPage();
@@ -43,7 +51,7 @@ private:
     QStringListModel *m_listModel   = nullptr;
     QLineEdit *m_searchLineEdit     = nullptr;
     QPushButton *m_saveButton       = nullptr;
-    QPushButton *m_cancelButton     = nullptr;
+    QPushButton *m_closeButton     = nullptr;
     QListView *m_listView           = nullptr;
     QStackedWidget *m_stackedWidget = nullptr;
 
@@ -67,4 +75,6 @@ private:
     QCheckBox *m_limbDarkeningCheck  = nullptr;
     QColor m_background;
     QColor m_unseen;
+
+    AppSettings m_saved; // what is on disk; the Save button tracks the diff
 };
