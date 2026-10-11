@@ -15,7 +15,7 @@
 SidePanel::SidePanel(QWidget *parent) : QDockWidget(parent)
 {
     setupUI();
-    setupConnections();
+    initConnections();
 }
 
 void
@@ -45,8 +45,11 @@ SidePanel::setupUI()
 }
 
 void
-SidePanel::setupConnections()
+SidePanel::initConnections()
 {
+    connect(m_graticuleColorButton, &QPushButton::clicked, this,
+            &SidePanel::onGraticuleColorButtonClicked);
+
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });
@@ -238,6 +241,11 @@ SidePanel::overlaysWidget()
         m_graticuleStepCombo->addItem(QString("%1°").arg(deg), deg);
     m_graticuleStepCombo->setCurrentIndex(3); // 30°
     m_graticuleLayout->addRow("Grid spacing", m_graticuleStepCombo);
+
+    m_graticuleColorButton = new QPushButton("");
+    m_graticuleLayout->addRow("Color",
+                              m_graticuleColorButton = new QPushButton(""));
+
     updateGraticuleRowVisibility();
 
     return widget;
@@ -497,9 +505,9 @@ SidePanel::setFitsInfo(const FitsInfo &info, int hdu, int column)
     m_hduCombo->clear();
     for (const FitsHdu &h : info.hdus)
     {
-        const QString label
-            = h.name.isEmpty() ? QString::number(h.index)
-                               : QString("%1: %2").arg(h.index).arg(h.name);
+        const QString label = h.name.isEmpty()
+                                  ? QString::number(h.index)
+                                  : QString("%1: %2").arg(h.index).arg(h.name);
         m_hduCombo->addItem(label, h.index);
     }
     m_hduCombo->setEnabled(info.hdus.size() > 1);
@@ -517,12 +525,27 @@ SidePanel::fillColumnCombo(int hdu, int column)
     m_columnCombo->clear();
     if (const FitsHdu *h = m_fitsInfo.find(hdu))
         for (const FitsColumn &c : h->columns)
-            m_columnCombo->addItem(c.name.isEmpty() ? QString::number(c.index)
-                                                    : c.name,
-                                   c.index);
+            m_columnCombo->addItem(
+                c.name.isEmpty() ? QString::number(c.index) : c.name, c.index);
     m_columnCombo->setEnabled(m_columnCombo->count() > 1);
 
     const int row = m_columnCombo->findData(column);
     if (row >= 0)
         m_columnCombo->setCurrentIndex(row);
+}
+
+void
+SidePanel::onGraticuleColorButtonClicked()
+{
+    QColor color = QColorDialog::getColor(QColor(m_graticuleColor), this,
+                                          "Select Graticule Color");
+    if (color.isValid())
+    {
+        auto graticuleColor = color.rgb() & 0xFFFFFF;
+        m_graticuleColor    = QColor::fromRgb(graticuleColor);
+        m_graticuleColorButton->setStyleSheet(
+            QString("background-color: #%1;")
+                .arg(graticuleColor, 6, 16, QChar('0')));
+        emit graticuleColorChanged(graticuleColor);
+    }
 }

@@ -194,6 +194,7 @@ public:
         return m_pendingMap.Npix() > 0 ? &m_pendingMap : nullptr;
     }
 
+    void setGraticuleColor(const QColor &color);
     void setGraticuleEnabled(bool enabled);
     void setGraticuleStep(double degrees);
     bool graticuleEnabled() const
@@ -312,4 +313,5 @@ private:
     bool m_minimapEnabled               = false;
     bool m_graticuleEnabled             = false;
     double m_graticuleStepDeg           = 30.0;
+    QColor m_graticuleColor             = QColor(255, 255, 255, 128);
 };

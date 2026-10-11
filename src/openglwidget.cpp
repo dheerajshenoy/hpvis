@@ -28,6 +28,7 @@
 #include <limits>
 #include <pointing.h>
 #include <qcoreapplication.h>
+#include <qsurfaceformat.h>
 #include <vector>
 
 // Converts Galactic coordinates (l, b) in degrees to Equatorial (RA, Dec) in
@@ -466,8 +467,10 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
     m_shaderProgram.setUniformValue(
         "graticule_step", float(qDegreesToRadians(m_graticuleStepDeg)));
-    m_shaderProgram.setUniformValue("graticule_color",
-                                    QVector4D(1.0f, 1.0f, 1.0f, 0.55f));
+    m_shaderProgram.setUniformValue(
+        "graticule_color",
+        QVector4D(m_graticuleColor.redF(), m_graticuleColor.greenF(),
+                  m_graticuleColor.blueF(), m_graticuleColor.alphaF()));
     m_shaderProgram.setUniformValue(
         "colorbar_rect",
         QVector4D(colorbar_rect.left(), colorbar_rect.top(),
@@ -1402,4 +1405,11 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
         draw(projectToWindow(lat, M_PI) - QPointF(4, 0),
              QString("%1°").arg(deg), true);
     }
+}
+
+void
+OpenGLWidget::setGraticuleColor(const QColor &color)
+{
+    m_graticuleColor = color;
+    update();
 }

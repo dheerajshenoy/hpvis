@@ -109,11 +109,12 @@ signals:
     void maskModeChanged(int mode);
     void maskOpacityChanged(float opacity);
     void graticuleToggled(bool enabled);
+    void graticuleColorChanged(uint32_t color);
     void graticuleStepChanged(double degrees);
 
 private:
     void setupUI();
-    void setupConnections();
+    void initConnections();
     void onBackgroundColorButtonClicked();
     void onUnseenColorButtonClicked();
     void onLoadMaskButtonClicked();
@@ -124,6 +125,7 @@ private:
     QWidget *mapInfoWidget();
     void fillColumnCombo(int hdu, int column);
     void updateGraticuleRowVisibility();
+    void onGraticuleColorButtonClicked();
 
 private:
     // Map info controls
@@ -157,17 +159,19 @@ private:
     QColor m_unseenColor              = QColor(0, 0, 0);
 
     // Mask overlay controls
-    QPushButton *m_maskOverlayButton = nullptr;
-    QWidget *m_maskListWidget        = nullptr;
-    QVBoxLayout *m_maskListLayout    = nullptr;
-    QPushButton *m_clearMaskButton   = nullptr;
-    QComboBox *m_maskModeCombo       = nullptr;
-    QSlider *m_maskOpacitySlider     = nullptr;
-    QFormLayout *m_overlaysLayout    = nullptr;
-    QLabel *m_fskyLabel              = nullptr;
-    QCheckBox *m_graticuleCheckBox   = nullptr;
-    QComboBox *m_graticuleStepCombo  = nullptr;
-    QFormLayout *m_graticuleLayout   = nullptr;
+    QPushButton *m_maskOverlayButton    = nullptr;
+    QWidget *m_maskListWidget           = nullptr;
+    QVBoxLayout *m_maskListLayout       = nullptr;
+    QPushButton *m_clearMaskButton      = nullptr;
+    QComboBox *m_maskModeCombo          = nullptr;
+    QSlider *m_maskOpacitySlider        = nullptr;
+    QFormLayout *m_overlaysLayout       = nullptr;
+    QLabel *m_fskyLabel                 = nullptr;
+    QCheckBox *m_graticuleCheckBox      = nullptr;
+    QComboBox *m_graticuleStepCombo     = nullptr;
+    QFormLayout *m_graticuleLayout      = nullptr;
+    QPushButton *m_graticuleColorButton = nullptr;
+    QColor m_graticuleColor             = QColor(255, 255, 255);
 
     // FITS Header info
     // TODO: Add a widget to display FITS header information

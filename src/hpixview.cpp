@@ -73,12 +73,20 @@ HpixView::initConnections()
     connect(m_sidePanel, &SidePanel::graticuleToggled, this,
             &HpixView::onGraticuleToggled);
 
+    connect(m_sidePanel, &SidePanel::graticuleColorChanged, this,
+            [this](const QColor &color)
+    {
+        if (m_view)
+            m_view->glWidget()->setGraticuleColor(color);
+    });
+
     connect(m_sidePanel, &SidePanel::graticuleStepChanged, this,
             [this](double degrees)
     {
         if (m_view)
             m_view->glWidget()->setGraticuleStep(degrees);
     });
+
     connect(m_sidePanel, &SidePanel::fitsSelectionChanged, this,
             [this](int hdu, int column)
     {
