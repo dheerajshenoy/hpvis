@@ -51,12 +51,9 @@ HpixView::initUI()
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_sidePanel = new SidePanel();
     m_statusBar = new StatusBar();
-    m_toolBar   = new ToolBar();
 
     m_statusBar->showMessage("Welcome to HpixView!", 5000);
     initMenubar();
-
-    addToolBar(m_toolBar);
 
     layout->addWidget(m_tabWidget);
     setCentralWidget(widget);
@@ -226,10 +223,6 @@ HpixView::initMenubar()
     m_viewSidePanelAction->setText("&Side Panel");
     m_viewMenu->addAction(m_viewSidePanelAction);
 
-    m_viewToolBarAction = m_toolBar->toggleViewAction();
-    m_viewToolBarAction->setText("&Toolbar");
-    m_viewMenu->addAction(m_viewToolBarAction);
-
     m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
 
     auto zoomLevels
@@ -333,9 +326,7 @@ HpixView::OpenFile(const QString &filePath)
             "FITS Files (*.fits *.fit *.fts);;All Files (*)");
 
         for (const auto &file : files)
-        {
             OpenFile(file);
-        }
 
         return; // Exit the function after processing selected files
     }

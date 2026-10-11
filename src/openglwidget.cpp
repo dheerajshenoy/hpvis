@@ -9,10 +9,9 @@
 #include "shaderloader.hpp"
 
 #include <QEnterEvent>
-#include <QFutureWatcher>
-#include <QtConcurrent>
 #include <QFile>
 #include <QFileInfo>
+#include <QFutureWatcher>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
@@ -20,6 +19,7 @@
 #include <QPainterPath>
 #include <QVector3D>
 #include <QWheelEvent>
+#include <QtConcurrent>
 #include <algorithm>
 #include <cmath>
 #include <healpix_base.h>
@@ -231,19 +231,18 @@ OpenGLWidget::recomputeDataRange()
 
     struct Stats
     {
-        long valid  = 0;
-        double sum  = 0.0; // for the mask-aware average / rms
+        long valid   = 0;
+        double sum   = 0.0; // for the mask-aware average / rms
         double sumSq = 0.0;
-        float min   = std::numeric_limits<float>::max();
-        float max   = std::numeric_limits<float>::lowest();
+        float min    = std::numeric_limits<float>::max();
+        float max    = std::numeric_limits<float>::lowest();
     };
 
     const float *data = m_pendingMap.Map().begin();
 
     // One chunk of the map per thread
-    const Stats st = parallel::reduceRange<Stats>(
-        totalPixels,
-        [&](long begin, long end)
+    const Stats st = parallel::reduceRange<Stats>(totalPixels,
+                                                  [&](long begin, long end)
     {
         Stats s;
         for (long i = begin; i < end; ++i)
@@ -271,8 +270,7 @@ OpenGLWidget::recomputeDataRange()
             s.max = std::max(s.max, v);
         }
         return s;
-    },
-        [](Stats &total, const Stats &part)
+    }, [](Stats &total, const Stats &part)
     {
         total.valid += part.valid;
         total.sum += part.sum;
@@ -321,6 +319,7 @@ OpenGLWidget::setMap(Healpix_Map<float> &&map)
     m_pendingMap.swap(map); // takes the buffer without copying it
     m_hasPendingMap = true;
 
+    m_pixelOrdering = static_cast<PixelOrdering>(m_pendingMap.Scheme());
     if (sizeChanged && !m_masks.empty())
     {
         m_masks.clear();
@@ -465,8 +464,8 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("view_scale", viewScale());
     m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
     m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
-    m_shaderProgram.setUniformValue("graticule_step",
-                                    float(qDegreesToRadians(m_graticuleStepDeg)));
+    m_shaderProgram.setUniformValue(
+        "graticule_step", float(qDegreesToRadians(m_graticuleStepDeg)));
     m_shaderProgram.setUniformValue("graticule_color",
                                     QVector4D(1.0f, 1.0f, 1.0f, 0.55f));
     m_shaderProgram.setUniformValue(
@@ -661,9 +660,9 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
         QStringList errors;
     };
 
-    const long mapNside   = m_pendingMap.Nside();
-    const long mapNpix    = m_pendingMap.Npix();
-    const auto mapScheme  = m_pendingMap.Scheme();
+    const long mapNside  = m_pendingMap.Nside();
+    const long mapNpix   = m_pendingMap.Npix();
+    const auto mapScheme = m_pendingMap.Scheme();
 
     auto *watcher = new QFutureWatcher<Result>(this);
     connect(watcher, &QFutureWatcher<Result>::finished, this,
@@ -685,9 +684,9 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
                                        .arg(kMaxMasks);
                 break;
             }
-            const bool dup = std::any_of(
-                m_masks.begin(), m_masks.end(),
-                [&](const MaskEntry &m) { return m.path == entry.path; });
+            const bool dup = std::any_of(m_masks.begin(), m_masks.end(),
+                                         [&](const MaskEntry &m)
+            { return m.path == entry.path; });
             if (dup)
                 continue;
             m_masks.push_back(std::move(entry));
@@ -702,8 +701,7 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
             applyMaskChange(true);
     });
 
-    watcher->setFuture(QtConcurrent::run(
-        [todo, mapNside, mapNpix, mapScheme]()
+    watcher->setFuture(QtConcurrent::run([todo, mapNside, mapNpix, mapScheme]()
     {
         Result result;
         for (const QString &file : todo)
@@ -752,10 +750,10 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
                     for (long i = begin; i < end; ++i)
                     {
                         // NaN / UNSEEN count as masked; weights clamp to [0, 1]
-                        const float v
-                            = (std::isfinite(d[i]) && d[i] > -1e30f) ? d[i]
-                                                                      : 0.0f;
-                        out[i] = static_cast<uint8_t>(
+                        const float v = (std::isfinite(d[i]) && d[i] > -1e30f)
+                                            ? d[i]
+                                            : 0.0f;
+                        out[i]        = static_cast<uint8_t>(
                             std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
                     }
                 });
@@ -1377,8 +1375,9 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
 
     auto draw = [&](const QPointF &at, const QString &text, bool alignRight)
     {
-        const QPointF origin(at.x() - (alignRight ? fm.horizontalAdvance(text) : 0),
-                             at.y() + fm.ascent() / 2.0);
+        const QPointF origin(
+            at.x() - (alignRight ? fm.horizontalAdvance(text) : 0),
+            at.y() + fm.ascent() / 2.0);
         const QRectF box(origin.x(), origin.y() - fm.ascent(),
                          fm.horizontalAdvance(text), fm.height());
         if (!bounds.contains(box))
@@ -1393,13 +1392,14 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
     {
         const double deg = std::round(qRadiansToDegrees(lon) * 100.0) / 100.0;
         const QPointF at = projectToWindow(0.0, lon);
-        draw(at + QPointF(0, fm.height() * 0.8), QString("%1°").arg(deg), false);
+        draw(at + QPointF(0, fm.height() * 0.8), QString("%1°").arg(deg),
+             false);
     }
     // Latitudes on the left edge of the ellipse (lon = 180°)
     for (double lat = -M_PI / 2 + step; lat < M_PI / 2 - 1e-9; lat += step)
     {
         const double deg = std::round(qRadiansToDegrees(lat) * 100.0) / 100.0;
-        draw(projectToWindow(lat, M_PI) - QPointF(4, 0), QString("%1°").arg(deg),
-             true);
+        draw(projectToWindow(lat, M_PI) - QPointF(4, 0),
+             QString("%1°").arg(deg), true);
     }
 }

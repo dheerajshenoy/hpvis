@@ -1,15 +1,14 @@
 #pragma once
 
+#include "appsettings.hpp"
 #include "argparse.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
-#include "appsettings.hpp"
 #include "recentfiles.hpp"
 #include "sidepanel.hpp"
 #include "statusbar.hpp"
 #include "tabwidget.hpp"
-#include "toolbar.hpp"
 #include "view.hpp"
 
 #include <QMainWindow>
@@ -67,7 +66,7 @@ private:
     QAction *m_fileOpenAction   = nullptr;
     QMenu *m_fileOpenRecentMenu = nullptr;
     RecentFiles m_recentFiles;
-    AppSettings m_settings = AppSettings::load();
+    AppSettings m_settings        = AppSettings::load();
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
 
@@ -77,7 +76,6 @@ private:
     QAction *m_viewColorBarAction  = nullptr;
     QAction *m_viewSidePanelAction = nullptr;
     QAction *m_viewResetViewAction = nullptr;
-    QAction *m_viewToolBarAction   = nullptr;
     QMenu *m_viewZoomMenu          = nullptr;
 
     QMenu *m_toolsMenu             = nullptr;
@@ -87,5 +85,4 @@ private:
     TabWidget *m_tabWidget = nullptr;
     SidePanel *m_sidePanel = nullptr;
     StatusBar *m_statusBar = nullptr;
-    ToolBar *m_toolBar     = nullptr;
 };
