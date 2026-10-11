@@ -78,10 +78,10 @@ Group into collapsible sections (QGroupBox / toolbox).
 - [ ] View center lon/lat spinboxes and rotation slider
 - [ ] Coordinate system combo (Galactic, Equatorial, Ecliptic)
 - [ ] Flip longitude toggle
-- [ ] Reset view button
+- [x] Reset view button
 
 ### Data
 - [ ] Column/field selector (TT, QQ, UU, ...)
-- [ ] Read-only map info: nside, npix, ordering, coord system, min/max/mean/std
+- [x] Read-only map info: nside, npix, ordering, coord system, min/max/mean/std
 - [ ] Default pixel ordering from FITS header (`ORDERING`) instead of manual choice
 - [ ] Smoothing FWHM spinbox

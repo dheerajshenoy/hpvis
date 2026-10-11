@@ -66,7 +66,7 @@ public:
                   int mode, float opacity);
 
     void setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
-                    double std);
+                    double std, double min, double max);
 
 signals:
     void pixelOrderingChanged(PixelOrdering ordering);
@@ -129,6 +129,8 @@ private:
     QLineEdit *m_npixEdit  = nullptr;
     QLineEdit *m_avgEdit   = nullptr;
     QLineEdit *m_rmsEdit   = nullptr;
+    QLineEdit *m_minEdit  = nullptr;
+    QLineEdit *m_maxEdit  = nullptr;
     QLineEdit *m_stdEdit   = nullptr;
 
     // FITS Header info

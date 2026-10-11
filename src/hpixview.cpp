@@ -283,10 +283,11 @@ HpixView::initViewConnections(const View *view)
 {
     connect(
         view->glWidget(), &OpenGLWidget::mapLoaded, this,
-        [this, view](long nside, long npix, double avg, double rms, double std)
+        [this, view](long nside, long npix, double avg, double rms, double std,
+                     float min, float max)
     {
         if (view == m_view)
-            m_sidePanel->setMapInfo(nside, npix, avg, rms, std);
+            m_sidePanel->setMapInfo(nside, npix, avg, rms, std, min, max);
     });
 
     connect(view, &View::cursorPosChanged, m_statusBar,
@@ -310,7 +311,8 @@ HpixView::initViewConnections(const View *view)
             const auto *gl = view->glWidget();
             m_sidePanel->setMapInfo(gl->healpixMap()->Nside(),
                                     gl->healpixMap()->Npix(), gl->mapAverage(),
-                                    gl->mapRms(), gl->mapStd());
+                                    gl->mapRms(), gl->mapStd(), gl->mapMin(),
+                                    gl->mapMax());
         }
         updateMaskListFromView(view);
     });
@@ -325,7 +327,8 @@ HpixView::updateSidePanelStateFromView(const View *view)
     auto *map = view->glWidget()->healpixMap();
     m_sidePanel->setMapInfo(
         map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
-        view->glWidget()->mapRms(), view->glWidget()->mapStd());
+        view->glWidget()->mapRms(), view->glWidget()->mapStd(),
+        view->glWidget()->mapMin(), view->glWidget()->mapMax());
     m_sidePanel->setPixelOrdering(view->glWidget()->pixelOrdering());
     m_sidePanel->setColormapRange(view->glWidget()->colormapMin(),
                                   view->glWidget()->colormapMax());

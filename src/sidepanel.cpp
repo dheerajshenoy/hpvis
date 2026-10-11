@@ -396,6 +396,8 @@ SidePanel::mapInfoWidget()
 
     layout->addRow("Nside:", makeField(m_nsideEdit));
     layout->addRow("Npix:", makeField(m_npixEdit));
+    layout->addRow("Min:", makeField(m_minEdit));
+    layout->addRow("Max:", makeField(m_maxEdit));
     layout->addRow("Average:", makeField(m_avgEdit));
     layout->addRow("RMS:", makeField(m_rmsEdit));
     layout->addRow("Std dev:", makeField(m_stdEdit));
@@ -405,10 +407,12 @@ SidePanel::mapInfoWidget()
 
 void
 SidePanel::setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
-                      double std)
+                      double std, double min, double max)
 {
     m_nsideEdit->setText(QString::number(nside));
     m_npixEdit->setText(QString::number(npix));
+    m_minEdit->setText(QString::number(min, 'g', 6));
+    m_maxEdit->setText(QString::number(max, 'g', 6));
     m_avgEdit->setText(QString::number(avg, 'g', 6));
     m_rmsEdit->setText(QString::number(rms, 'g', 6));
     m_stdEdit->setText(QString::number(std, 'g', 6));

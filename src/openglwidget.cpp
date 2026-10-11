@@ -266,6 +266,9 @@ OpenGLWidget::recomputeDataRange()
                    ? std::sqrt(std::max(0.0, sumSq / validPixels
                                                  - m_mapAverage * m_mapAverage))
                    : 0.0;
+    // Extremes of the surviving pixels (before the empty-range fallbacks below)
+    m_mapMin = validPixels ? m_dataMin : 0.0f;
+    m_mapMax = validPixels ? m_dataMax : 0.0f;
 
     if (totalPixels > 0)
         m_fsky = float(validPixels) / float(totalPixels);
@@ -310,7 +313,7 @@ OpenGLWidget::setMap(const Healpix_Map<float> &map)
         uploadMapToGPU(m_pendingMap);
         m_hasPendingMap = false;
         emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(), m_mapAverage,
-                       m_mapRms, m_mapStd);
+                       m_mapRms, m_mapStd, m_mapMin, m_mapMax);
     }
 
     update();
@@ -369,7 +372,7 @@ OpenGLWidget::paintGL()
         m_hasPendingMap = false;
 
         emit mapLoaded(m_pendingMap.Nside(), m_pendingMap.Npix(), m_mapAverage,
-                       m_mapRms, m_mapStd);
+                       m_mapRms, m_mapStd, m_mapMin, m_mapMax);
     }
 
     if (m_maskDirty)
@@ -488,8 +491,10 @@ OpenGLWidget::paintGL()
             = minimapRect.left() + hw + double(m_camera->panOffset.x()) * hw;
         const double cy
             = minimapRect.top() + hh - double(m_camera->panOffset.y()) * hh;
-        const double vw = hw / m_camera->zoom;
-        const double vh = hh / m_camera->zoom;
+        // The window shows viewScale() / zoom of the plane in each direction
+        const QVector2D vs = viewScale();
+        const double vw    = hw * vs.x() / m_camera->zoom;
+        const double vh    = hh * vs.y() / m_camera->zoom;
 
         p.setClipRect(minimapRect);
         p.setPen(QPen(QColor(255, 80, 80), 1.5));
@@ -877,8 +882,7 @@ OpenGLWidget::emitCursorData()
     const QVector2D ndc = toNdc(m_cursorPos);
     const QVector2D p   = ndc / m_camera->zoom + m_camera->panOffset;
     double colat, phi;
-    if (m_nside <= 0 || m_pendingMap.Npix() == 0 || std::abs(ndc.x()) > 1.0f
-        || std::abs(ndc.y()) > 1.0f // in the padding
+    if (m_nside <= 0 || m_pendingMap.Npix() == 0
         || !inverseMollweide(p * 0.5f + QVector2D(0.5f, 0.5f), colat, phi))
     {
         emit cursorPosChanged(QPointF(), QPointF(), std::nan(""), -1);
@@ -915,11 +919,17 @@ OpenGLWidget::toNdc(const QPointF &pos) const
 QVector2D
 OpenGLWidget::viewScale() const
 {
+    // Largest 2:1 box (the Mollweide ellipse's aspect) that fits inside the
+    // window minus the padding, centered. Window NDC divided by the box's
+    // share of the window gives map NDC in [-1, 1] inside the box.
     const float w   = float(std::max(width(), 1));
     const float h   = float(std::max(height(), 1));
     const float pad = float(kMapPadding);
-    return QVector2D(w / std::max(w - 2.0f * pad, 1.0f),
-                     h / std::max(h - 2.0f * pad, 1.0f));
+    const float aw  = std::max(w - 2.0f * pad, 1.0f);
+    const float ah  = std::max(h - 2.0f * pad, 1.0f);
+    const float bw  = std::min(aw, 2.0f * ah);
+    const float bh  = bw * 0.5f;
+    return QVector2D(w / bw, h / bh);
 }
 
 bool
@@ -1187,7 +1197,8 @@ OpenGLWidget::processSelectionRegion()
     if (r.width() < 4 || r.height() < 4) // a click, not a drag
         return;
 
-    m_camera->zoomToRect(toNdc(r.topLeft()), toNdc(r.bottomRight()));
+    m_camera->zoomToRect(toNdc(r.topLeft()), toNdc(r.bottomRight()),
+                          viewScale());
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
 }

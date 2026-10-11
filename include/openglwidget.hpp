@@ -127,6 +127,14 @@ public:
     {
         return m_mapStd;
     }
+    float mapMin() const
+    {
+        return m_mapMin;
+    }
+    float mapMax() const
+    {
+        return m_mapMax;
+    }
 
     inline float fsky() const
     {
@@ -204,7 +212,8 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent *e) override;
 
 signals:
-    void mapLoaded(long nside, long npix, double avg, double rms, double std);
+    void mapLoaded(long nside, long npix, double avg, double rms, double std,
+                   float min, float max);
     void zoomChanged(float zoom);
     void masksChanged(); // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
@@ -242,6 +251,8 @@ private:
     double m_mapAverage           = 0.0;
     double m_mapRms               = 0.0;
     double m_mapStd               = 0.0;
+    float m_mapMin                = 0.0f;
+    float m_mapMax                = 1.0f;
     bool m_invertColormap         = false;
     QColor m_bgColor              = QColor(10, 10, 15);
     QColor m_unseenColor          = QColor(0, 0, 0);
