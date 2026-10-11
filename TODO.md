@@ -30,8 +30,7 @@
 
 ## Overlays
 - [x] Mask overlay
-- [ ] Graticule checkbox + spacing spinbox
-- [ ] Graticule (lon/lat grid) with labels
+- [x] Graticule checkbox + spacing spinbox
 - [ ] Markers / catalog overlay (load from CSV)
 - [ ] Text annotations
 

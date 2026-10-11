@@ -76,6 +76,7 @@ public:
         QSignalBlocker b1(m_graticuleCheckBox);
         QSignalBlocker b2(m_graticuleStepCombo);
         m_graticuleCheckBox->setChecked(enabled);
+        updateGraticuleRowVisibility();
         const int i = m_graticuleStepCombo->findData(degrees);
         if (i >= 0)
             m_graticuleStepCombo->setCurrentIndex(i);
@@ -115,6 +116,7 @@ private:
     QWidget *colormapWidget();
     QWidget *overlaysWidget();
     QWidget *mapInfoWidget();
+    void updateGraticuleRowVisibility();
 
 private:
     // Pixel ordering controls
@@ -143,6 +145,7 @@ private:
     QLabel *m_fskyLabel              = nullptr;
     QCheckBox *m_graticuleCheckBox   = nullptr;
     QComboBox *m_graticuleStepCombo  = nullptr;
+    QFormLayout *m_graticuleLayout   = nullptr;
 
     // Map info controls
     QLineEdit *m_nsideEdit = nullptr;

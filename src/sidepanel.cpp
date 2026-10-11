@@ -5,6 +5,7 @@
 #include <QColorDialog>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QScrollArea>
 #include <QSlider>
@@ -91,7 +92,11 @@ SidePanel::setupConnections()
     });
 
     connect(m_graticuleCheckBox, &QCheckBox::toggled, this,
-            [this](bool checked) { emit graticuleToggled(checked); });
+            [this](bool checked)
+    {
+        updateGraticuleRowVisibility();
+        emit graticuleToggled(checked);
+    });
 
     connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
             [this](int) { emit graticuleStepChanged(graticuleStep()); });
@@ -159,12 +164,26 @@ SidePanel::pixelOrderingWidget()
     return widget;
 }
 
+// A titled box with a form layout inside, used to group related controls
+static QGroupBox *
+makeGroup(const QString &title, QFormLayout *&layout)
+{
+    auto *box = new QGroupBox(title);
+    layout    = new QFormLayout(box);
+    return box;
+}
+
 QWidget *
 SidePanel::overlaysWidget()
 {
-    QWidget *widget     = new QWidget();
-    QFormLayout *layout = new QFormLayout(widget);
-    m_overlaysLayout    = layout;
+    QWidget *widget = new QWidget();
+    auto *outer     = new QVBoxLayout(widget);
+    outer->setContentsMargins(0, 0, 0, 0);
+
+    // --- Masks ---
+    QFormLayout *layout;
+    outer->addWidget(makeGroup("Masks", layout));
+    m_overlaysLayout = layout; // used to hide the dim-strength row
 
     m_maskOverlayButton = new QPushButton("Add Mask...");
     m_clearMaskButton   = new QPushButton("Clear");
@@ -196,54 +215,56 @@ SidePanel::overlaysWidget()
     m_fskyLabel = new QLabel();
     layout->addRow("Sky fraction", m_fskyLabel);
 
+    // --- Graticule ---
+    outer->addWidget(makeGroup("Graticule", m_graticuleLayout));
+
     m_graticuleCheckBox = new QCheckBox("Show Graticule");
-    layout->addRow(m_graticuleCheckBox);
+    m_graticuleLayout->addRow(m_graticuleCheckBox);
 
     m_graticuleStepCombo = new QComboBox();
     for (double deg : {10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0})
         m_graticuleStepCombo->addItem(QString("%1°").arg(deg), deg);
     m_graticuleStepCombo->setCurrentIndex(3); // 30°
-    layout->addRow("Grid spacing", m_graticuleStepCombo);
+    m_graticuleLayout->addRow("Grid spacing", m_graticuleStepCombo);
+    updateGraticuleRowVisibility();
 
-    widget->setLayout(layout);
     return widget;
+}
+
+// The spacing only matters while the graticule is on
+void
+SidePanel::updateGraticuleRowVisibility()
+{
+    m_graticuleLayout->setRowVisible(m_graticuleStepCombo,
+                                     m_graticuleCheckBox->isChecked());
 }
 
 QWidget *
 SidePanel::colormapWidget()
 {
-    QWidget *widget     = new QWidget();
-    QFormLayout *layout = new QFormLayout(widget);
+    QWidget *widget = new QWidget();
+    auto *outer     = new QVBoxLayout(widget);
+    outer->setContentsMargins(0, 0, 0, 0);
 
-    m_bgColorButton = new QPushButton("");
-    m_bgColorButton->setFixedHeight(20);
-    m_bgColorButton->setStyleSheet(
-        QString("background-color: #%1;").arg(0x0A0A0F, 6, 16, QChar('0')));
+    QFormLayout *layout;
 
-    layout->addRow("Background Color:", m_bgColorButton);
-
-    m_unseenColorButton = new QPushButton("");
-    m_unseenColorButton->setFixedHeight(20);
-    m_unseenColorButton->setStyleSheet(
-        QString("background-color: #%1;").arg(0x000000, 6, 16, QChar('0')));
-
-    layout->addRow("Unseen Color:", m_unseenColorButton);
-
-    widget->setLayout(layout);
+    // --- Colormap ---
+    outer->addWidget(makeGroup("Colormap", layout));
 
     m_colormapCombo = new QComboBox();
-
     const QStringList colormaps
         = {"Grayscale", "Inferno", "Magma",  "Plasma", "Viridis",
            "Cubehelix", "Jet",     "HSV",    "Hot",    "Cool",
            "Spring",    "Summer",  "Autumn", "Winter", "Rainbow"};
-
     m_colormapCombo->addItems(colormaps);
     m_colormapCombo->setCurrentIndex(static_cast<int>(Colormap::VIRIDIS));
     layout->addRow("Colormap", m_colormapCombo);
 
     m_reverseColormapCheck = new QCheckBox("Reverse");
     layout->addRow(m_reverseColormapCheck);
+
+    // --- Range ---
+    outer->addWidget(makeGroup("Range", layout));
 
     m_colormapMinSpin = new QDoubleSpinBox();
     m_colormapMinSpin->setRange(-1e9, 1e9);
@@ -257,16 +278,28 @@ SidePanel::colormapWidget()
     layout->addRow("Max", m_colormapMaxSpin);
 
     m_colormapScaleCombo = new QComboBox();
-
     m_colormapScaleCombo->addItem("Linear");
     m_colormapScaleCombo->addItem("Logarithmic");
-
     layout->addRow("Scale", m_colormapScaleCombo);
 
     m_colormapResetBtn = new QPushButton("Reset Range");
     layout->addRow(m_colormapResetBtn);
 
-    widget->setLayout(layout);
+    // --- Colors ---
+    outer->addWidget(makeGroup("Colors", layout));
+
+    m_bgColorButton = new QPushButton("");
+    m_bgColorButton->setFixedHeight(20);
+    m_bgColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(0x0A0A0F, 6, 16, QChar('0')));
+    layout->addRow("Background:", m_bgColorButton);
+
+    m_unseenColorButton = new QPushButton("");
+    m_unseenColorButton->setFixedHeight(20);
+    m_unseenColorButton->setStyleSheet(
+        QString("background-color: #%1;").arg(0x000000, 6, 16, QChar('0')));
+    layout->addRow("Unseen:", m_unseenColorButton);
+
     return widget;
 }
 
@@ -373,13 +406,17 @@ SidePanel::setMasks(const QStringList &names, const QStringList &paths,
     updateDimRowVisibility();
 }
 
-// The strength slider (and its label) only applies to the "Dim" mode
+// The mode row needs at least one mask; the strength slider (and its label)
+// additionally only applies to the "Dim" mode
 void
 SidePanel::updateDimRowVisibility()
 {
     constexpr int kDimMode = 1;
+    const bool anyMask     = m_maskListLayout->count() > 0;
+    m_overlaysLayout->setRowVisible(m_maskModeCombo, anyMask);
     m_overlaysLayout->setRowVisible(
-        m_maskOpacitySlider, m_maskModeCombo->currentIndex() == kDimMode);
+        m_maskOpacitySlider,
+        anyMask && m_maskModeCombo->currentIndex() == kDimMode);
 }
 
 void
