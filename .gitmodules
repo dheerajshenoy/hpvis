@@ -1,0 +1,3 @@
+[submodule "thirdparty/NaMaster"]
+	path = thirdparty/NaMaster
+	url = https://github.com/dheerajshenoy/NaMaster
