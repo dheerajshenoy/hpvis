@@ -19,9 +19,7 @@ endif()
 
 
 
-# Point pkg-config at the vendored HEALPix
 set(HEALPIX_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/healpix)
-set(ENV{PKG_CONFIG_PATH} "${HEALPIX_ROOT}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Concurrent Graphs)
 find_package(OpenMP REQUIRED)
@@ -33,8 +31,40 @@ set(CMAKE_AUTOUIC ON)
 
 
 add_subdirectory(thirdparty/cfitsio)
-pkg_check_modules(HEALPIX REQUIRED IMPORTED_TARGET healpix_cxx)
 pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
+
+# --- HEALPix C++ (and libsharp) ----------------------------------------
+# Built from the vendored sources into the build tree (out of tree, so the
+# sources stay clean and no absolute paths end up in the repository).
+include(ExternalProject)
+set(HEALPIX_PREFIX ${CMAKE_BINARY_DIR}/healpix)
+file(MAKE_DIRECTORY ${HEALPIX_PREFIX}/include ${HEALPIX_PREFIX}/include/healpix_cxx)
+
+ExternalProject_Add(libsharp_ext
+    PREFIX ${CMAKE_BINARY_DIR}/libsharp
+    SOURCE_DIR ${HEALPIX_ROOT}/src/common_libraries/libsharp
+    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${HEALPIX_PREFIX}
+    BUILD_COMMAND $(MAKE)
+    INSTALL_COMMAND $(MAKE) install
+    BUILD_BYPRODUCTS ${HEALPIX_PREFIX}/lib/libsharp.so)
+
+ExternalProject_Add(healpix_cxx_ext
+    PREFIX ${CMAKE_BINARY_DIR}/healpix_cxx
+    SOURCE_DIR ${HEALPIX_ROOT}/src/cxx
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+        "PKG_CONFIG_PATH=${HEALPIX_PREFIX}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}"
+        <SOURCE_DIR>/configure --prefix=${HEALPIX_PREFIX}
+    BUILD_COMMAND $(MAKE)
+    INSTALL_COMMAND $(MAKE) install
+    BUILD_BYPRODUCTS ${HEALPIX_PREFIX}/lib/libhealpix_cxx.so
+    DEPENDS libsharp_ext)
+
+add_library(healpix_cxx SHARED IMPORTED)
+set_target_properties(healpix_cxx PROPERTIES
+    IMPORTED_LOCATION ${HEALPIX_PREFIX}/lib/libhealpix_cxx.so
+    INTERFACE_INCLUDE_DIRECTORIES "${HEALPIX_PREFIX}/include;${HEALPIX_PREFIX}/include/healpix_cxx"
+    INTERFACE_LINK_LIBRARIES "${HEALPIX_PREFIX}/lib/libsharp.so;PkgConfig::CFITSIO")
+add_dependencies(healpix_cxx healpix_cxx_ext)
 
 # --- NaMaster (libnmt) -------------------------------------------------
 # libnmt needs the HEALPix C library (chealpix), which isn't packaged on
@@ -51,7 +81,6 @@ if (WITH_NAMASTER)
 
     # libnmt's autotools build only works in-source, so build a copy of the
     # submodule inside the build tree using its own install_libnmt.sh.
-    include(ExternalProject)
     set(NMT_PREFIX ${CMAKE_BINARY_DIR}/namaster/src/namaster_ext/_deps)
     file(MAKE_DIRECTORY ${NMT_PREFIX}/include)
     ExternalProject_Add(namaster_ext
@@ -130,10 +159,10 @@ add_executable(${PROJECT_NAME}
 
 # So the executable finds the vendored .so at runtime
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    BUILD_RPATH "${HEALPIX_ROOT}/lib;${NMT_PREFIX}/lib")
+    BUILD_RPATH "${HEALPIX_PREFIX}/lib;${NMT_PREFIX}/lib")
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    PkgConfig::HEALPIX
+    healpix_cxx
     PkgConfig::CFITSIO
     nmt
     OpenMP::OpenMP_CXX

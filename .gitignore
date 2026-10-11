@@ -1,2 +1,16 @@
 build/
 samples/*.fits
+
+# Generated HEALPix build outputs and unused parts of the vendored tree
+thirdparty/healpix/bin/
+thirdparty/healpix/lib/
+thirdparty/healpix/include/
+thirdparty/healpix/doc/
+thirdparty/healpix/test/
+thirdparty/healpix/Makefile
+thirdparty/healpix/Makefile_*
+thirdparty/healpix/src/healpy/
+thirdparty/healpix/src/idl/
+thirdparty/healpix/src/java/
+thirdparty/healpix/src/f90/
+thirdparty/healpix/src/cxx/autom4te.cache/
