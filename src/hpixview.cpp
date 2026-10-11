@@ -556,3 +556,22 @@ HpixView::onGraticuleToggled(bool enabled)
     if (m_view)
         m_view->glWidget()->setGraticuleEnabled(enabled);
 }
+
+void
+HpixView::dragEnterEvent(QDragEnterEvent *event)
+{
+    event->acceptProposedAction();
+}
+
+void
+HpixView::dropEvent(QDropEvent *event)
+{
+    const QMimeData *mimeData = event->mimeData();
+    if (mimeData->hasUrls())
+    {
+        for (const QUrl &url : mimeData->urls())
+        {
+            OpenFile(url.toLocalFile());
+        }
+    }
+}

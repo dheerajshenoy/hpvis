@@ -22,6 +22,10 @@ public:
 
     void OpenFile(const QString &filePath = QString());
 
+protected:
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
+
 private:
     void parseArgs(const argparse::ArgumentParser &parser);
     void initUI();
