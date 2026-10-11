@@ -1,7 +1,6 @@
 #include "argparse.hpp"
-#include "hpvis.hpp"
-
 #include "fitsinfo.hpp"
+#include "hpvis.hpp"
 
 #include <QApplication>
 #include <algorithm>
@@ -33,24 +32,18 @@ addArguments(argparse::ArgumentParser &parser)
         .metavar("COLORMAP")
         .help("Colormap, e.g. viridis, inferno, jet (default: from settings)");
 
-    parser.add_argument("-r", "--reverse")
-        .flag()
-        .help("Reverse the colormap");
+    parser.add_argument("-r", "--reverse").flag().help("Reverse the colormap");
 
     parser.add_argument("-s", "--scale")
         .choices("linear", "log")
         .metavar("SCALE")
         .help("Colormap scale: linear or log");
 
-    parser.add_argument("--min")
-        .metavar("VALUE")
-        .scan<'g', double>()
-        .help("Lower end of the color range");
+    parser.add_argument("--min").metavar("VALUE").scan<'g', double>().help(
+        "Lower end of the color range");
 
-    parser.add_argument("--max")
-        .metavar("VALUE")
-        .scan<'g', double>()
-        .help("Upper end of the color range");
+    parser.add_argument("--max").metavar("VALUE").scan<'g', double>().help(
+        "Upper end of the color range");
 
     parser.add_argument("-p", "--projection")
         .choices("mollweide", "plate_carree", "orthographic",
@@ -63,10 +56,8 @@ addArguments(argparse::ArgumentParser &parser)
         .flag()
         .help("Show the coordinate grid");
 
-    parser.add_argument("--mask")
-        .metavar("FILE")
-        .append()
-        .help("Mask file to apply (can be given more than once)");
+    parser.add_argument("--mask").metavar("FILE").append().help(
+        "Mask file to apply (can be given more than once)");
 
     // Non-interactive modes
     parser.add_argument("-e", "--export")
@@ -77,9 +68,8 @@ addArguments(argparse::ArgumentParser &parser)
         .flag()
         .help("Print the map HDUs and columns of the files and exit");
 
-    parser.add_argument("--stats")
-        .flag()
-        .help("Print min, max, mean, rms and std of the files and exit");
+    parser.add_argument("--stats").flag().help(
+        "Print min, max, mean, rms and std of the files and exit");
 }
 
 // --info: list the HDUs and columns that can be shown
@@ -112,7 +102,8 @@ printStats(const QString &path, int hdu, int column)
     file.open(path.toStdString());
     const FitsInfo info = scanFits(file);
     if (info.hdus.isEmpty())
-        throw std::runtime_error("no HEALPix map found in " + path.toStdString());
+        throw std::runtime_error("no HEALPix map found in "
+                                 + path.toStdString());
 
     if (hdu <= 0)
         hdu = info.hdus.first().index;
@@ -192,8 +183,7 @@ main(int argc, char *argv[])
                 if (parser.get<bool>("--info"))
                     printInfo(path);
                 if (parser.get<bool>("--stats"))
-                    printStats(path,
-                               parser.present<int>("--hdu").value_or(0),
+                    printStats(path, parser.present<int>("--hdu").value_or(0),
                                parser.present<int>("--column").value_or(0));
             }
             catch (const std::exception &e)
@@ -210,7 +200,6 @@ main(int argc, char *argv[])
     QCoreApplication::setApplicationName(PROJECT_NAME);
     // QSettings needs both names (config goes to ~/.config/hpvis/)
     QCoreApplication::setOrganizationName(PROJECT_NAME);
-    QCoreApplication::setOrganizationName("Dheeraj Shenoy");
     QCoreApplication::setOrganizationDomain(
         "dheerajshenoy.github.io/" PROJECT_NAME);
     QCoreApplication::setApplicationName("hpvis");

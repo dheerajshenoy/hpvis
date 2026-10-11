@@ -3,13 +3,11 @@
 #include "alm.h"
 #include "alm_healpix_tools.h"
 #include "alm_powspec_tools.h"
-#include "powspec.h"
-
 #include "fitsinfo.hpp"
-
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
+#include "powspec.h"
 
 #include <QComboBox>
 #include <QFutureWatcher>
@@ -21,10 +19,10 @@
 #include <QQuickView>
 #include <QVBoxLayout>
 #include <QValueAxis>
-#include <QtConcurrent>
-#include <memory>
 #include <QVariantList>
+#include <QtConcurrent>
 #include <cmath>
+#include <memory>
 
 // The maps behind one computation; Q and U are empty for an intensity map
 struct Stokes
@@ -242,9 +240,10 @@ PowerSpectrumDialog::computePowerSpectrum(const PowerSpectrumInput &input)
             if (!text.isEmpty())
                 text += "\n";
             m_warningLabel->setText(
-                text + "\u26a0 The map has unseen pixels, which are set to "
-                       "zero. The spectra are not corrected for them and may "
-                       "be wrong.");
+                text
+                + "\u26a0 The map has unseen pixels, which are set to "
+                  "zero. The spectra are not corrected for them and may "
+                  "be wrong.");
             m_warningLabel->show();
         }
         showSpectra(r.spectra);
@@ -287,9 +286,9 @@ PowerSpectrumDialog::showSpectra(const Spectra &spectra)
         const char *name;
         const std::vector<double> *data;
     };
-    const Entry entries[] = {{"TT", &m_spectra.TT}, {"EE", &m_spectra.EE},
-                             {"BB", &m_spectra.BB}, {"TE", &m_spectra.TE},
-                             {"TB", &m_spectra.TB}, {"EB", &m_spectra.EB}};
+    const Entry entries[]
+        = {{"TT", &m_spectra.TT}, {"EE", &m_spectra.EE}, {"BB", &m_spectra.BB},
+           {"TE", &m_spectra.TE}, {"TB", &m_spectra.TB}, {"EB", &m_spectra.EB}};
 
     QSignalBlocker block(m_spectrumCombo);
     m_spectrumCombo->clear();
@@ -309,14 +308,13 @@ PowerSpectrumDialog::updatePlot()
     if (!root)
         return;
 
-    const QString name = m_spectrumCombo->currentText();
-    const std::vector<double> *data
-        = name == "TT"   ? &m_spectra.TT
-          : name == "EE" ? &m_spectra.EE
-          : name == "BB" ? &m_spectra.BB
-          : name == "TE" ? &m_spectra.TE
-          : name == "TB" ? &m_spectra.TB
-                         : &m_spectra.EB;
+    const QString name              = m_spectrumCombo->currentText();
+    const std::vector<double> *data = name == "TT"   ? &m_spectra.TT
+                                      : name == "EE" ? &m_spectra.EE
+                                      : name == "BB" ? &m_spectra.BB
+                                      : name == "TE" ? &m_spectra.TE
+                                      : name == "TB" ? &m_spectra.TB
+                                                     : &m_spectra.EB;
 
     // D_l = l(l+1) C_l / 2pi, as flat lists QML can read (l = 2 onwards)
     QVariantList ell, dl;
@@ -326,9 +324,7 @@ PowerSpectrumDialog::updatePlot()
         dl.append(double(l) * double(l + 1) * (*data)[l] / (2.0 * M_PI));
     }
 
-    QMetaObject::invokeMethod(root, "setData", Q_ARG(QVariant, ell),
-                              Q_ARG(QVariant, dl),
-                              Q_ARG(QVariant,
-                                    QString("D_l (%1) = l(l+1)C_l / 2\u03c0")
-                                        .arg(name)));
+    QMetaObject::invokeMethod(
+        root, "setData", Q_ARG(QVariant, ell), Q_ARG(QVariant, dl),
+        Q_ARG(QVariant, QString("D_l (%1) = l(l+1)C_l / 2\u03c0").arg(name)));
 }
