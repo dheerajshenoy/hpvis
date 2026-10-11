@@ -51,12 +51,12 @@
 - [ ] Copy view to clipboard
 
 ## UI / App
-- [ ] Close tabs, tab context menu (duplicate, close others)
+- [x] Close tabs, tab context menu (duplicate, close others)
 - [ ] Side-by-side / linked views (synced zoom, rotation, color range)
 - [x] Settings persistence (QSettings: last dir, colormap, window geometry)
-- [ ] Keyboard shortcuts
-- [ ] Wire up Edit and View menus (currently empty)
-- [ ] Fix `~` expansion and relative paths for command-line files
+- [x] Keyboard shortcuts
+- [x] Wire up Edit and View menus (currently empty)
+- [x] Fix `~` expansion and relative paths for command-line files
 - [ ] Packaging (AppImage / Arch PKGBUILD) and README with screenshots
 
 ## Quality
@@ -86,3 +86,12 @@
 - [x] Read-only map info: nside, npix, ordering, coord system, min/max/mean/std
 - [x] Default pixel ordering from FITS header (`ORDERING`) instead of manual choice
 - [ ] Smoothing FWHM spinbox
+
+### Analysis
+- [ ] Power Spectrum Analysis ($C_\ell$ / $D_\ell$)
+The cornerstone of CMB analysis is converting a pixel map into its angular power spectrum to reveal acoustic peaks.
+TT, EE, BB, and TE Spectra: Calculate and plot temperature (TT), E-mode polarization, B-mode polarization, and temperature-polarization cross-spectra.
+Multipole Plotter ($D_\ell$): Display $D_\ell \equiv \frac{\ell(\ell+1)}{2\pi} C_\ell$ as a function of the multipole moment $\ell$.
+Theoretical Model Overlay: Allow users to load or compute theoretical $C_\ell$ curves (e.g., from CAMB or Planck best-fit parameters) to compare directly against their map data.
+
+- [ ] Map-Level & Statistical DiagnosticsTools to inspect the raw properties of the loaded HEALPix map:Pixel Distribution Histogram: A live histogram of pixel values compared against a Gaussian distribution (useful for detecting foreground contamination or non-Gaussianities).High-Order Statistics: Real-time computation of Skewness and Kurtosis to check for asymmetry or heavy tails in the temperature fluctuations.Interactive Cursor Readout: Display coordinates (Galactic $l/b$ or Equatorial RA/Dec) and exact temperature/polarization values ($\mu\text{K}$ or $\text{K}$) instantly as the user hovers over any pixel.
