@@ -67,52 +67,6 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     { emit colormapChanged(static_cast<Colormap>(index)); });
-
-    m_reverseColormapCheck = new QCheckBox("Reverse");
-    addWidget(m_reverseColormapCheck);
-    connect(m_reverseColormapCheck, &QCheckBox::toggled, this,
-            &ViewToolBar::colormapReverseChanged);
-
-    m_colormapScaleCombo = new QComboBox();
-    m_colormapScaleCombo->addItems({"Linear", "Logarithmic"});
-    addLabeled("Scale", m_colormapScaleCombo);
-    connect(m_colormapScaleCombo, &QComboBox::currentIndexChanged, this,
-            [this](int index)
-    {
-        emit colormapScaleChanged(index == 0 ? ColormapScale::LINEAR
-                                             : ColormapScale::LOG);
-    });
-
-    auto makeRangeSpin = []()
-    {
-        auto *spin = new QDoubleSpinBox();
-        spin->setRange(-1e9, 1e9);
-        spin->setDecimals(6);
-        return spin;
-    };
-    m_colormapMinSpin = makeRangeSpin();
-    m_colormapMaxSpin = makeRangeSpin();
-    addLabeled("Min", m_colormapMinSpin);
-    addLabeled("Max", m_colormapMaxSpin);
-    connect(m_colormapMinSpin,
-            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
-            &ViewToolBar::colormapMinChanged);
-    connect(m_colormapMaxSpin,
-            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
-            &ViewToolBar::colormapMaxChanged);
-
-    auto *reset = new QPushButton("Reset Range");
-    addWidget(reset);
-    connect(reset, &QPushButton::clicked, this,
-            &ViewToolBar::colormapRangeResetRequested);
-    addSeparator();
-
-    // --- Graticule ---
-    m_graticuleAction = addAction("Graticule");
-    m_graticuleAction->setCheckable(true);
-    m_graticuleAction->setToolTip("Show the coordinate grid");
-    connect(m_graticuleAction, &QAction::toggled, this,
-            &ViewToolBar::graticuleToggled);
 }
 
 void
@@ -123,42 +77,12 @@ ViewToolBar::setColormap(Colormap colormap)
 }
 
 void
-ViewToolBar::setColormapReverse(bool reverse)
-{
-    QSignalBlocker blocker(m_reverseColormapCheck);
-    m_reverseColormapCheck->setChecked(reverse);
-}
-
-void
-ViewToolBar::setColormapScale(ColormapScale scale)
-{
-    QSignalBlocker blocker(m_colormapScaleCombo);
-    m_colormapScaleCombo->setCurrentIndex(static_cast<int>(scale));
-}
-
-void
-ViewToolBar::setColormapRange(double min, double max)
-{
-    QSignalBlocker minBlock(m_colormapMinSpin);
-    QSignalBlocker maxBlock(m_colormapMaxSpin);
-    m_colormapMinSpin->setValue(min);
-    m_colormapMaxSpin->setValue(max);
-}
-
-void
 ViewToolBar::setProjection(Projection projection)
 {
     QSignalBlocker blocker(m_projectionCombo);
     const int i = m_projectionCombo->findData(static_cast<int>(projection));
     if (i >= 0)
         m_projectionCombo->setCurrentIndex(i);
-}
-
-void
-ViewToolBar::setGraticule(bool enabled)
-{
-    QSignalBlocker blocker(m_graticuleAction);
-    m_graticuleAction->setChecked(enabled);
 }
 
 // Items carry the real (1-based) HDU / column numbers as data

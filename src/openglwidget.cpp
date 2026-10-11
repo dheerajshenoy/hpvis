@@ -110,6 +110,7 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
     m_camera = new MapCamera();
     setMouseTracking(true);
+    setFocusPolicy(Qt::ClickFocus);
     m_cursorPos = QPointF(width() / 2.0, height() / 2.0);
     setCursor(Qt::CrossCursor);
     emitCursorData();
@@ -1253,6 +1254,9 @@ OpenGLWidget::rotationAngles(double &lonDeg, double &latDeg,
 void
 OpenGLWidget::mousePressEvent(QMouseEvent *e)
 {
+    // Take focus from toolbar combos/spinboxes so shortcuts work again
+    setFocus(Qt::MouseFocusReason);
+
     // Region Selection: Shift + Left drag, or the next drag after
     // View > Zoom > Zoom To Region
     if (e->button() == Qt::LeftButton

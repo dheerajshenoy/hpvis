@@ -12,18 +12,18 @@
 #include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
-#include <QDoubleSpinBox>
-#include <QFormLayout>
-#include <QInputDialog>
-#include <QLabel>
-#include <QPushButton>
 #include <QDir>
+#include <QDoubleSpinBox>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFormLayout>
 #include <QGraphicsView>
+#include <QInputDialog>
+#include <QLabel>
 #include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <cmath>
@@ -58,6 +58,8 @@ HpixView::initUI()
     QWidget *widget     = new QWidget();
     widget->setLayout(layout);
 
+    layout->setContentsMargins(0, 0, 0, 0);
+    widget->setContentsMargins(0, 0, 0, 0);
     m_tabWidget = new TabWidget();
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_toolBar   = new ViewToolBar();
@@ -87,9 +89,6 @@ HpixView::initConnections()
             m_view->glWidget()->setProjection(projection);
     });
 
-    connect(m_toolBar, &ViewToolBar::graticuleToggled, this,
-            &HpixView::onGraticuleToggled);
-
     connect(m_toolBar, &ViewToolBar::fitsSelectionChanged, this,
             [this](int hdu, int column)
     {
@@ -109,21 +108,6 @@ HpixView::initConnections()
 
     connect(m_toolBar, &ViewToolBar::colormapChanged, this,
             &HpixView::onColormapChanged);
-
-    connect(m_toolBar, &ViewToolBar::colormapRangeResetRequested, this,
-            &HpixView::onColormapRangeResetRequested);
-
-    connect(m_toolBar, &ViewToolBar::colormapReverseChanged, this,
-            &HpixView::onColormapInvertChanged);
-
-    connect(m_toolBar, &ViewToolBar::colormapScaleChanged, this,
-            &HpixView::onColormapScaleChanged);
-
-    connect(m_toolBar, &ViewToolBar::colormapMaxChanged, this,
-            &HpixView::onColormapMaxChanged);
-
-    connect(m_toolBar, &ViewToolBar::colormapMinChanged, this,
-            &HpixView::onColormapMinChanged);
 
     connect(m_tabWidget, &TabWidget::currentChanged, this,
             &HpixView::onTabChanged);
@@ -148,6 +132,17 @@ HpixView::initMenubar()
 
     m_fileExportAction = m_fileMenu->addAction(
         "&Export", this, &HpixView::onExportActionTriggered);
+
+    m_headerAction = m_fileMenu->addAction("FITS &Header...", this, [this]()
+    {
+        if (!m_view)
+        {
+            QMessageBox::information(this, "FITS Header", "Open a file first.");
+            return;
+        }
+        FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
+        dialog.exec();
+    });
 
     m_fileCloseTabAction = m_fileMenu->addAction("&Close Tab", this, [this]()
     {
@@ -177,10 +172,10 @@ HpixView::initMenubar()
     m_viewMenu->addSeparator();
 
     // Pixel ordering (radio items: Nested / Ring)
-    m_pixelOrderingMenu  = m_viewMenu->addMenu("Pixel &Ordering");
-    auto *orderingGroup  = new QActionGroup(this);
-    m_nestedAction       = m_pixelOrderingMenu->addAction("&Nested");
-    m_ringAction         = m_pixelOrderingMenu->addAction("&Ring");
+    m_pixelOrderingMenu = m_viewMenu->addMenu("Pixel &Ordering");
+    auto *orderingGroup = new QActionGroup(this);
+    m_nestedAction      = m_pixelOrderingMenu->addAction("&Nested");
+    m_ringAction        = m_pixelOrderingMenu->addAction("&Ring");
     for (QAction *a : {m_nestedAction, m_ringAction})
     {
         a->setCheckable(true);
@@ -212,10 +207,13 @@ HpixView::initMenubar()
             onUnseenColorChanged(c);
     });
 
-    // Graticule spacing and color (the on/off toggle is in the toolbar)
-    m_graticuleMenu        = m_viewMenu->addMenu("&Graticule");
-    m_graticuleStepMenu    = m_graticuleMenu->addMenu("&Spacing");
-    auto *stepGroup        = new QActionGroup(this);
+    // Graticule spacing and color
+    m_graticuleMenu       = m_viewMenu->addMenu("&Graticule");
+    m_graticuleShowAction = m_graticuleMenu->addAction(
+        "&Show Graticule", this, &HpixView::onGraticuleToggled);
+    m_graticuleShowAction->setCheckable(true);
+    m_graticuleStepMenu = m_graticuleMenu->addMenu("&Spacing");
+    auto *stepGroup     = new QActionGroup(this);
     for (double deg : {10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0})
     {
         QAction *a = m_graticuleStepMenu->addAction(QString("%1°").arg(deg));
@@ -237,6 +235,30 @@ HpixView::initMenubar()
         if (c.isValid())
             m_view->glWidget()->setGraticuleColor(c);
     });
+
+    m_reverseColormapAction = m_viewMenu->addAction(
+        "Re&verse Colormap", this, &HpixView::onColormapInvertChanged);
+    m_reverseColormapAction->setCheckable(true);
+
+    QMenu *scaleMenu    = m_viewMenu->addMenu("Color S&cale");
+    auto *scaleGroup    = new QActionGroup(this);
+    m_scaleLinearAction = scaleMenu->addAction("&Linear");
+    m_scaleLogAction    = scaleMenu->addAction("L&ogarithmic");
+    for (QAction *a : {m_scaleLinearAction, m_scaleLogAction})
+    {
+        a->setCheckable(true);
+        scaleGroup->addAction(a);
+    }
+    m_scaleLinearAction->setChecked(true);
+    connect(m_scaleLinearAction, &QAction::triggered, this,
+            [this]() { onColormapScaleChanged(ColormapScale::LINEAR); });
+    connect(m_scaleLogAction, &QAction::triggered, this,
+            [this]() { onColormapScaleChanged(ColormapScale::LOG); });
+
+    m_viewMenu->addAction("Color Bar &Range...", this,
+                          &HpixView::onColormapRangeActionTriggered);
+    m_viewMenu->addAction("Reset Color Bar Ran&ge", this,
+                          &HpixView::onColormapRangeResetRequested);
 
     m_viewMenu->addAction("Set &Rotation...", this,
                           &HpixView::onRotationActionTriggered);
@@ -297,18 +319,6 @@ HpixView::initMenubar()
 
     m_toolsSettingsAction = m_toolsMenu->addAction(
         "&Settings", this, &HpixView::onSettingsActionTriggered);
-
-    // A plain button in the menu bar (no drop-down)
-    m_headerAction = menuBar->addAction("&Header", this, [this]()
-    {
-        if (!m_view)
-        {
-            QMessageBox::information(this, "FITS Header", "Open a file first.");
-            return;
-        }
-        FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
-        dialog.exec();
-    });
 
     auto helpMenu = menuBar->addMenu("&Help");
 
@@ -441,15 +451,7 @@ HpixView::initViewConnections(const View *view)
         // Show what is really loaded (the previous selection after an error)
         if (view == m_view)
             m_toolBar->setFitsInfo(view->fitsInfo(), view->hdu(),
-                                     view->column());
-    });
-
-    // Mask load/clear/toggle changes the implicit colormap range
-    connect(view, &View::colormapRangeChanged, this,
-            [this, view](float min, float max)
-    {
-        if (view == m_view)
-            m_toolBar->setColormapRange(min, max);
+                                   view->column());
     });
 
     connect(view, &View::masksChanged, this, [this, view]()
@@ -468,10 +470,11 @@ HpixView::updateControlsFromView(const View *view)
     const OpenGLWidget *gl = view->glWidget();
     m_toolBar->setFitsInfo(view->fitsInfo(), view->hdu(), view->column());
     m_toolBar->setProjection(gl->projection());
-    m_toolBar->setColormapRange(gl->colormapMin(), gl->colormapMax());
-    m_toolBar->setColormapScale(gl->colormapScale());
-    m_toolBar->setGraticule(gl->graticuleEnabled());
-    m_toolBar->setColormapReverse(gl->colormapInvert());
+    (gl->colormapScale() == ColormapScale::LINEAR ? m_scaleLinearAction
+                                                  : m_scaleLogAction)
+        ->setChecked(true);
+    m_graticuleShowAction->setChecked(gl->graticuleEnabled());
+    m_reverseColormapAction->setChecked(gl->colormapInvert());
     m_toolBar->setColormap(gl->colormap());
 
     (gl->pixelOrdering() == PixelOrdering::NESTED ? m_nestedAction
@@ -532,8 +535,8 @@ HpixView::rebuildMasksMenu(const View *view)
     });
     add->setEnabled(gl);
 
-    QAction *clear = m_masksMenu->addAction("&Clear All", this,
-                                            &HpixView::onMaskCleared);
+    QAction *clear
+        = m_masksMenu->addAction("&Clear All", this, &HpixView::onMaskCleared);
     clear->setEnabled(gl && gl->maskCount() > 0);
 
     if (!gl || gl->maskCount() == 0)
@@ -588,14 +591,16 @@ HpixView::rebuildMasksMenu(const View *view)
         });
     }
 
-    QAction *strength = m_masksMenu->addAction("Dim &Strength...", this, [this]()
+    QAction *strength
+        = m_masksMenu->addAction("Dim &Strength...", this, [this]()
     {
         if (!m_view)
             return;
-        bool ok = false;
+        bool ok     = false;
         const int v = QInputDialog::getInt(
-            this, "Dim Strength", "Strength (%):",
-            qRound(m_view->glWidget()->maskOpacity() * 100.0f), 0, 100, 1, &ok);
+            this, "Dim Strength",
+            "Strength (%):", qRound(m_view->glWidget()->maskOpacity() * 100.0f),
+            0, 100, 1, &ok);
         if (ok)
             m_view->glWidget()->setMaskOpacity(v / 100.0f);
     });
@@ -673,11 +678,7 @@ void
 HpixView::onColormapRangeResetRequested()
 {
     if (m_view)
-    {
         m_view->glWidget()->resetColormapRange();
-        m_toolBar->setColormapRange(m_view->glWidget()->colormapMin(),
-                                    m_view->glWidget()->colormapMax());
-    }
 }
 
 void
@@ -859,7 +860,7 @@ HpixView::onPowerSpectrumActionTriggered()
 {
     if (!m_view)
         return;
-    OpenGLWidget *gl = m_view->glWidget();
+    OpenGLWidget *gl              = m_view->glWidget();
     const Healpix_Map<float> *map = gl->healpixMap();
     if (!map)
         return;
@@ -868,7 +869,7 @@ HpixView::onPowerSpectrumActionTriggered()
     input.path = m_view->filePath();
     input.hdu  = m_view->hdu();
     // A copy keeps the worker safe if the map is replaced meanwhile
-    input.map = std::make_shared<Healpix_Map<float>>(*map);
+    input.map  = std::make_shared<Healpix_Map<float>>(*map);
     for (int i = 0; i < gl->maskCount(); ++i)
         input.maskActive |= gl->maskEnabled(i);
 
@@ -896,7 +897,10 @@ HpixView::onStatisticsActionTriggered()
         label->setTextInteractionFlags(Qt::TextSelectableByMouse);
         layout->addRow(name, label);
     };
-    auto num = [](double v) { return QString::number(v, 'g', 6); };
+    auto num = [](double v)
+    {
+        return QString::number(v, 'g', 6);
+    };
 
     add("Nside:", QString::number(gl->healpixMap()->Nside()));
     add("Npix:", QString::number(gl->healpixMap()->Npix()));
@@ -964,6 +968,50 @@ HpixView::onRotationActionTriggered()
         lonSpin->setValue(a);
         latSpin->setValue(b);
         rollSpin->setValue(c);
+    });
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addRow(buttons);
+    dialog.exec();
+}
+
+void
+HpixView::onColormapRangeActionTriggered()
+{
+    if (!m_view)
+        return;
+    OpenGLWidget *gl = m_view->glWidget();
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("Color Bar Range");
+    auto *layout = new QFormLayout(&dialog);
+
+    auto makeSpin = [](double value)
+    {
+        auto *spin = new QDoubleSpinBox();
+        spin->setRange(-1e9, 1e9);
+        spin->setDecimals(6);
+        spin->setValue(value);
+        return spin;
+    };
+    auto *minSpin = makeSpin(gl->colormapMin());
+    auto *maxSpin = makeSpin(gl->colormapMax());
+    layout->addRow("Min:", minSpin);
+    layout->addRow("Max:", maxSpin);
+
+    // Applied live
+    connect(minSpin, &QDoubleSpinBox::valueChanged, &dialog,
+            [gl](double v) { gl->setColormapMin(v); });
+    connect(maxSpin, &QDoubleSpinBox::valueChanged, &dialog,
+            [gl](double v) { gl->setColormapMax(v); });
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+    auto *reset   = buttons->addButton("Reset", QDialogButtonBox::ResetRole);
+    connect(reset, &QPushButton::clicked, &dialog, [=]()
+    {
+        gl->resetColormapRange();
+        QSignalBlocker b1(minSpin), b2(maxSpin);
+        minSpin->setValue(gl->colormapMin());
+        maxSpin->setValue(gl->colormapMax());
     });
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addRow(buttons);
