@@ -7,7 +7,8 @@ shader, so large maps (nside 2048 and above) stay responsive.
 ## Features
 
 - Five projections: Mollweide, Plate Carrée, Orthographic, Azimuthal
-  equidistant and Gnomonic, with interactive sky rotation.
+  equidistant and Gnomonic, with interactive sky rotation, seen from the
+  inside (the sky) or the outside (like a globe).
 - RING and NESTED pixel ordering.
 - 15 colormaps plus your own (CSV or JSON), linear and logarithmic scales, an adjustable color range and a
   color bar.
@@ -57,6 +58,7 @@ hpvis [options] [FILE...]
 | `-s, --scale linear\|log` | Color scale |
 | `--min V`, `--max V` | Color range |
 | `-p, --projection P` | `mollweide`, `plate_carree`, `orthographic`, `azimuthal_equidistant`, `gnomonic` |
+| `--view inside\|outside` | Perspective: the sky seen from the inside (longitude increases to the left, the default) or from the outside like a globe (mirrored) |
 | `-g, --graticule` | Show the coordinate grid |
 | `--mask FILE` | Apply a mask (repeatable) |
 | `-e, --export FILE` | Save the view as an image and exit |

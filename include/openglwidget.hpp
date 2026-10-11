@@ -210,6 +210,13 @@ public:
     void setGraticuleEnabled(bool enabled);
     void setGraticuleStep(double degrees);
     void setGlobeShadow(bool enabled);
+    // false: the sky seen from the inside (longitude increases to the left);
+    // true: seen from the outside like a globe (the mirror image)
+    void setViewFromOutside(bool outside);
+    bool viewFromOutside() const
+    {
+        return m_viewOutside;
+    }
     // Orthographic: inertia after a drag and a glide on reset
     void setAnimateGlobe(bool enabled);
     bool animateGlobe() const
@@ -356,6 +363,7 @@ private:
     bool m_minimapEnabled               = false;
     bool m_graticuleEnabled             = false;
     bool m_globeShadow                  = true;
+    bool m_viewOutside                  = false;
     bool m_limbDarkening                = true;
     double m_graticuleStepDeg           = 30.0;
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);

@@ -42,6 +42,7 @@ private:
         std::optional<Colormap> colormap;
         std::optional<ColormapScale> scale;
         std::optional<Projection> projection;
+        std::optional<bool> viewFromOutside;
         std::optional<double> min, max;
         bool reverse   = false;
         bool graticule = false;
@@ -109,6 +110,9 @@ private:
     QAction *m_viewMinimapAction   = nullptr;
     QAction *m_headerAction        = nullptr;
     QAction *m_viewColorBarAction  = nullptr;
+    QMenu *m_perspectiveMenu       = nullptr;
+    QAction *m_insideAction        = nullptr;
+    QAction *m_outsideAction       = nullptr;
     QMenu *m_pixelOrderingMenu     = nullptr;
     QAction *m_nestedAction        = nullptr;
     QAction *m_ringAction          = nullptr;

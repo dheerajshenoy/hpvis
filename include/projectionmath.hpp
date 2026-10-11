@@ -14,17 +14,24 @@ namespace projectionmath
 double
 aspect(Projection projection);
 
+// All the functions below take `fromOutside`: false is the sky seen from the
+// inside (longitude increasing to the left, as in healpy), true is the mirror
+// image, seen from the outside like a globe (longitude increasing to the
+// right).
+
 // Plane point -> sky (colatitude, longitude in [0, 2pi)). False when the
 // point is outside the projection's shape.
 bool
-inverse(Projection projection, QVector2D plane, double &colat, double &phi);
+inverse(Projection projection, QVector2D plane, double &colat, double &phi,
+        bool fromOutside = false);
 
 // Sky (latitude, longitude, both radians) -> plane point. False when the
 // point is not shown (the far side of the globe).
 bool
-forward(Projection projection, double lat, double lon, QVector2D &plane);
+forward(Projection projection, double lat, double lon, QVector2D &plane,
+        bool fromOutside = false);
 
 // A meridian that is visible in the projection, where latitude labels go
 double
-labelMeridian(Projection projection);
+labelMeridian(Projection projection, bool fromOutside = false);
 } // namespace projectionmath

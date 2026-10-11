@@ -91,6 +91,9 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
             m_cli.projection = Projection(i);
     }
 
+    if (auto view = parser.present<std::string>("--view"))
+        m_cli.viewFromOutside = (*view == "outside");
+
     m_cli.min       = parser.present<double>("--min");
     m_cli.max       = parser.present<double>("--max");
     m_cli.reverse   = parser.get<bool>("--reverse");
@@ -129,6 +132,8 @@ HpVis::applyCliOptions(View *view)
         gl->setColormapScale(*m_cli.scale);
     if (m_cli.projection)
         gl->setProjection(*m_cli.projection);
+    if (m_cli.viewFromOutside)
+        gl->setViewFromOutside(*m_cli.viewFromOutside);
     if (m_cli.graticule)
         gl->setGraticuleEnabled(true);
     if (m_cli.min)
@@ -277,6 +282,32 @@ HpVis::initMenubar()
     m_viewColorBarAction->setChecked(true);
 
     m_viewMenu->addSeparator();
+
+    // Perspective (radio items: Inside / Outside)
+    m_perspectiveMenu = m_viewMenu->addMenu("&Perspective");
+    auto *perspectiveGroup = new QActionGroup(this);
+    m_insideAction  = m_perspectiveMenu->addAction("&Inside (sky)");
+    m_outsideAction = m_perspectiveMenu->addAction("&Outside (globe)");
+    m_insideAction->setStatusTip(
+        "The sky seen from the center: longitude increases to the left");
+    m_outsideAction->setStatusTip(
+        "The mirror image, like a globe: longitude increases to the right");
+    for (QAction *a : {m_insideAction, m_outsideAction})
+    {
+        a->setCheckable(true);
+        perspectiveGroup->addAction(a);
+    }
+    m_insideAction->setChecked(true);
+    connect(m_insideAction, &QAction::triggered, this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->setViewFromOutside(false);
+    });
+    connect(m_outsideAction, &QAction::triggered, this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->setViewFromOutside(true);
+    });
 
     // Pixel ordering (radio items: Nested / Ring)
     m_pixelOrderingMenu = m_viewMenu->addMenu("Pixel &Ordering");
@@ -605,6 +636,8 @@ HpVis::updateControlsFromView(const View *view)
     m_reverseColormapAction->setChecked(gl->colormapInvert());
     m_toolBar->setColormap(gl->colormap());
 
+    (gl->viewFromOutside() ? m_outsideAction : m_insideAction)
+        ->setChecked(true);
     (gl->pixelOrdering() == PixelOrdering::NESTED ? m_nestedAction
                                                   : m_ringAction)
         ->setChecked(true);
@@ -939,6 +972,9 @@ HpVis::applySavedSettings()
         if (s.animateOrthoGlobe != previous.animateOrthoGlobe)
             gl->setAnimateGlobe(s.animateOrthoGlobe);
 
+        if (s.viewFromOutside != previous.viewFromOutside)
+            gl->setViewFromOutside(s.viewFromOutside);
+
         if (s.projection != previous.projection)
             gl->setProjection(s.projection);
 
@@ -1003,6 +1039,7 @@ HpVis::applyDefaults(View *view)
     gl->setGlobeShadow(m_settings.globeShadow);
     gl->setLimbDarkening(m_settings.limbDarkening);
     gl->setProjection(m_settings.projection);
+    gl->setViewFromOutside(m_settings.viewFromOutside);
     gl->setAnimateGlobe(m_settings.animateOrthoGlobe);
     gl->setGraticuleColor(m_settings.graticuleColor);
     gl->setMaskMode(m_settings.maskMode);

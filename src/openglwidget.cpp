@@ -493,6 +493,7 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
     m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
     m_shaderProgram.setUniformValue("globe_shadow", m_globeShadow);
+    m_shaderProgram.setUniformValue("view_outside", m_viewOutside);
     m_shaderProgram.setUniformValue("limb_darkening", m_limbDarkening);
     m_shaderProgram.setUniformValue(
         "graticule_step", float(qDegreesToRadians(m_graticuleStepDeg)));
@@ -1055,7 +1056,7 @@ OpenGLWidget::emitCursorData()
     const QVector2D p   = ndc / m_camera->zoom + m_camera->panOffset;
     double colat, phi;
     if (m_nside <= 0 || m_pendingMap.Npix() == 0
-        || !projectionmath::inverse(m_projection, p, colat, phi))
+        || !projectionmath::inverse(m_projection, p, colat, phi, m_viewOutside))
     {
         emit cursorPosChanged(QPointF(), QPointF(), std::nan(""), -1);
         return;
@@ -1197,7 +1198,7 @@ OpenGLWidget::viewDirectionAt(const QPointF &pos, QVector3D &dir) const
 {
     const QVector2D p = toNdc(pos) / m_camera->zoom + m_camera->panOffset;
     double colat, phi;
-    if (!projectionmath::inverse(m_projection, p, colat, phi))
+    if (!projectionmath::inverse(m_projection, p, colat, phi, m_viewOutside))
         return false;
     dir = directionFromAngles(colat, phi);
     return true;
@@ -1239,10 +1240,11 @@ OpenGLWidget::updateRotation(const QPointF &pos)
 
         double colat, phi;
         if (!projectionmath::inverse(m_projection, p * (0.9999f / r), colat,
-                                     phi))
+                                     phi, m_viewOutside))
             return;
         const QVector3D limb = directionFromAngles(colat, phi); // on the edge
-        if (!projectionmath::inverse(m_projection, QVector2D(0, 0), colat, phi))
+        if (!projectionmath::inverse(m_projection, QVector2D(0, 0), colat, phi,
+                                     m_viewOutside))
             return;
         const QVector3D front = directionFromAngles(colat, phi); // disc center
 
@@ -1661,6 +1663,16 @@ OpenGLWidget::setGraticuleEnabled(bool enabled)
 }
 
 void
+OpenGLWidget::setViewFromOutside(bool outside)
+{
+    if (m_viewOutside == outside)
+        return;
+    m_viewOutside = outside;
+    emitCursorData();
+    update();
+}
+
+void
 OpenGLWidget::setGlobeShadow(bool enabled)
 {
     m_globeShadow = enabled;
@@ -1693,7 +1705,8 @@ OpenGLWidget::projectToWindow(double lat, double lon, QPointF &out) const
                         colat, phi);
 
     QVector2D plane;
-    if (!projectionmath::forward(m_projection, M_PI / 2.0 - colat, phi, plane))
+    if (!projectionmath::forward(m_projection, M_PI / 2.0 - colat, phi, plane,
+                                     m_viewOutside))
         return false;
 
     // Inverse of the camera and of toNdc()
@@ -1736,7 +1749,7 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
                  false);
     }
     // Latitudes along a visible meridian near the left side of the picture
-    const double meridian = projectionmath::labelMeridian(m_projection);
+    const double meridian = projectionmath::labelMeridian(m_projection, m_viewOutside);
     for (double lat = -M_PI / 2 + step; lat < M_PI / 2 - 1e-9; lat += step)
     {
         const double deg = std::round(qRadiansToDegrees(lat) * 100.0) / 100.0;

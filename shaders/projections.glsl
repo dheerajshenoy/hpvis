@@ -131,6 +131,10 @@ bool inverseProjection(
     out float colat,
     out float phi
 ) {
+    // The outside view is the inside one mirrored left-right
+    if (view_outside)
+        uv.x = 1.0 - uv.x; // uv is in [0, 1], centered on 0.5
+
     if (projection_type == PROJ_MOLLWEIDE)
         return inverseMollweide(uv, colat, phi);
 

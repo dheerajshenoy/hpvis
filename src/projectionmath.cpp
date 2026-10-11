@@ -41,9 +41,11 @@ aspect(Projection projection)
 }
 
 bool
-inverse(Projection projection, QVector2D plane, double &colat, double &phi)
+inverse(Projection projection, QVector2D plane, double &colat, double &phi,
+        bool fromOutside)
 {
-    const double px = plane.x(), py = plane.y();
+    // The outside view is the inside one mirrored left-right
+    const double px = fromOutside ? -plane.x() : plane.x(), py = plane.y();
 
     switch (projection)
     {
@@ -107,8 +109,9 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi)
     return false;
 }
 
-bool
-forward(Projection projection, double lat, double lon, QVector2D &plane)
+static bool
+forwardInside(Projection projection, double lat, double lon,
+              QVector2D &plane)
 {
     switch (projection)
     {
@@ -164,8 +167,29 @@ forward(Projection projection, double lat, double lon, QVector2D &plane)
     return false;
 }
 
+bool
+forward(Projection projection, double lat, double lon, QVector2D &plane,
+        bool fromOutside)
+{
+    if (!forwardInside(projection, lat, lon, plane))
+        return false;
+    if (fromOutside)
+        plane.setX(-plane.x());
+    return true;
+}
+
+static double labelMeridianInside(Projection projection);
+
 double
-labelMeridian(Projection projection)
+labelMeridian(Projection projection, bool fromOutside)
+{
+    // Mirroring the picture is the same as flipping the sign of longitude
+    const double m = labelMeridianInside(projection);
+    return fromOutside ? -m : m;
+}
+
+static double
+labelMeridianInside(Projection projection)
 {
     switch (projection)
     {

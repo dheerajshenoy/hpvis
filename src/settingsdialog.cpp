@@ -45,7 +45,7 @@ SettingsDialog::initUI()
     m_pageKeywords = {
         "general files recent history list folder directory remember last "
         "interface toolbar status bar show hide",
-        "appearance new maps defaults projection mollweide orthographic "
+        "appearance new maps defaults projection perspective inside outside sky globe mirror mollweide orthographic "
         "colormap animate "
         "color scale linear log reverse background unseen globe shadow limb "
         "darkening",
@@ -121,6 +121,7 @@ SettingsDialog::initConnections()
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_projectionCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_perspectiveCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_maskModeCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_maskOpacitySlider, &QSlider::valueChanged, this, changed);
     connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
@@ -208,6 +209,7 @@ SettingsDialog::currentSettings() const
     a.showToolbar        = m_showToolbarCheck->isChecked();
     a.showStatusBar      = m_showStatusBarCheck->isChecked();
     a.projection         = Projection(m_projectionCombo->currentIndex());
+    a.viewFromOutside    = m_perspectiveCombo->currentIndex() == 1;
     a.graticuleColor     = m_graticuleColor;
     a.maskMode           = m_maskModeCombo->currentIndex();
     a.maskOpacityPercent = m_maskOpacitySlider->value();
@@ -249,6 +251,7 @@ SettingsDialog::loadSettings()
     m_showToolbarCheck->setChecked(a.showToolbar);
     m_showStatusBarCheck->setChecked(a.showStatusBar);
     m_projectionCombo->setCurrentIndex(int(a.projection));
+    m_perspectiveCombo->setCurrentIndex(a.viewFromOutside ? 1 : 0);
     m_graticuleColor = a.graticuleColor;
     setColorButton(m_graticuleColorButton, m_graticuleColor);
     m_maskModeCombo->setCurrentIndex(a.maskMode);
@@ -357,6 +360,14 @@ SettingsDialog::createAppearanceSettingsPage()
                                  "Orthographic", "Azimuthal Equidistant",
                                  "Gnomonic"});
     projForm->addRow("Default projection:", m_projectionCombo);
+
+    m_perspectiveCombo = new QComboBox();
+    m_perspectiveCombo->addItems({"Inside (sky)", "Outside (globe)"});
+    m_perspectiveCombo->setToolTip(
+        "Inside: the sky seen from the center, longitude increasing to the "
+        "left.\nOutside: the mirror image, like a globe, longitude "
+        "increasing to the right.");
+    projForm->addRow("Perspective:", m_perspectiveCombo);
     outer->addWidget(projBox);
 
     // --- Color ---

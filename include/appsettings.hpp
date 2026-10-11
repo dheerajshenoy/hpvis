@@ -21,6 +21,7 @@ struct AppSettings
     ColormapScale scale    = ColormapScale::LINEAR;
     QColor background      = QColor(10, 10, 15);
     QColor unseen          = QColor(0, 0, 0);
+    bool viewFromOutside   = false; // false: sky seen from the inside
     Projection projection  = Projection::MOLLWEIDE;
     QColor graticuleColor  = QColor(255, 255, 255);
     int maskMode           = 0;  // 0 = hide, 1 = dim

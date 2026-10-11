@@ -21,6 +21,9 @@ AppSettings::load()
     a.showStatusBar
         = s.value("general/showStatusBar", d.showStatusBar).toBool();
 
+    a.viewFromOutside
+        = s.value("view/fromOutside", d.viewFromOutside).toBool();
+
     const int pj = s.value("view/projection", int(d.projection)).toInt();
     a.projection = (pj >= 0 && pj <= int(Projection::GNOMONIC)) ? Projection(pj)
                                                                 : d.projection;
@@ -75,6 +78,7 @@ AppSettings::save() const
     s.setValue("general/showStatusBar", showStatusBar);
 
     s.setValue("view/projection", int(projection));
+    s.setValue("view/fromOutside", viewFromOutside);
     s.setValue("view/graticuleColor", graticuleColor.name());
     s.setValue("view/maskMode", maskMode);
     s.setValue("view/maskOpacity", maskOpacityPercent);

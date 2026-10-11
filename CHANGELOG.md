@@ -52,6 +52,11 @@ First development release.
   Center latitude / Roll boxes that apply live and can be typed into, and
   View > Reset Rotation restores the orientation. The cursor readout and
   graticule labels follow the rotation.
+- Perspective: every projection can be drawn as the sky seen from the inside
+  (longitude increasing to the left, the default) or from the outside like a
+  globe (the mirror image). Switch it in View > Perspective, set the default in
+  Settings > Appearance, or use `--view inside|outside`. The cursor readout,
+  dragging, zoom to region, minimap and graticule labels follow it.
 - Orthographic globe animation (Settings > Appearance, on by default): a drag
   that ends while the globe is still moving lets it keep spinning and slow down
   with friction (any click stops it), and Reset View, Reset Rotation and

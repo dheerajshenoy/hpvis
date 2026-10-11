@@ -52,6 +52,12 @@ addArguments(argparse::ArgumentParser &parser)
         .help("Projection: mollweide, plate_carree, orthographic, "
               "azimuthal_equidistant or gnomonic");
 
+    parser.add_argument("--view")
+        .choices("inside", "outside")
+        .metavar("VIEW")
+        .help("Perspective: inside (the sky, longitude to the left) or "
+              "outside (like a globe, mirrored)");
+
     parser.add_argument("-g", "--graticule")
         .flag()
         .help("Show the coordinate grid");
