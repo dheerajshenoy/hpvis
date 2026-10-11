@@ -1,6 +1,7 @@
 # TODO
 
 ## Rendering
+- [ ] Tiled rendering for large maps (nside > 2048)
 - [ ] Check shader compile errors (`addShaderFromSourceCode` return values) and show them in a dialog
 - [ ] Smooth/bilinear interpolation option
 - [x] Integer uniforms / 2D index math for nside > 1024 (float precision)
