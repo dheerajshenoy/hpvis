@@ -936,6 +936,9 @@ HpVis::applySavedSettings()
         if (s.limbDarkening != previous.limbDarkening)
             gl->setLimbDarkening(s.limbDarkening);
 
+        if (s.animateOrthoGlobe != previous.animateOrthoGlobe)
+            gl->setAnimateGlobe(s.animateOrthoGlobe);
+
         if (s.projection != previous.projection)
             gl->setProjection(s.projection);
 
@@ -1000,6 +1003,7 @@ HpVis::applyDefaults(View *view)
     gl->setGlobeShadow(m_settings.globeShadow);
     gl->setLimbDarkening(m_settings.limbDarkening);
     gl->setProjection(m_settings.projection);
+    gl->setAnimateGlobe(m_settings.animateOrthoGlobe);
     gl->setGraticuleColor(m_settings.graticuleColor);
     gl->setMaskMode(m_settings.maskMode);
     gl->setMaskOpacity(m_settings.maskOpacityPercent / 100.0f);

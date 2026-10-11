@@ -400,7 +400,7 @@ SettingsDialog::createAppearanceSettingsPage()
 
     auto *animationBox  = new QGroupBox("Animation");
     auto *animationForm = new QFormLayout(animationBox);
-    m_animateCheck      = new QCheckBox("Enable Ortho Sphere Animation");
+    m_animateCheck      = new QCheckBox("Orthographic globe: spin after dragging, glide on reset");
     animationForm->addRow(m_animateCheck);
 
     outer->addWidget(orthoBox);

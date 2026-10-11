@@ -52,6 +52,10 @@ First development release.
   Center latitude / Roll boxes that apply live and can be typed into, and
   View > Reset Rotation restores the orientation. The cursor readout and
   graticule labels follow the rotation.
+- Orthographic globe animation (Settings > Appearance, on by default): a drag
+  that ends while the globe is still moving lets it keep spinning and slow down
+  with friction (any click stops it), and Reset View, Reset Rotation and
+  double-click glide back to the default orientation instead of jumping.
 - Mouse wheel zoom, left-drag pan, double-click to reset the view.
 - Touchpad support: pinch to zoom, two-finger scroll to pan, Ctrl+scroll to
   zoom, smart-zoom gesture to reset.

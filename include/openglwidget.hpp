@@ -11,7 +11,9 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
+#include <QElapsedTimer>
 #include <QQuaternion>
+#include <QTimer>
 #include <array>
 #include <cstdint>
 #include <healpix_map.h>
@@ -208,6 +210,12 @@ public:
     void setGraticuleEnabled(bool enabled);
     void setGraticuleStep(double degrees);
     void setGlobeShadow(bool enabled);
+    // Orthographic: inertia after a drag and a glide on reset
+    void setAnimateGlobe(bool enabled);
+    bool animateGlobe() const
+    {
+        return m_animateGlobe;
+    }
     void setLimbDarkening(bool enabled);
     bool graticuleEnabled() const
     {
@@ -276,6 +284,10 @@ private:
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
+    bool globeAnimates() const;
+    void stopGlobeAnimation();
+    void rotateTo(const QQuaternion &target);
+    void tickGlobeAnimation();
     void uploadColormapLut();
     void recomputeDataRange();
     void applyMaskChange(bool texturesChanged);
@@ -352,4 +364,16 @@ private:
     QVector3D m_rotateGrab; // view-frame direction grabbed at drag start
     QQuaternion m_rotation;      // current rotation quaternion for 3D view
     QQuaternion m_rotationStart; // rotation at the start of a drag
+
+    // Globe animation. Spin: the drag's angular velocity (deg/s, around an
+    // axis in the globe's own frame) decays with friction after release.
+    // Glide: eases from m_glideFrom to m_glideTo.
+    enum class GlobeAnim { None, Spin, Glide };
+    bool m_animateGlobe = true;
+    GlobeAnim m_globeAnim = GlobeAnim::None;
+    QTimer m_globeTimer;
+    QElapsedTimer m_globeClock;      // frame time while animating
+    QElapsedTimer m_dragClock;       // time between drag moves
+    QVector3D m_spinVelocity;        // axis * deg/s
+    QQuaternion m_glideFrom, m_glideTo;
 };

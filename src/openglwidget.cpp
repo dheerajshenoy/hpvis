@@ -113,6 +113,9 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
     m_camera = new MapCamera();
     setMouseTracking(true);
     setFocusPolicy(Qt::ClickFocus);
+    m_globeTimer.setInterval(16);
+    connect(&m_globeTimer, &QTimer::timeout, this,
+            &OpenGLWidget::tickGlobeAnimation);
     connect(&ColormapRegistry::instance(), &ColormapRegistry::changed, this,
             [this]()
     {
@@ -1206,9 +1209,12 @@ OpenGLWidget::startRotation(const QPointF &pos)
 {
     if (!viewDirectionAt(pos, m_rotateGrab))
         return false;
+    stopGlobeAnimation();
+    m_dragClock.invalidate();
     m_isRotating    = true;
     m_rotationStart = m_rotation;
     setCursor(Qt::ClosedHandCursor);
+    m_dragClock.start();
     return true;
 }
 
@@ -1247,8 +1253,99 @@ OpenGLWidget::updateRotation(const QPointF &pos)
         v1 = limb * std::sin(theta) + front * std::cos(theta);
     }
 
+    const QQuaternion previous = m_rotation;
     setRotation((m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
                     .normalized());
+
+    // Angular velocity of this step (in the globe's own frame), smoothed
+    if (globeAnimates() && m_dragClock.isValid())
+    {
+        const double dt = m_dragClock.nsecsElapsed() * 1e-9;
+        if (dt > 1e-4)
+        {
+            QVector3D axis;
+            float angle;
+            (previous.inverted() * m_rotation).getAxisAndAngle(&axis, &angle);
+            if (angle > 180.0f) // shortest way round
+                angle -= 360.0f;
+            const QVector3D v = axis * float(angle / dt);
+            m_spinVelocity    = 0.5f * m_spinVelocity + 0.5f * v;
+        }
+    }
+    m_dragClock.restart();
+}
+
+bool
+OpenGLWidget::globeAnimates() const
+{
+    return m_animateGlobe && m_projection == Projection::ORTHOGRAPHIC;
+}
+
+void
+OpenGLWidget::setAnimateGlobe(bool enabled)
+{
+    m_animateGlobe = enabled;
+    if (!enabled)
+        stopGlobeAnimation();
+}
+
+void
+OpenGLWidget::stopGlobeAnimation()
+{
+    m_globeTimer.stop();
+    m_globeAnim    = GlobeAnim::None;
+    m_spinVelocity = QVector3D();
+}
+
+// Eases to `target`, or jumps there when animation is off
+void
+OpenGLWidget::rotateTo(const QQuaternion &target)
+{
+    stopGlobeAnimation();
+    if (!globeAnimates())
+    {
+        setRotation(target);
+        return;
+    }
+    m_glideFrom    = m_rotation;
+    m_glideTo      = target;
+    m_globeAnim    = GlobeAnim::Glide;
+    m_globeClock.start();
+    m_globeTimer.start();
+}
+
+void
+OpenGLWidget::tickGlobeAnimation()
+{
+    if (m_globeAnim == GlobeAnim::Glide)
+    {
+        constexpr double kDurationMs = 450.0;
+        const double t = std::min(1.0, m_globeClock.elapsed() / kDurationMs);
+        const float e  = float(1.0 - std::pow(1.0 - t, 3.0)); // ease out
+        setRotation(QQuaternion::slerp(m_glideFrom, m_glideTo, e).normalized());
+        if (t >= 1.0)
+            stopGlobeAnimation();
+        return;
+    }
+
+    if (m_globeAnim == GlobeAnim::Spin)
+    {
+        const double dt = std::min(0.05, m_globeClock.nsecsElapsed() * 1e-9);
+        m_globeClock.restart();
+
+        constexpr float kFriction = 3.0f; // 1/s: the speed falls by e per 1/3 s
+        m_spinVelocity *= float(std::exp(-kFriction * dt));
+        const float speed = m_spinVelocity.length(); // deg/s
+        if (speed < 4.0f)
+        {
+            stopGlobeAnimation();
+            return;
+        }
+        setRotation((m_rotation
+                     * QQuaternion::fromAxisAndAngle(m_spinVelocity / speed,
+                                                     float(speed * dt)))
+                        .normalized());
+    }
 }
 
 void
@@ -1263,12 +1360,13 @@ OpenGLWidget::setRotation(const QQuaternion &rotation)
 void
 OpenGLWidget::resetRotation()
 {
-    setRotation(QQuaternion());
+    rotateTo(QQuaternion());
 }
 
 void
 OpenGLWidget::setRotationAngles(double lonDeg, double latDeg, double rollDeg)
 {
+    stopGlobeAnimation();
     const QQuaternion rz
         = QQuaternion::fromAxisAndAngle(0, 0, 1, float(lonDeg));
     const QQuaternion ry
@@ -1305,6 +1403,7 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
 {
     // Take focus from toolbar combos/spinboxes so shortcuts work again
     setFocus(Qt::MouseFocusReason);
+    stopGlobeAnimation();
 
     // Region Selection: Shift + Left drag, or the next drag after
     // View > Zoom > Zoom To Region
@@ -1409,6 +1508,19 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
     {
         m_isRotating = false;
         setCursor(Qt::CrossCursor);
+
+        // Throw: keep spinning when released while still moving
+        const bool moving = m_dragClock.isValid()
+                            && m_dragClock.elapsed() < 60
+                            && m_spinVelocity.length() > 15.0f;
+        if (globeAnimates() && moving)
+        {
+            m_globeAnim = GlobeAnim::Spin;
+            m_globeClock.start();
+            m_globeTimer.start();
+        }
+        else
+            m_spinVelocity = QVector3D();
         return;
     }
 
@@ -1430,7 +1542,7 @@ OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
     if (e->button() == Qt::LeftButton)
     {
         m_camera->reset();
-        setRotation(QQuaternion());
+        rotateTo(QQuaternion());
         emit zoomChanged(m_camera->zoom);
         emitCursorData();
         update();
@@ -1497,7 +1609,7 @@ void
 OpenGLWidget::resetView()
 {
     m_camera->reset();
-    setRotation(QQuaternion());
+    rotateTo(QQuaternion());
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
     update();
@@ -1644,5 +1756,7 @@ void
 OpenGLWidget::setProjection(Projection projection)
 {
     m_projection = projection;
+    if (!globeAnimates())
+        stopGlobeAnimation();
     update();
 }
