@@ -72,6 +72,15 @@ public:
         return m_graticuleStepCombo->currentData().toDouble();
     }
 
+    // Select a projection without emitting projectionChanged
+    void setProjection(Projection projection)
+    {
+        QSignalBlocker blocker(m_projectionCombo);
+        const int i = m_projectionCombo->findData(static_cast<int>(projection));
+        if (i >= 0)
+            m_projectionCombo->setCurrentIndex(i);
+    }
+
     // Mirror a view's state without emitting signals
     void setGraticule(bool enabled, double degrees)
     {

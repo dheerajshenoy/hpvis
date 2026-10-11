@@ -458,6 +458,7 @@ HpixView::updateSidePanelStateFromView(const View *view)
 
     auto *map = view->glWidget()->healpixMap();
     m_sidePanel->setFitsInfo(view->fitsInfo(), view->hdu(), view->column());
+    m_sidePanel->setProjection(view->glWidget()->projection());
     m_sidePanel->setMapInfo(
         map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
         view->glWidget()->mapRms(), view->glWidget()->mapStd(),
