@@ -32,6 +32,7 @@ set(CMAKE_AUTOUIC ON)
 
 add_subdirectory(thirdparty/cfitsio)
 pkg_check_modules(HEALPIX REQUIRED IMPORTED_TARGET healpix_cxx)
+pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
 
 include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/include)
@@ -40,6 +41,9 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/hpixview.cpp
     src/view.cpp
+    src/fitsinfo.cpp
+    src/recentfiles.cpp
+    src/fitsheaderdialog.cpp
     src/openglwidget.cpp
     src/tabbar.cpp
     src/tabwidget.cpp
@@ -65,6 +69,9 @@ add_executable(${PROJECT_NAME}
     include/shaderloader.hpp
     include/mapcamera.hpp
     include/parallel.hpp
+    include/fitsinfo.hpp
+    include/recentfiles.hpp
+    include/fitsheaderdialog.hpp
     include/statusbar.hpp
 )
 
@@ -74,6 +81,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     PkgConfig::HEALPIX
+    PkgConfig::CFITSIO
     OpenMP::OpenMP_CXX
     Qt6::Core
     Qt6::Gui

@@ -91,8 +91,20 @@ SidePanel::setupConnections()
         emit maskModeChanged(mode);
     });
 
-    connect(m_graticuleCheckBox, &QCheckBox::toggled, this,
-            [this](bool checked)
+    // New HDU: list its columns and load its first one
+    connect(m_hduCombo, &QComboBox::activated, this, [this](int)
+    {
+        const int hdu = m_hduCombo->currentData().toInt();
+        fillColumnCombo(hdu, 0);
+        emit fitsSelectionChanged(hdu, m_columnCombo->currentData().toInt());
+    });
+    connect(m_columnCombo, &QComboBox::activated, this, [this](int)
+    {
+        emit fitsSelectionChanged(m_hduCombo->currentData().toInt(),
+                                  m_columnCombo->currentData().toInt());
+    });
+
+    connect(m_graticuleCheckBox, &QCheckBox::toggled, this, [this](bool checked)
     {
         updateGraticuleRowVisibility();
         emit graticuleToggled(checked);
@@ -447,6 +459,8 @@ SidePanel::mapInfoWidget()
         return field;
     };
 
+    layout->addRow("HDU:", m_hduCombo = new QComboBox());
+    layout->addRow("Column:", m_columnCombo = new QComboBox());
     layout->addRow("Nside:", makeField(m_nsideEdit));
     layout->addRow("Npix:", makeField(m_npixEdit));
     layout->addRow("Min:", makeField(m_minEdit));
@@ -469,4 +483,46 @@ SidePanel::setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
     m_avgEdit->setText(QString::number(avg, 'g', 6));
     m_rmsEdit->setText(QString::number(rms, 'g', 6));
     m_stdEdit->setText(QString::number(std, 'g', 6));
+}
+
+// Fills the HDU and column combos from the file's table HDUs. Items carry the
+// real (1-based) HDU / column numbers as data.
+void
+SidePanel::setFitsInfo(const FitsInfo &info, int hdu, int column)
+{
+    QSignalBlocker b1(m_hduCombo);
+    QSignalBlocker b2(m_columnCombo);
+
+    m_fitsInfo = info;
+    m_hduCombo->clear();
+    for (const FitsHdu &h : info.hdus)
+    {
+        const QString label
+            = h.name.isEmpty() ? QString::number(h.index)
+                               : QString("%1: %2").arg(h.index).arg(h.name);
+        m_hduCombo->addItem(label, h.index);
+    }
+    m_hduCombo->setEnabled(info.hdus.size() > 1);
+
+    const int row = m_hduCombo->findData(hdu);
+    if (row >= 0)
+        m_hduCombo->setCurrentIndex(row);
+    fillColumnCombo(hdu, column);
+}
+
+void
+SidePanel::fillColumnCombo(int hdu, int column)
+{
+    QSignalBlocker blocker(m_columnCombo);
+    m_columnCombo->clear();
+    if (const FitsHdu *h = m_fitsInfo.find(hdu))
+        for (const FitsColumn &c : h->columns)
+            m_columnCombo->addItem(c.name.isEmpty() ? QString::number(c.index)
+                                                    : c.name,
+                                   c.index);
+    m_columnCombo->setEnabled(m_columnCombo->count() > 1);
+
+    const int row = m_columnCombo->findData(column);
+    if (row >= 0)
+        m_columnCombo->setCurrentIndex(row);
 }

@@ -1,12 +1,14 @@
 #pragma once
 
 #include "colormap.hpp"
+#include "fitsinfo.hpp"
 #include "healpix_map.h"
 #include "openglwidget.hpp"
 #include "pixelordering.hpp"
 
 #include <QVBoxLayout>
 #include <QWidget>
+#include <fitshandle.h>
 
 class View : public QWidget
 {
@@ -21,6 +23,16 @@ public:
         return m_filePath;
     }
 
+    inline int hduIndex() const
+    {
+        return m_hduIndex;
+    }
+
+    inline void setFilePath(const QString &path)
+    {
+        m_filePath = path;
+    }
+
     // Direct access to the renderer, for settings (colormap, masks, ...)
     inline OpenGLWidget *glWidget() const
     {
@@ -32,14 +44,38 @@ public:
         return m_glWidget->healpixMap();
     }
 
+    void setHduIndex(int index);
+
     // Asynchronous: reads the file in the background and emits loadFinished
     void loadMap(const QString &filename);
+    // Same file, another table HDU / column (both 1-based). Asynchronous;
+    // emits hduLoaded.
+    void loadHdu(int hdu, int column);
+
+    const FitsInfo &fitsInfo() const
+    {
+        return m_fitsInfo;
+    }
+    int hdu() const
+    {
+        return m_hdu;
+    }
+    int column() const
+    {
+        return m_column;
+    }
+    bool loading() const
+    {
+        return m_loading;
+    }
 
 private:
     void initConnections();
+    void startLoad(int hdu, int column, bool initial);
 
 signals:
-    void loadFinished(bool ok, const QString &error);
+    void loadFinished(bool ok, const QString &error); // first load only
+    void hduLoaded(bool ok, const QString &error);    // after loadHdu()
     // lonLat in degrees; value is NaN and index -1 when off the map
     void cursorPosChanged(QPointF lonLat, QPointF raDec, double value,
                           qlonglong index);
@@ -48,6 +84,12 @@ signals:
     void colormapRangeChanged(float min, float max);
 
 private:
+    fitshandle m_fitsHandle;
     OpenGLWidget *m_glWidget = nullptr;
     QString m_filePath;
+    FitsInfo m_fitsInfo;
+    int m_hdu     = 0;
+    int m_column  = 0;
+    bool m_loading = false;
+    int m_hduIndex = -1;
 };

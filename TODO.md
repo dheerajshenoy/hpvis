@@ -35,7 +35,7 @@
 - [ ] Text annotations
 
 ## Data & files
-- [ ] Multi-column FITS support (choose TT/QQ/UU, etc.) via a column selector
+- [x] Multi-column FITS support (choose TT/QQ/UU, etc.) via a column selector
 - [ ] Show FITS header metadata (dock/dialog)
 - [ ] Polarization display (Q/U → amplitude, vectors)
 - [ ] Map operations: difference, ratio, smoothing, ud_grade

@@ -1,6 +1,8 @@
 #include "openglwidget.hpp"
 
+#include "fitsinfo.hpp"
 #include "healpix_cxx/error_handling.h"
+#include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "healpix_map.h"
 #include "parallel.hpp"
@@ -708,8 +710,23 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
         {
             try
             {
+                // Use the file's first HEALPix map HDU / column (masks have
+                // their own layout, independent of the map's selection)
                 Healpix_Map<float> mask;
-                read_Healpix_map_from_fits(file.toStdString(), mask, 1, 2);
+                {
+                    fitshandle fits;
+                    fits.open(file.toStdString());
+                    const FitsInfo info = scanFits(fits);
+                    if (info.hdus.isEmpty())
+                    {
+                        result.errors << QString("%1: no HEALPix map found.")
+                                             .arg(QFileInfo(file).fileName());
+                        continue;
+                    }
+                    fits.goto_hdu(info.hdus.first().index);
+                    read_Healpix_map_from_fits(
+                        fits, mask, info.hdus.first().columns.first().index);
+                }
 
                 if (mask.Nside() != mapNside)
                 {

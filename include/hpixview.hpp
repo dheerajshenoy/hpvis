@@ -1,5 +1,6 @@
 #pragma once
 
+#include "recentfiles.hpp"
 #include "argparse.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
@@ -32,6 +33,7 @@ private:
     void initConnections();
     void initViewConnections(const View *view);
     void initMenubar();
+    void updateRecentMenu();
     void initCFITSIO();
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
@@ -63,11 +65,13 @@ private:
     QMenu *m_fileMenu             = nullptr;
     QAction *m_fileOpenAction     = nullptr;
     QMenu *m_fileOpenRecentMenu   = nullptr;
+    RecentFiles m_recentFiles;
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
 
     QMenu *m_viewMenu              = nullptr;
     QAction *m_viewMinimapAction   = nullptr;
+    QAction *m_headerAction        = nullptr;
     QAction *m_viewColorBarAction  = nullptr;
     QAction *m_viewSidePanelAction = nullptr;
     QAction *m_viewResetViewAction = nullptr;

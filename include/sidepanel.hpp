@@ -1,6 +1,7 @@
 #pragma once
 
 #include "colormap.hpp"
+#include "fitsinfo.hpp"
 #include "pixelordering.hpp"
 
 #include <QCheckBox>
@@ -85,7 +86,12 @@ public:
     void setMapInfo(qlonglong nside, qlonglong npix, double avg, double rms,
                     double std, double min, double max);
 
+    // Lists the file's table HDUs and their columns, selecting `hdu`/`column`
+    // (both 1-based) without emitting fitsSelectionChanged
+    void setFitsInfo(const FitsInfo &info, int hdu, int column);
+
 signals:
+    void fitsSelectionChanged(int hdu, int column);
     void pixelOrderingChanged(PixelOrdering ordering);
     void colormapChanged(Colormap colormap);
     void colormapMinChanged(double min);
@@ -116,9 +122,22 @@ private:
     QWidget *colormapWidget();
     QWidget *overlaysWidget();
     QWidget *mapInfoWidget();
+    void fillColumnCombo(int hdu, int column);
     void updateGraticuleRowVisibility();
 
 private:
+    // Map info controls
+    QComboBox *m_hduCombo  = nullptr;
+    QComboBox *m_columnCombo = nullptr;
+    FitsInfo m_fitsInfo;
+    QLineEdit *m_nsideEdit = nullptr;
+    QLineEdit *m_npixEdit  = nullptr;
+    QLineEdit *m_avgEdit   = nullptr;
+    QLineEdit *m_rmsEdit   = nullptr;
+    QLineEdit *m_minEdit   = nullptr;
+    QLineEdit *m_maxEdit   = nullptr;
+    QLineEdit *m_stdEdit   = nullptr;
+
     // Pixel ordering controls
     QComboBox *m_pixOrdCombo = nullptr;
 
@@ -146,15 +165,6 @@ private:
     QCheckBox *m_graticuleCheckBox   = nullptr;
     QComboBox *m_graticuleStepCombo  = nullptr;
     QFormLayout *m_graticuleLayout   = nullptr;
-
-    // Map info controls
-    QLineEdit *m_nsideEdit = nullptr;
-    QLineEdit *m_npixEdit  = nullptr;
-    QLineEdit *m_avgEdit   = nullptr;
-    QLineEdit *m_rmsEdit   = nullptr;
-    QLineEdit *m_minEdit   = nullptr;
-    QLineEdit *m_maxEdit   = nullptr;
-    QLineEdit *m_stdEdit   = nullptr;
 
     // FITS Header info
     // TODO: Add a widget to display FITS header information

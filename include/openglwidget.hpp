@@ -187,7 +187,7 @@ public:
 
     inline const Healpix_Map<float> *healpixMap() const
     {
-        return m_nside > 0 ? &m_pendingMap : nullptr;
+        return m_pendingMap.Npix() > 0 ? &m_pendingMap : nullptr;
     }
 
     void setGraticuleEnabled(bool enabled);

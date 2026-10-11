@@ -1,5 +1,6 @@
 #include "hpixview.hpp"
 
+#include "fitsheaderdialog.hpp"
 #include "pixelordering.hpp"
 #include "sidepanel.hpp"
 #include "view.hpp"
@@ -81,6 +82,24 @@ HpixView::initConnections()
         if (m_view)
             m_view->glWidget()->setGraticuleStep(degrees);
     });
+    connect(m_sidePanel, &SidePanel::fitsSelectionChanged, this,
+            [this](int hdu, int column)
+    {
+        if (!m_view)
+            return;
+        if (m_view->loading())
+        {
+            // Busy: put the combos back to what is loaded
+            m_sidePanel->setFitsInfo(m_view->fitsInfo(), m_view->hdu(),
+                                     m_view->column());
+            return;
+        }
+        m_statusBar->showMessage(QString("Loading HDU %1, column %2...")
+                                     .arg(hdu)
+                                     .arg(column));
+        m_view->loadHdu(hdu, column);
+    });
+
     connect(m_sidePanel, &SidePanel::pixelOrderingChanged, this,
             &HpixView::onPixelOrderingChanged);
 
@@ -170,6 +189,7 @@ HpixView::initMenubar()
     m_fileOpenRecentMenu = m_fileMenu->addMenu("&Open Recent");
     m_fileOpenRecentMenu->menuAction()->setShortcut(
         QKeySequence("Ctrl+Shift+O"));
+    updateRecentMenu();
 
     m_fileExportAction = m_fileMenu->addAction(
         "&Export", this, &HpixView::onExportActionTriggered);
@@ -250,12 +270,56 @@ HpixView::initMenubar()
     m_toolsSettingsAction = m_toolsMenu->addAction(
         "&Settings", this, &HpixView::onSettingsActionTriggered);
 
+    // A plain button in the menu bar (no drop-down)
+    m_headerAction = menuBar->addAction("&Header", this, [this]()
+    {
+        if (!m_view)
+        {
+            QMessageBox::information(this, "FITS Header",
+                                     "Open a file first.");
+            return;
+        }
+        FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
+        dialog.exec();
+    });
+
     auto helpMenu = menuBar->addMenu("&Help");
 
     helpMenu->addAction("&About", this, []()
     {
         QMessageBox::about(nullptr, "About HpixView",
                            "HpixView is a simple viewer for HEALPix maps.");
+    });
+}
+
+// Rebuilds File > Open Recent from the saved list
+void
+HpixView::updateRecentMenu()
+{
+    m_fileOpenRecentMenu->clear();
+
+    const QStringList files = m_recentFiles.files();
+    if (files.isEmpty())
+    {
+        m_fileOpenRecentMenu->addAction("No recent files")->setEnabled(false);
+        return;
+    }
+
+    int n = 1;
+    for (const QString &path : files)
+    {
+        QAction *action = m_fileOpenRecentMenu->addAction(
+            QString("&%1  %2").arg(n++).arg(QFileInfo(path).fileName()),
+            this, [this, path]() { OpenFile(path); });
+        action->setToolTip(path);
+        action->setStatusTip(path);
+    }
+
+    m_fileOpenRecentMenu->addSeparator();
+    m_fileOpenRecentMenu->addAction("&Clear Recent Files", this, [this]()
+    {
+        m_recentFiles.clear();
+        updateRecentMenu();
     });
 }
 
@@ -290,10 +354,13 @@ HpixView::OpenFile(const QString &filePath)
     view->hide();
 
     connect(view, &View::loadFinished, this,
-            [this, view, filename](bool ok, const QString &error)
+            [this, view, filename, resolvedPath](bool ok, const QString &error)
     {
         if (!ok)
         {
+            // e.g. a recent file that was moved or is no longer valid
+            m_recentFiles.remove(resolvedPath);
+            updateRecentMenu();
             QMessageBox::critical(this, "Error",
                                   QString("Failed to load map: %1").arg(error));
             m_statusBar->showMessage(QString("Failed to load %1").arg(filename),
@@ -307,6 +374,16 @@ HpixView::OpenFile(const QString &filePath)
         // first tab switch
         m_tabWidget->setCurrentIndex(m_tabWidget->indexOf(view));
         initViewConnections(view);
+
+        // The tab-changed signal fired inside addTab(), before this view had
+        // its file info; fill the side panel and status bar now
+        if (m_view == view)
+        {
+            updateSidePanelStateFromView(view);
+            updateStatusBarFromView(view);
+        }
+        m_recentFiles.add(resolvedPath);
+        updateRecentMenu();
         m_statusBar->showMessage(QString("Loaded %1").arg(filename), 3000);
     });
 
@@ -328,6 +405,25 @@ HpixView::initViewConnections(const View *view)
             &StatusBar::setCursorData);
 
     connect(view, &View::zoomChanged, m_statusBar, &StatusBar::setZoom);
+
+    // Result of switching HDU / column from the side panel
+    connect(view, &View::hduLoaded, this,
+            [this, view](bool ok, const QString &error)
+    {
+        if (!ok)
+            QMessageBox::critical(this, "Error",
+                                  QString("Failed to load map: %1").arg(error));
+        else
+            m_statusBar->showMessage(
+                QString("Loaded HDU %1, column %2")
+                    .arg(view->hdu())
+                    .arg(view->column()),
+                3000);
+        // Show what is really loaded (the previous selection after an error)
+        if (view == m_view)
+            m_sidePanel->setFitsInfo(view->fitsInfo(), view->hdu(),
+                                     view->column());
+    });
 
     // Mask load/clear/toggle changes the implicit colormap range
     connect(view, &View::colormapRangeChanged, this,
@@ -359,6 +455,7 @@ HpixView::updateSidePanelStateFromView(const View *view)
         return;
 
     auto *map = view->glWidget()->healpixMap();
+    m_sidePanel->setFitsInfo(view->fitsInfo(), view->hdu(), view->column());
     m_sidePanel->setMapInfo(
         map->Nside(), map->Npix(), view->glWidget()->mapAverage(),
         view->glWidget()->mapRms(), view->glWidget()->mapStd(),

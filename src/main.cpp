@@ -13,6 +13,8 @@ int
 main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    // Names the per-user data directory (e.g. ~/.local/share/Hpixview)
+    QCoreApplication::setApplicationName(PROJECT_NAME);
 
     argparse::ArgumentParser parser(PROJECT_NAME, PROJECT_VERSION,
                                     argparse::default_arguments::all);

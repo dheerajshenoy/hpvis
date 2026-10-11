@@ -76,8 +76,19 @@ First development release.
 - View menu toggles for the side panel and the minimap.
 - Full-width status bar showing the file name, file size, zoom level, and the
   cursor's longitude/latitude, pixel index and pixel value.
+- File > Open Recent lists the last 10 opened files (newest first, with a
+  "Clear Recent Files" entry). The list is saved in
+  `recent_files.txt` in the app data directory
+  (`~/.local/share/Hpixview/` on Linux).
 - Open files from the File menu, or from the command line (`Hpixview
   file.fits ...`).
+- Files are opened with `fitshandle`: every HDU that holds a HEALPix map (NSIDE and
+  ORDERING keywords, columns of 12*nside^2 values) is listed in the Map Info section (HDU and Column), and switching either one
+  reloads that map in the background. The first map HDU / column is used
+  when a file is opened.
+- "Header" button in the menu bar opens a dialog with the FITS header cards
+  (keyword, value, comment) of any HDU in the current file, with a filter box
+  and a Copy button.
 - Maps and masks are read on background threads, so the window stays
   responsive while large files load (the status bar shows "Loading...").
   Several files opened together load in parallel.
