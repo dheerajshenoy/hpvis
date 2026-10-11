@@ -1,12 +1,13 @@
 #include "view.hpp"
 
 #include "healpix_cxx/error_handling.h"
-#include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/fitshandle.h"
+#include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 
 #include <QFutureWatcher>
 #include <QtConcurrent>
+#include <cmath>
 #include <memory>
 
 View::View(QWidget *parent) : QWidget(parent)
@@ -43,7 +44,7 @@ struct LoadResult
 void
 View::startLoad(int hdu, int column, bool initial)
 {
-    m_loading = true;
+    m_loading              = true;
     const QString filename = m_filePath;
 
     auto *watcher = new QFutureWatcher<LoadResult>(this);
@@ -88,8 +89,10 @@ View::startLoad(int hdu, int column, bool initial)
             {
                 result.info = scanFits(file);
                 if (result.info.hdus.isEmpty())
-                    throw PlanckError("No HEALPix map found (needs a table with NSIDE and ORDERING\n"
-                                      "keywords and a column of 12*nside^2 values)");
+                    throw PlanckError(
+                        "No HEALPix map found (needs a table with NSIDE and "
+                        "ORDERING\n"
+                        "keywords and a column of 12*nside^2 values)");
                 useHdu = result.info.hdus.first().index;
                 useCol = result.info.hdus.first().columns.first().index;
             }
@@ -99,14 +102,35 @@ View::startLoad(int hdu, int column, bool initial)
             // Check the header before reading gigabytes of pixels
             const int nside = file.get_key<int>("NSIDE");
             if (nside > kMaxSupportedNside)
-                throw PlanckError(
-                    ("nside " + std::to_string(nside)
-                     + " is currently not supported (maximum is "
-                     + std::to_string(kMaxSupportedNside) + ").")
-                        .c_str());
+                throw PlanckError(("nside " + std::to_string(nside)
+                                   + " is currently not supported (maximum is "
+                                   + std::to_string(kMaxSupportedNside) + ").")
+                                      .c_str());
 
             auto map = std::make_shared<Healpix_Map<float>>();
             read_Healpix_map_from_fits(file, *map, useCol);
+
+            // A binary 0/1 map is a mask: show its 0 pixels as unseen
+            {
+                float *d     = const_cast<float *>(map->Map().begin());
+                const long n = map->Npix();
+                bool binary  = true;
+                bool hasZero = false;
+                bool hasOne  = false;
+                for (long i = 0; i < n && binary; ++i)
+                {
+                    if (d[i] == 0.0f)
+                        hasZero = true;
+                    else if (d[i] == 1.0f)
+                        hasOne = true;
+                    else if (std::isfinite(d[i]) && d[i] > -1e30f)
+                        binary = false;
+                }
+                if (binary && hasZero && hasOne)
+                    for (long i = 0; i < n; ++i)
+                        if (d[i] == 0.0f)
+                            d[i] = float(Healpix_undef);
+            }
             result.map    = std::move(map);
             result.hdu    = useHdu;
             result.column = useCol;
