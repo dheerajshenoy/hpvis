@@ -15,7 +15,9 @@ class QLabel;
 class QPushButton;
 class QQuickView;
 class View;
+class QCheckBox;
 class QProgressBar;
+class QToolButton;
 class QTimer;
 struct PowerSpectrumJob;
 
@@ -65,6 +67,9 @@ private:
     void updateProgress();
     void refresh();
     void updatePlot(const Spectra &spectra);
+    void applyPlotScales();
+    void exportCsv();
+    void exportImage();
 
 private:
     QPointer<View> m_view;
@@ -82,6 +87,10 @@ private:
     QComboBox *m_accuracyCombo = nullptr;
     QComboBox *m_lmaxCombo     = nullptr;
     QLabel *m_infoLabel        = nullptr;
+    QComboBox *m_quantityCombo = nullptr; // what the y axis shows
+    QCheckBox *m_logXCheck     = nullptr;
+    QCheckBox *m_logYCheck     = nullptr;
+    QToolButton *m_exportButton = nullptr;
     QPushButton *m_computeButton = nullptr;
     QProgressBar *m_progressBar  = nullptr;
     QLabel *m_progressLabel      = nullptr;

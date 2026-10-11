@@ -117,6 +117,18 @@ First development release.
   shows a progress bar with the current step and the elapsed time, and the
   button becomes Cancel (it stops after the current transform), and warns when the map's
   HDU, column or masks changed since.
+- The power spectrum dock has Accuracy (Fast 0, Normal 1 or Accurate 3
+  refinement rounds) and lmax (2 x nside, 3 x nside - 1 or nside) choices,
+  remembered between runs. Fewer rounds and a lower lmax are much faster, and
+  the dock shows what the current result used. The defaults are Normal and
+  2 x nside.
+- The power spectrum plot has a choice of y quantity (Dℓ, Cℓ or ℓ²Cℓ) and
+  logarithmic ℓ and y axes (both remembered), a hover readout of ℓ and the
+  value at the nearest point, wheel zoom around the cursor (Shift: ℓ only,
+  Ctrl: y only), drag to pan and double-click to show everything. The Export
+  menu saves the plot as a PNG image or all computed spectra (Cℓ and Dℓ for
+  ℓ = 0..lmax, with nside, lmax and the refinement rounds in a header line) as
+  CSV.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are
   computed once on load and whenever masks change, so switching tabs with
@@ -162,7 +174,8 @@ First development release.
 ### Build and packaging
 - CMake build with Qt 6, vendored cfitsio, and OpenMP linked. HEALPix C++ and
   libsharp are built from the vendored sources into the build tree, so no
-  prebuilt libraries or absolute paths are kept in the repository.
+  prebuilt libraries or absolute paths are kept in the repository. They are
+  built with `-O3` to speed up the spherical harmonic transforms.
 - The project is named `hpvis`.
 - Sample data in `samples/` (WMAP nside 32, Planck dust nside 2048, and two
   test masks).

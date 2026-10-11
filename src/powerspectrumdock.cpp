@@ -10,7 +10,17 @@
 #include "powspec.h"
 #include "view.hpp"
 
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QImage>
+#include <QMenu>
+#include <QMessageBox>
+#include <QTextStream>
+#include <QToolButton>
 #include <QHBoxLayout>
 #include <QFutureWatcher>
 #include <QLabel>
@@ -357,6 +367,55 @@ PowerSpectrumDock::initUI()
     options->addWidget(m_lmaxCombo);
     options->addStretch();
 
+    // What the plot shows: the quantity, the axis scales, and export
+    m_quantityCombo = new QComboBox();
+    m_quantityCombo->addItem("D\u2113 = \u2113(\u2113+1) C\u2113 / 2\u03c0", 0);
+    m_quantityCombo->addItem("C\u2113", 1);
+    m_quantityCombo->addItem("\u2113\u00b2 C\u2113", 2);
+    m_logXCheck = new QCheckBox("Log \u2113");
+    m_logYCheck = new QCheckBox("Log y");
+    m_exportButton = new QToolButton();
+    m_exportButton->setText("Export");
+    m_exportButton->setPopupMode(QToolButton::InstantPopup);
+    auto *exportMenu = new QMenu(m_exportButton);
+    exportMenu->addAction("Plot as &image...", this,
+                          &PowerSpectrumDock::exportImage);
+    exportMenu->addAction("Spectra as &CSV...", this,
+                          &PowerSpectrumDock::exportCsv);
+    m_exportButton->setMenu(exportMenu);
+    {
+        QSettings settings;
+        const int q = m_quantityCombo->findData(
+            settings.value("powerspectrum/quantity", 0).toInt());
+        m_quantityCombo->setCurrentIndex(q >= 0 ? q : 0);
+        m_logXCheck->setChecked(
+            settings.value("powerspectrum/logX", false).toBool());
+        m_logYCheck->setChecked(
+            settings.value("powerspectrum/logY", false).toBool());
+    }
+    auto replot = [this]()
+    {
+        QSettings settings;
+        settings.setValue("powerspectrum/quantity",
+                          m_quantityCombo->currentData());
+        settings.setValue("powerspectrum/logX", m_logXCheck->isChecked());
+        settings.setValue("powerspectrum/logY", m_logYCheck->isChecked());
+        const auto it = m_results.constFind(m_view.data());
+        if (it != m_results.constEnd())
+            updatePlot(it->spectra);
+    };
+    connect(m_quantityCombo, &QComboBox::currentIndexChanged, this, replot);
+    connect(m_logXCheck, &QCheckBox::toggled, this, replot);
+    connect(m_logYCheck, &QCheckBox::toggled, this, replot);
+
+    auto *plotOptions = new QHBoxLayout();
+    plotOptions->addWidget(new QLabel("y:"));
+    plotOptions->addWidget(m_quantityCombo);
+    plotOptions->addWidget(m_logXCheck);
+    plotOptions->addWidget(m_logYCheck);
+    plotOptions->addStretch();
+    plotOptions->addWidget(m_exportButton);
+
     auto *top = new QHBoxLayout();
     top->addWidget(m_spectrumCombo, 1);
     top->addStretch();
@@ -369,6 +428,7 @@ PowerSpectrumDock::initUI()
     layout->addWidget(m_progressBar);
     layout->addWidget(m_progressLabel);
     layout->addWidget(m_statusLabel);
+    layout->addLayout(plotOptions);
     layout->addWidget(m_chartContainer, 1);
     setWidget(content);
 }
@@ -644,6 +704,18 @@ PowerSpectrumDock::updateProgress()
             : QString("%1 \u2014 %2 elapsed").arg(job.stage.load()).arg(elapsed));
 }
 
+// The spectrum the combo selects, from a result
+static const std::vector<double> *
+spectrumByName(const Spectra &spectra, const QString &name)
+{
+    return name == "TT"   ? &spectra.TT
+           : name == "EE" ? &spectra.EE
+           : name == "BB" ? &spectra.BB
+           : name == "TE" ? &spectra.TE
+           : name == "TB" ? &spectra.TB
+                          : &spectra.EB;
+}
+
 void
 PowerSpectrumDock::updatePlot(const Spectra &spectra)
 {
@@ -652,22 +724,122 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra)
         return;
 
     const QString name              = m_spectrumCombo->currentText();
-    const std::vector<double> *data = name == "TT"   ? &spectra.TT
-                                      : name == "EE" ? &spectra.EE
-                                      : name == "BB" ? &spectra.BB
-                                      : name == "TE" ? &spectra.TE
-                                      : name == "TB" ? &spectra.TB
-                                                     : &spectra.EB;
+    const std::vector<double> *data = spectrumByName(spectra, name);
 
-    // D_l = l(l+1) C_l / 2pi, as flat lists QML can read (l = 2 onwards)
-    QVariantList ell, dl;
+    // The y quantity, as flat lists QML can read (l = 2 onwards)
+    const int quantity = m_quantityCombo->currentData().toInt();
+    QVariantList ell, values;
     for (size_t l = 2; l < data->size(); ++l)
     {
-        ell.append(double(l));
-        dl.append(double(l) * double(l + 1) * (*data)[l] / (2.0 * M_PI));
+        const double c  = (*data)[l];
+        const double ll = double(l);
+        ell.append(ll);
+        values.append(quantity == 0   ? ll * (ll + 1.0) * c / (2.0 * M_PI)
+                      : quantity == 1 ? c
+                                      : ll * ll * c);
     }
 
-    QMetaObject::invokeMethod(
-        root, "setData", Q_ARG(QVariant, ell), Q_ARG(QVariant, dl),
-        Q_ARG(QVariant, QString("D_l (%1) = l(l+1)C_l / 2\u03c0").arg(name)));
+    const QString symbol = quantity == 0   ? QString("D\u2113")
+                           : quantity == 1 ? QString("C\u2113")
+                                           : QString("\u2113\u00b2 C\u2113");
+    const QString title  = quantity == 0
+                               ? QString("D\u2113 (%1) = \u2113(\u2113+1) C\u2113 / 2\u03c0").arg(name)
+                               : QString("%1 (%2)").arg(symbol, name);
+    const QString shortName = QString("%1 (%2)").arg(symbol, name);
+
+    QMetaObject::invokeMethod(root, "setScales",
+                              Q_ARG(QVariant, m_logXCheck->isChecked()),
+                              Q_ARG(QVariant, m_logYCheck->isChecked()));
+    QMetaObject::invokeMethod(root, "setData", Q_ARG(QVariant, ell),
+                              Q_ARG(QVariant, values),
+                              Q_ARG(QVariant, title),
+                              Q_ARG(QVariant, shortName));
+}
+
+static QString
+exportStartDir()
+{
+    const QString dir = QSettings().value("general/lastDirectory").toString();
+    return (!dir.isEmpty() && QDir(dir).exists()) ? dir : QDir::homePath();
+}
+
+void
+PowerSpectrumDock::exportImage()
+{
+    const QString path = QFileDialog::getSaveFileName(
+        this, "Export Plot", exportStartDir() + "/power_spectrum.png",
+        "PNG Files (*.png);;All Files (*)");
+    if (path.isEmpty())
+        return;
+    QSettings().setValue("general/lastDirectory",
+                         QFileInfo(path).absolutePath());
+
+    const QImage image = m_chartView->grabWindow();
+    if (image.isNull() || !image.save(path))
+        QMessageBox::critical(this, "Export Plot",
+                              QString("Failed to save %1").arg(path));
+}
+
+// Every computed spectrum: C_l and D_l = l(l+1) C_l / 2pi, for l = 0..lmax
+void
+PowerSpectrumDock::exportCsv()
+{
+    const auto it = m_results.constFind(m_view.data());
+    if (it == m_results.constEnd())
+    {
+        QMessageBox::information(this, "Export Spectra",
+                                 "Compute a power spectrum first.");
+        return;
+    }
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, "Export Spectra", exportStartDir() + "/power_spectrum.csv",
+        "CSV Files (*.csv);;All Files (*)");
+    if (path.isEmpty())
+        return;
+    QSettings().setValue("general/lastDirectory",
+                         QFileInfo(path).absolutePath());
+
+    const Spectra &sp = it->spectra;
+    struct Column
+    {
+        const char *name;
+        const std::vector<double> *data;
+    };
+    QList<Column> columns;
+    for (const Column &c :
+         {Column{"TT", &sp.TT}, Column{"EE", &sp.EE}, Column{"BB", &sp.BB},
+          Column{"TE", &sp.TE}, Column{"TB", &sp.TB}, Column{"EB", &sp.EB}})
+        if (!c.data->empty())
+            columns << c;
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        QMessageBox::critical(this, "Export Spectra",
+                              QString("Cannot write %1").arg(path));
+        return;
+    }
+    QTextStream out(&file);
+    out << "# lmax = " << it->lmax << ", nside = " << it->nside
+        << ", refinement rounds = " << it->iterations << "\n";
+    out << "l";
+    for (const Column &c : columns)
+        out << ",C_l_" << c.name;
+    for (const Column &c : columns)
+        out << ",D_l_" << c.name;
+    out << "\n";
+
+    out.setRealNumberPrecision(10);
+    const size_t n = sp.TT.size();
+    for (size_t l = 0; l < n; ++l)
+    {
+        out << l;
+        for (const Column &c : columns)
+            out << ',' << (*c.data)[l];
+        const double f = double(l) * double(l + 1) / (2.0 * M_PI);
+        for (const Column &c : columns)
+            out << ',' << f * (*c.data)[l];
+        out << "\n";
+    }
 }
