@@ -150,10 +150,25 @@ First development release.
   lists every curve at that multipole. The mode picks Overlay, Ratio to this
   map or Difference from this map, and all of it follows the chosen spectrum,
   y quantity and axis scales.
+  "Common ℓ range" limits all curves to the highest multipole they all
+  have (maps of different nside end at different multipoles). The CSV export
+  includes the compared maps and curves too: their columns end in `@name`,
+  and are empty where a curve has no value.
 - Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
   RMS, standard deviation and the sky fraction (f_sky). The statistics are
   computed once on load and whenever masks change, so switching tabs with
   large maps stays fast. They only include pixels kept by the enabled masks.
+- The Statistics dock has a pixel value histogram of the current map. Choose
+  the field (column) of the map, the number of bins, density or counts, a log
+  y axis, whether the enabled masks are used, and whether to clip the outliers
+  (0.1 % to 99.9 %). Compare overlays the histograms of other open maps on the
+  same bins (the union of their ranges), or shows them as a ratio to, or a
+  difference from, the current map. The plot has a legend, a hover readout of
+  the bin and every curve's value, wheel zoom, drag pan and double-click to
+  reset, uses the plot colors of the power spectrum plot, and can be exported
+  as an image or as CSV (bins, counts and density of every curve). Fields are
+  read from the file, so a 0 / 1 map shows its zeros; a computed map uses its
+  values in memory.
 - View menu toggles for the minimap and the color bar.
 - Full-width status bar showing the file name, file size, zoom level, and the
   cursor's longitude/latitude, pixel index and pixel value.

@@ -133,6 +133,7 @@ add_executable(${PROJECT_NAME}
     src/skyframe.cpp
     src/mapexpression.cpp
     src/mapoperation.cpp
+    src/histogram.cpp
     src/mapoperationdialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
@@ -158,6 +159,7 @@ add_executable(${PROJECT_NAME}
     include/skyframe.hpp
     include/mapexpression.hpp
     include/mapoperation.hpp
+    include/histogram.hpp
     include/mapoperationdialog.hpp
     include/openglwidget.hpp
     include/argparse.hpp

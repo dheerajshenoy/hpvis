@@ -95,7 +95,7 @@ private:
     QString titleOf(const View *view) const;
     void pickPlotColor(QPushButton *button, QColor &color, const QString &title);
     void showColorOnButton(QPushButton *button, const QColor &color);
-    void exportCsv();
+    void exportCsv(const QString &path = QString());
     void exportImage();
 
 private:
@@ -113,6 +113,7 @@ private:
     QSet<const View *> m_compareViews;
     QList<External> m_external;
     QComboBox *m_modeCombo       = nullptr;
+    QCheckBox *m_commonCheck     = nullptr; // limit all curves to a shared l range
     QToolButton *m_compareButton = nullptr;
     QSet<const View *> m_busy;
     // The running computation of each busy view (progress, cancel flag)

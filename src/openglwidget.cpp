@@ -196,6 +196,37 @@ OpenGLWidget::setMaskOpacity(float opacity)
     update();
 }
 
+std::vector<uint8_t>
+OpenGLWidget::keepMask() const
+{
+    const long npix = m_pendingMap.Npix();
+    struct Active
+    {
+        const uint8_t *data;
+        bool inverted;
+    };
+    std::vector<Active> active;
+    for (const MaskEntry &m : m_masks)
+        if (m.enabled && m.data.size() == size_t(npix))
+            active.push_back({m.data.data(), m.inverted});
+    if (active.empty())
+        return {};
+
+    std::vector<uint8_t> keep(size_t(npix), 1);
+#pragma omp parallel for schedule(static)
+    for (long i = 0; i < npix; ++i)
+    {
+        float k = 1.0f; // the same product as the shader and the statistics
+        for (const Active &m : active)
+        {
+            const float w = m.data[i] * (1.0f / 255.0f);
+            k *= m.inverted ? 1.0f - w : w;
+        }
+        keep[size_t(i)] = k >= 0.5f ? 1 : 0;
+    }
+    return keep;
+}
+
 void
 OpenGLWidget::recomputeDataRange()
 {

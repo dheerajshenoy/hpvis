@@ -44,6 +44,7 @@
 #include <QtConcurrent>
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <cmath>
 #include <memory>
 
@@ -381,7 +382,7 @@ PowerSpectrumDock::initUI()
     exportMenu->addAction("Plot as &image...", this,
                           &PowerSpectrumDock::exportImage);
     exportMenu->addAction("Spectra as &CSV...", this,
-                          &PowerSpectrumDock::exportCsv);
+                          [this]() { exportCsv(); });
     m_exportButton->setMenu(exportMenu);
     {
         QSettings settings;
@@ -448,10 +449,23 @@ PowerSpectrumDock::initUI()
     m_compareButton->setMenu(compareMenu);
     connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
             [this]() { replot(); });
+    m_commonCheck = new QCheckBox("Common \u2113 range");
+    m_commonCheck->setToolTip(
+        "Show every curve only up to the highest multipole they all have.\n"
+        "Maps of different nside, or computed with a different lmax, end at "
+        "different multipoles.");
+    m_commonCheck->setChecked(
+        QSettings().value("powerspectrum/commonRange", false).toBool());
+    connect(m_commonCheck, &QCheckBox::toggled, this, [this](bool on)
+    {
+        QSettings().setValue("powerspectrum/commonRange", on);
+        replot();
+    });
 
     auto *compareOptions = new QHBoxLayout();
     compareOptions->addWidget(m_compareButton);
     compareOptions->addWidget(m_modeCombo);
+    compareOptions->addWidget(m_commonCheck);
     compareOptions->addStretch();
 
     auto *plotOptions = new QHBoxLayout();
@@ -845,10 +859,11 @@ PowerSpectrumDock::replot(bool keepRange)
 static QVariantMap
 makeCurve(const QString &name, const QColor &color,
           const std::vector<double> &values, const std::vector<double> *ref,
-          int mode, int quantity)
+          int mode, int quantity, size_t maxEll)
 {
     QVariantList ell, y;
-    const size_t n = ref ? std::min(values.size(), ref->size()) : values.size();
+    size_t n = ref ? std::min(values.size(), ref->size()) : values.size();
+    n        = std::min(n, maxEll + 1);
     for (size_t l = 2; l < n; ++l)
     {
         const double ll = double(l);
@@ -925,16 +940,28 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
            "#f0e442", "#0072b2", "#999999", "#56b4e9"};
     QVariantList curves;
     const QString thisName = titleOf(m_view.data());
+
+    // With "Common l range" every curve stops at the highest multipole all of
+    // them have
+    size_t maxEll = std::numeric_limits<size_t>::max() - 1;
+    if (m_commonCheck->isChecked())
+    {
+        maxEll = current.size() - 1;
+        for (const Other &o : others)
+            maxEll = std::min(maxEll, o.data->size() - 1);
+    }
+
     if (mode == 0)
         curves.append(makeCurve(thisName, m_plotLine, current, nullptr, 0,
-                                quantity));
+                                quantity, maxEll));
     int next = 0;
     for (const Other &o : others)
     {
         QColor c(palette[next++ % palette.size()]);
         if (c == m_plotLine)
             c = QColor(palette[next++ % palette.size()]);
-        curves.append(makeCurve(o.name, c, *o.data, &current, mode, quantity));
+        curves.append(makeCurve(o.name, c, *o.data, &current, mode, quantity,
+                                maxEll));
     }
 
     const QString symbol = quantity == 0   ? QString("D\u2113")
@@ -1089,6 +1116,10 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
                 continue;
             for (int i = 1; i < parts.size(); ++i)
             {
+                // "C_l_TT@other map" is a column of another map in an export
+                // that included a comparison: only the first map is read
+                if (parts[i].contains('@'))
+                    continue;
                 const QString t = parts[i].toUpper();
                 for (int s = 0; s < names.size(); ++s)
                     if (t.contains(names[s]))
@@ -1223,9 +1254,12 @@ PowerSpectrumDock::exportImage()
                               QString("Failed to save %1").arg(path));
 }
 
-// Every computed spectrum: C_l and D_l = l(l+1) C_l / 2pi, for l = 0..lmax
+// Every computed spectrum of this map, then those of the maps and curves
+// compared with it (as shown in the plot): C_l and D_l = l(l+1) C_l / 2pi for
+// l = 0..lmax. Columns of the others end in "@name"; where a curve has no
+// value (it ends earlier) the field is empty.
 void
-PowerSpectrumDock::exportCsv()
+PowerSpectrumDock::exportCsv(const QString &givenPath)
 {
     const auto it = m_results.constFind(m_view.data());
     if (it == m_results.constEnd())
@@ -1235,26 +1269,64 @@ PowerSpectrumDock::exportCsv()
         return;
     }
 
-    const QString path = QFileDialog::getSaveFileName(
-        this, "Export Spectra", exportStartDir() + "/power_spectrum.csv",
-        "CSV Files (*.csv);;All Files (*)");
+    QString path = givenPath;
     if (path.isEmpty())
-        return;
-    QSettings().setValue("general/lastDirectory",
-                         QFileInfo(path).absolutePath());
+    {
+        path = QFileDialog::getSaveFileName(
+            this, "Export Spectra", exportStartDir() + "/power_spectrum.csv",
+            "CSV Files (*.csv);;All Files (*)");
+        if (path.isEmpty())
+            return;
+        QSettings().setValue("general/lastDirectory",
+                             QFileInfo(path).absolutePath());
+    }
 
-    const Spectra &sp = it->spectra;
+    struct Source
+    {
+        QString suffix; // "" for this map, "@name" for the others
+        QString label;
+        const Spectra *spectra;
+    };
+    auto clean = [](QString name)
+    {
+        name.replace(QRegularExpression("[,;\\s]+"), "_");
+        return name;
+    };
+    QList<Source> sources;
+    sources.append({QString(), titleOf(m_view.data()), &it->spectra});
+    for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
+    {
+        if (!m.view || m.view.data() == m_view.data()
+            || !m_compareViews.contains(m.view.data()))
+            continue;
+        const auto r = m_results.constFind(m.view.data());
+        if (r != m_results.constEnd())
+            sources.append({"@" + clean(m.title), m.title, &r->spectra});
+    }
+    for (const External &e : m_external)
+        if (e.enabled)
+            sources.append({"@" + clean(e.name), e.name, &e.spectra});
+
     struct Column
     {
-        const char *name;
+        QString name;
         const std::vector<double> *data;
     };
     QList<Column> columns;
-    for (const Column &c :
-         {Column{"TT", &sp.TT}, Column{"EE", &sp.EE}, Column{"BB", &sp.BB},
-          Column{"TE", &sp.TE}, Column{"TB", &sp.TB}, Column{"EB", &sp.EB}})
-        if (!c.data->empty())
-            columns << c;
+    size_t n = 0;
+    for (const Source &src : sources)
+    {
+        const Spectra &sp = *src.spectra;
+        for (const Column &c :
+             {Column{"TT", &sp.TT}, Column{"EE", &sp.EE},
+              Column{"BB", &sp.BB}, Column{"TE", &sp.TE},
+              Column{"TB", &sp.TB}, Column{"EB", &sp.EB}})
+            if (!c.data->empty())
+            {
+                columns << Column{c.name + src.suffix, c.data};
+                n = std::max(n, c.data->size());
+            }
+    }
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -1266,6 +1338,8 @@ PowerSpectrumDock::exportCsv()
     QTextStream out(&file);
     out << "# lmax = " << it->lmax << ", nside = " << it->nside
         << ", refinement rounds = " << it->iterations << "\n";
+    for (int i = 1; i < sources.size(); ++i)
+        out << "# " << sources[i].suffix << " = " << sources[i].label << "\n";
     out << "l";
     for (const Column &c : columns)
         out << ",C_l_" << c.name;
@@ -1274,15 +1348,20 @@ PowerSpectrumDock::exportCsv()
     out << "\n";
 
     out.setRealNumberPrecision(10);
-    const size_t n = sp.TT.size();
+    auto field = [&out](const std::vector<double> &d, size_t l, double factor)
+    {
+        out << ',';
+        if (l < d.size() && std::isfinite(d[l]))
+            out << factor * d[l];
+    };
     for (size_t l = 0; l < n; ++l)
     {
         out << l;
         for (const Column &c : columns)
-            out << ',' << (*c.data)[l];
+            field(*c.data, l, 1.0);
         const double f = double(l) * double(l + 1) / (2.0 * M_PI);
         for (const Column &c : columns)
-            out << ',' << f * (*c.data)[l];
+            field(*c.data, l, f);
         out << "\n";
     }
 }

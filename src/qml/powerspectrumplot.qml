@@ -46,42 +46,74 @@ Item {
 
     // GraphsView does not repaint when only a color changes; the dock sends
     // the curves again after a color change, which rebuilds the series
-    onBgColorChanged: graph.update()
-    onFgColorChanged: graph.update()
+    onBgColorChanged: redraw()
+    onFgColorChanged: redraw()
 
-    property var linX: ValueAxis {
-        min: view.xMin
-        max: view.xMax
-        titleText: "Multipole ℓ"
-        titleColor: view.fg
-        color: view.dim
-        subColor: view.dim
+    // The axes are created afresh whenever the scale changes: reusing an axis
+    // object that was taken off the graph leaves the series drawn against the
+    // old scale (the curves vanish)
+    Component {
+        id: linXComp
+        ValueAxis {
+            min: view.xMin
+            max: view.xMax
+            titleText: "Multipole ℓ"
+            titleColor: view.fg
+            color: view.dim
+            subColor: view.dim
+        }
     }
-    property var logXAxis: LogValueAxis {
-        base: 10
-        min: Math.max(view.xMin, 1e-9)
-        max: view.xMax
-        titleText: "Multipole ℓ"
-        titleColor: view.fg
-        color: view.dim
-        subColor: view.dim
+    Component {
+        id: logXComp
+        LogValueAxis {
+            base: 10
+            min: Math.max(view.xMin, 1e-9)
+            max: view.xMax
+            titleText: "Multipole ℓ"
+            titleColor: view.fg
+            color: view.dim
+            subColor: view.dim
+        }
     }
-    property var linY: ValueAxis {
-        min: view.yMin
-        max: view.yMax
-        titleText: view.yTitle
-        titleColor: view.fg
-        color: view.dim
-        subColor: view.dim
+    Component {
+        id: linYComp
+        ValueAxis {
+            min: view.yMin
+            max: view.yMax
+            titleText: view.yTitle
+            titleColor: view.fg
+            color: view.dim
+            subColor: view.dim
+        }
     }
-    property var logYAxis: LogValueAxis {
-        base: 10
-        min: Math.max(view.yMin, 1e-300)
-        max: view.yMax
-        titleText: view.yTitle
-        titleColor: view.fg
-        color: view.dim
-        subColor: view.dim
+    Component {
+        id: logYComp
+        LogValueAxis {
+            base: 10
+            min: Math.max(view.yMin, 1e-300)
+            max: view.yMax
+            titleText: view.yTitle
+            titleColor: view.fg
+            color: view.dim
+            subColor: view.dim
+        }
+    }
+
+    // GraphsView can keep painting with the previous axis ranges after the
+    // axes or the series change, until it is resized: ask for a redraw now
+    // and once more after the scene graph has caught up
+    function redraw() {
+        if (graph)
+            graph.update()
+        redrawTimer.restart()
+    }
+    Timer {
+        id: redrawTimer
+        interval: 30
+        onTriggered: {
+            if (view.graph)
+                view.graph.update()
+        }
     }
 
     Component {
@@ -91,22 +123,41 @@ Item {
         }
     }
 
-    GraphsView {
-        id: graph
-        anchors.fill: parent
+    // The graph is rebuilt (with the right axis types from the start)
+    // whenever a log setting changes: switching the axes of a live GraphsView
+    // leaves its series drawn against the old scale
+    property var graph: graphLoader.item
 
-        axisX: view.logX ? view.logXAxis : view.linX
-        axisY: view.logY ? view.logYAxis : view.linY
-
-        theme: GraphsTheme {
-            colorScheme: view.dark ? GraphsTheme.ColorScheme.Dark
-                                   : GraphsTheme.ColorScheme.Light
-            backgroundColor: view.bgColor
-            plotAreaBackgroundColor: view.plotBg
-            labelTextColor: view.fg
-            grid.mainColor: view.gridMain
-            grid.subColor: view.gridSub
+    Component {
+        id: graphComp
+        GraphsView {
+            id: g
+            theme: GraphsTheme {
+                colorScheme: view.dark ? GraphsTheme.ColorScheme.Dark
+                                       : GraphsTheme.ColorScheme.Light
+                backgroundColor: view.bgColor
+                plotAreaBackgroundColor: view.plotBg
+                labelTextColor: view.fg
+                grid.mainColor: view.gridMain
+                grid.subColor: view.gridSub
+            }
+            Component.onCompleted: {
+                axisX = (view.logX ? logXComp : linXComp).createObject(g)
+                axisY = (view.logY ? logYComp : linYComp).createObject(g)
+            }
         }
+    }
+
+    Loader {
+        id: graphLoader
+        anchors.fill: parent
+        sourceComponent: graphComp
+    }
+
+    function recreateGraph() {
+        seriesObjects = []   // they go with the old graph
+        graphLoader.active = false
+        graphLoader.active = true
     }
 
     // ---- axis <-> pixel mapping (in the axis' own space: log10 or linear)
@@ -146,6 +197,7 @@ Item {
         rebuild()
         if (!keepRange)
             fitAll()
+        redraw()
     }
 
     // Called when the user switches between linear and logarithmic axes
@@ -154,8 +206,10 @@ Item {
             return
         logX = lx
         logY = ly
+        recreateGraph()
         rebuild()
         fitAll()
+        redraw()
     }
 
     // A point can only be drawn when it is a number, and on a log axis when
@@ -166,6 +220,8 @@ Item {
     }
 
     function rebuild() {
+        if (!graph)
+            return
         for (let k = 0; k < seriesObjects.length; ++k) {
             graph.removeSeries(seriesObjects[k])
             seriesObjects[k].destroy()
@@ -422,7 +478,10 @@ Item {
         }
 
         TapHandler {
-            onDoubleTapped: view.fitAll()
+            onDoubleTapped: {
+                view.fitAll()
+                view.redraw()
+            }
         }
     }
 }

@@ -181,6 +181,7 @@ HpVis::initUI()
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_toolBar   = new ViewToolBar();
     m_statsDock = new StatisticsDock(this);
+    m_statsDock->setOpenMapsProvider([this]() { return openMaps(); });
     m_powerDock = new PowerSpectrumDock(this);
     m_powerDock->setOpenMapsProvider([this]() { return openMaps(); });
     m_statusBar = new StatusBar();
@@ -244,6 +245,7 @@ HpVis::initConnections()
         m_settings.plotBackground = bg;
         m_settings.plotForeground = fg;
         m_settings.plotLine       = line;
+        m_statsDock->setPlotColors(bg, fg, line);
     });
 
     connect(m_tabWidget, &TabWidget::currentChanged, this,
@@ -889,6 +891,7 @@ HpVis::onTabCloseRequested(int index)
 
     QWidget *widget = m_tabWidget->widget(index);
     m_powerDock->forget(qobject_cast<View *>(widget));
+    m_statsDock->forget(qobject_cast<View *>(widget));
     m_tabWidget->removeTab(index);
     delete widget;
 
@@ -1015,6 +1018,8 @@ HpVis::applySavedSettings()
     updateRecentMenu();
     applyInterfaceSettings();
     m_powerDock->setPlotColors(m_settings.plotBackground,
+                               m_settings.plotForeground, m_settings.plotLine);
+    m_statsDock->setPlotColors(m_settings.plotBackground,
                                m_settings.plotForeground, m_settings.plotLine);
 
     // Apply what changed to the maps that are already open too. Only the

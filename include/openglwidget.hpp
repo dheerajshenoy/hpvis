@@ -192,6 +192,10 @@ public:
         return m_masks[index].inverted;
     }
 
+    // 1 for the pixels the enabled masks keep, one entry per pixel; empty when
+    // no mask is enabled
+    std::vector<uint8_t> keepMask() const;
+
     inline int maskMode() const
     {
         return m_maskMode;

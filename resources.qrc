@@ -19,6 +19,7 @@
 
         <!-- QML -->
         <file>src/qml/powerspectrumplot.qml</file>
+        <file>src/qml/histogram.qml</file>
 
     </qresource>
 </RCC>
