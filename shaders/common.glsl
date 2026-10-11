@@ -22,5 +22,7 @@ uniform float mask_opacity;  // strength of "dim"
 uniform float zoom;
 uniform vec2 panOffset;
 uniform vec3 unseen_color;
+uniform bool globe_shadow;   // orthographic: soft shadow outside the globe
+uniform bool limb_darkening; // orthographic: darken towards the limb
 
 #define PI 3.14159265358979323846

@@ -40,7 +40,7 @@ SettingsDialog::initUI()
     m_pageKeywords = {
         "general recent files history list",
         "appearance new maps defaults colormap color scale linear log reverse "
-        "background unseen color bar minimap graticule grid spacing",
+        "background unseen color bar minimap graticule grid spacing globe shadow limb darkening orthographic",
         "about version author license",
     };
 
@@ -170,6 +170,8 @@ SettingsDialog::loadSettings()
     m_graticuleCheck->setChecked(a.graticule);
     const int step = m_graticuleStepCombo->findData(a.graticuleStep);
     m_graticuleStepCombo->setCurrentIndex(step >= 0 ? step : 3);
+    m_globeShadowCheck->setChecked(a.globeShadow);
+    m_limbDarkeningCheck->setChecked(a.limbDarkening);
 }
 
 void
@@ -187,6 +189,8 @@ SettingsDialog::saveSettings()
     a.minimap         = m_minimapCheck->isChecked();
     a.graticule       = m_graticuleCheck->isChecked();
     a.graticuleStep   = m_graticuleStepCombo->currentData().toDouble();
+    a.globeShadow     = m_globeShadowCheck->isChecked();
+    a.limbDarkening   = m_limbDarkeningCheck->isChecked();
     a.save();
 }
 
@@ -293,6 +297,12 @@ SettingsDialog::createAppearanceSettingsPage()
     m_graticuleStepCombo->setEnabled(false);
     connect(m_graticuleCheck, &QCheckBox::toggled, m_graticuleStepCombo,
             &QWidget::setEnabled);
+
+    m_globeShadowCheck = new QCheckBox("Orthographic: shadow around globe");
+    overlayForm->addRow(m_globeShadowCheck);
+
+    m_limbDarkeningCheck = new QCheckBox("Orthographic: limb darkening");
+    overlayForm->addRow(m_limbDarkeningCheck);
 
     outer->addWidget(overlayBox);
     outer->addStretch();

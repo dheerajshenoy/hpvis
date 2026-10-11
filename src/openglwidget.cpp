@@ -466,6 +466,8 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("view_scale", viewScale());
     m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
     m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
+    m_shaderProgram.setUniformValue("globe_shadow", m_globeShadow);
+    m_shaderProgram.setUniformValue("limb_darkening", m_limbDarkening);
     m_shaderProgram.setUniformValue(
         "graticule_step", float(qDegreesToRadians(m_graticuleStepDeg)));
     m_shaderProgram.setUniformValue(
@@ -1464,6 +1466,20 @@ void
 OpenGLWidget::setGraticuleEnabled(bool enabled)
 {
     m_graticuleEnabled = enabled;
+    update();
+}
+
+void
+OpenGLWidget::setGlobeShadow(bool enabled)
+{
+    m_globeShadow = enabled;
+    update();
+}
+
+void
+OpenGLWidget::setLimbDarkening(bool enabled)
+{
+    m_limbDarkening = enabled;
     update();
 }
 

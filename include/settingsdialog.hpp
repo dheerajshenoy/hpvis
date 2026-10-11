@@ -63,6 +63,8 @@ private:
     QCheckBox *m_minimapCheck        = nullptr;
     QCheckBox *m_graticuleCheck      = nullptr;
     QComboBox *m_graticuleStepCombo  = nullptr;
+    QCheckBox *m_globeShadowCheck    = nullptr;
+    QCheckBox *m_limbDarkeningCheck  = nullptr;
     QColor m_background;
     QColor m_unseen;
 };

@@ -207,6 +207,8 @@ public:
     void setGraticuleColor(const QColor &color);
     void setGraticuleEnabled(bool enabled);
     void setGraticuleStep(double degrees);
+    void setGlobeShadow(bool enabled);
+    void setLimbDarkening(bool enabled);
     bool graticuleEnabled() const
     {
         return m_graticuleEnabled;
@@ -333,6 +335,8 @@ private:
     static constexpr int kMinimapMargin = 12;
     bool m_minimapEnabled               = false;
     bool m_graticuleEnabled             = false;
+    bool m_globeShadow                  = true;
+    bool m_limbDarkening                = true;
     double m_graticuleStepDeg           = 30.0;
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);
     Projection m_projection             = Projection::MOLLWEIDE;

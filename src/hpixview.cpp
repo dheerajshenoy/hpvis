@@ -738,6 +738,12 @@ HpixView::onSettingsActionTriggered()
 
         if (s.graticuleStep != previous.graticuleStep)
             gl->setGraticuleStep(s.graticuleStep);
+
+        if (s.globeShadow != previous.globeShadow)
+            gl->setGlobeShadow(s.globeShadow);
+
+        if (s.limbDarkening != previous.limbDarkening)
+            gl->setLimbDarkening(s.limbDarkening);
     }
 
     // Refresh the side panel and menu check marks for the current tab
@@ -767,6 +773,8 @@ HpixView::applyDefaults(View *view)
     gl->setMinimapEnabled(m_settings.minimap);
     gl->setGraticuleEnabled(m_settings.graticule);
     gl->setGraticuleStep(m_settings.graticuleStep);
+    gl->setGlobeShadow(m_settings.globeShadow);
+    gl->setLimbDarkening(m_settings.limbDarkening);
 }
 
 void

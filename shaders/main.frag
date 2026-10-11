@@ -37,9 +37,15 @@ void main() {
     vec2 p = ndc / zoom + panOffset;
     vec2 viewUV = p * 0.5 + 0.5;
 
-    // if (!inverseMollweide(viewUV, colat, phi)) {
     if (!inverseProjection(viewUV, colat, phi)) {
-        FragColor = vec4(bg_color, 1.0); // background outside
+        vec3 outside = bg_color;
+        if (projection_type == PROJ_ORTHOGRAPHIC && globe_shadow) {
+            // Globe edge is at r = 1 in this unit; fade a dark halo outwards
+            float r = length(viewUV - vec2(0.5)) * 2.0;
+            float shadow = 0.45 * exp(-(r - 1.0) * 12.0);
+            outside = mix(bg_color, vec3(0.0), shadow);
+        }
+        FragColor = vec4(outside, 1.0);
         return;
     }
 
@@ -60,6 +66,7 @@ void main() {
     float mapVal = texelFetch(mapTexture, ivec2(pixIdx % W, pixIdx / W), 0).r;
 
     vec3 color;
+
     // HEALPix UNSEEN is -1.6375e30 (finite, not NaN); also catch NaN/Inf.
     if (mapVal < -1.0e30 || isnan(mapVal) || isinf(mapVal)) {
         color = unseen_color;
@@ -80,6 +87,12 @@ void main() {
             else
                 color = mix(color, unseen_color, (1.0 - keep) * mask_opacity);
         }
+    }
+
+    if (limb_darkening && projection_type == PROJ_ORTHOGRAPHIC) {
+        vec2 q = (viewUV - vec2(0.5)) * 2.0;
+        float mu = sqrt(max(0.0, 1.0 - dot(q, q))); // 1 at center, 0 at limb
+        color *= 1.0 - 0.55 * (1.0 - mu);
     }
 
     // Drawn last so the lines also cross unseen / masked pixels

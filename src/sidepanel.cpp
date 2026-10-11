@@ -318,7 +318,7 @@ SidePanel::colormapWidget()
     m_unseenColorButton = new QPushButton("");
     m_unseenColorButton->setFixedHeight(20);
     m_unseenColorButton->setStyleSheet(
-        QString("background-color: #%1;").arg(0x000000, 6, 16, QChar('0')));
+        QString("background-color: #%1;").arg(0xFFFFFF, 6, 16, QChar('0')));
     layout->addRow("Unseen:", m_unseenColorButton);
 
     return widget;

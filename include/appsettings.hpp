@@ -21,6 +21,8 @@ struct AppSettings
     bool minimap              = false;
     bool graticule            = false;
     double graticuleStep      = 30.0; // degrees
+    bool globeShadow          = true; // orthographic outer shadow
+    bool limbDarkening        = true; // orthographic limb darkening
 
     static AppSettings load();
     void save() const;

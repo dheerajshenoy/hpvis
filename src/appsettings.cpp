@@ -36,6 +36,8 @@ AppSettings::load()
     a.graticuleStep
         = std::clamp(s.value("view/graticuleStep", d.graticuleStep).toDouble(),
                      1.0, 90.0);
+    a.globeShadow   = s.value("view/globeShadow", d.globeShadow).toBool();
+    a.limbDarkening = s.value("view/limbDarkening", d.limbDarkening).toBool();
     return a;
 }
 
@@ -54,5 +56,7 @@ AppSettings::save() const
     s.setValue("view/minimap", minimap);
     s.setValue("view/graticule", graticule);
     s.setValue("view/graticuleStep", graticuleStep);
+    s.setValue("view/globeShadow", globeShadow);
+    s.setValue("view/limbDarkening", limbDarkening);
     s.sync();
 }
