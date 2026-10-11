@@ -11,8 +11,8 @@ First development release.
   equidistant, Gnomonic), all with north up and longitude increasing to the left. The
   disk projections are drawn as true circles, and the cursor readout,
   graticule labels, zoom-to-region and the minimap follow the projection.
-- Support for both RING and NESTED pixel ordering, selectable from the side
-  panel.
+- Support for both RING and NESTED pixel ordering, selectable from
+  View > Pixel Ordering.
 - Longitude increases to the left, matching healpy.
 - Pixel indices use integer math (`texelFetch`) so large `nside` values stay
   exact.
@@ -40,9 +40,10 @@ First development release.
 - Interactive sky rotation: Ctrl + left-drag or middle-drag in any projection
   (plain left-drag in the Orthographic and Azimuthal views) grabs the sky
   point under the cursor and keeps it there. Double-click or Reset View
-  restores the orientation. The Projection section has Center longitude /
-  Center latitude / Roll boxes that follow the drag and can be typed into. The cursor readout and graticule labels follow
-  the rotation.
+  restores the orientation. View > Set Rotation... has Center longitude /
+  Center latitude / Roll boxes that apply live and can be typed into, and
+  View > Reset Rotation restores the orientation. The cursor readout and
+  graticule labels follow the rotation.
 - Mouse wheel zoom, left-drag pan, double-click to reset the view.
 - Touchpad support: pinch to zoom, two-finger scroll to pan, Ctrl+scroll to
   zoom, smart-zoom gesture to reset.
@@ -54,16 +55,16 @@ First development release.
 
 ### Masks
 - Load one or more HEALPix mask files, and add more at any time.
-- Each mask has its own checkbox in the side panel and a button to remove it;
-  "Clear" removes all of them.
-- Per-mask "Inv" checkbox inverts a mask (1 − m), for files that store 1 for
+- A Masks menu: Add Mask..., Clear All, and a submenu per mask with Enabled,
+  Invert and Remove.
+- Per-mask Invert inverts a mask (1 − m), for files that store 1 for
   "masked" instead of "keep". Like enabling, it only changes a uniform.
 - Enabled masks are combined (product) on the GPU. Toggling a mask only
   changes a uniform and does not re-upload any data.
 - Masks are stored as 8-bit values and packed four to an RGBA8 texture; up to
   16 masks can be loaded.
-- "Hide" mode paints masked pixels in the unseen color; "Dim" mode fades them
-  with an adjustable strength.
+- "Hide" mode (Masks > Mode) paints masked pixels in the unseen color; "Dim"
+  mode fades them with an adjustable strength (Masks > Dim Strength...).
 - Masks must match the map's `nside`; a mismatch shows a warning and the file
   is skipped. A mask with a different pixel ordering is converted.
 - The implicit color range ignores masked pixels while masks are enabled.
@@ -76,14 +77,18 @@ First development release.
 ### Interface
 - Tabbed interface: open several maps at once, each with its own view and
   settings.
-- Side panel with collapsible sections (Pixel Ordering, Color, Overlays) in a
-  scroll area.
-- Panel controls follow the current tab when you switch tabs.
-- "Map Info" section (nside, npix, minimum, maximum, average, RMS, standard deviation). The statistics are computed
-  once on load and whenever masks change, so switching tabs with large maps
-  stays fast. They only include pixels kept by the enabled masks.
-- Sky fraction (f_sky) shown for the enabled masks.
-- View menu toggles for the side panel and the minimap.
+- A toolbar with the frequently used controls: HDU, Column, Projection and
+  Colormap. Everything else is in the menus: View (pixel ordering, colors,
+  color scale, reverse colormap, color bar range, graticule, rotation), Masks
+  and Tools.
+- Toolbar and menu controls follow the current tab when you switch tabs.
+- Clicking the map takes keyboard focus from the toolbar, so the shortcuts
+  keep working.
+- Tools > Analysis > Statistics shows nside, npix, minimum, maximum, average,
+  RMS, standard deviation and the sky fraction (f_sky). The statistics are
+  computed once on load and whenever masks change, so switching tabs with
+  large maps stays fast. They only include pixels kept by the enabled masks.
+- View menu toggles for the minimap and the color bar.
 - Full-width status bar showing the file name, file size, zoom level, and the
   cursor's longitude/latitude, pixel index and pixel value.
 - File > Open Recent lists the last 10 opened files (newest first, with a
@@ -91,19 +96,29 @@ First development release.
   `recent_files.txt` in the app data directory
   (`~/.local/share/hpvis/` on Linux).
 - Open files from the File menu, or from the command line (`hpvis
-  file.fits ...`).
+  file.fits ...`). Command-line options override the saved defaults: `--hdu`,
+  `--column`, `--colormap`, `--reverse`, `--scale`, `--min`, `--max`,
+  `--projection`, `--graticule` and `--mask`. `--export FILE` saves the view as
+  an image and exits, and `--info` / `--stats` print the HDUs and columns or
+  the map statistics without opening a window.
 - Files are opened with `fitshandle`: every HDU that holds a HEALPix map (NSIDE and
-  ORDERING keywords, columns of 12*nside^2 values) is listed in the Map Info section (HDU and Column), and switching either one
+  ORDERING keywords, columns of 12*nside^2 values) is listed in the toolbar (HDU and Column), and switching either one
   reloads that map in the background. The first map HDU / column is used
   when a file is opened.
-- "Header" button in the menu bar opens a dialog with the FITS header cards
+- File > FITS Header... opens a dialog with the FITS header cards
   (keyword, value, comment) of any HDU in the current file, with a filter box
   and a Copy button.
-- Settings dialog (Tools > Settings) with General, Appearance and About pages
-  and a search box. It stores the number of recent files and the defaults for
-  all maps (colormap, reverse, scale, background and unseen colors,
-  color bar, minimap, graticule and its spacing) with `QSettings`. Changes also
-  apply to maps that are already open.
+- Settings dialog (Tools > Settings) with General, Appearance, Overlays and
+  About pages, grouped into sections, and a search box. It stores, with
+  `QSettings`:
+  - General: the number of recent files, whether file dialogs start in the
+    last used folder, and toolbar / status bar visibility.
+  - Appearance: the default projection, colormap, reverse, scale, background
+    and unseen colors, and the orthographic shadow and limb darkening.
+  - Overlays: color bar, minimap, graticule (visibility, spacing, color) and
+    the default mask mode and dim strength.
+
+  Changes also apply to maps that are already open.
 - Maps and masks are read on background threads, so the window stays
   responsive while large files load (the status bar shows "Loading...").
   Several files opened together load in parallel.
@@ -112,6 +127,9 @@ First development release.
 - Error dialog when a map cannot be loaded, including HEALPix library errors.
 
 ### Build and packaging
-- CMake build with Qt 6, vendored cfitsio and HEALPix, and OpenMP linked.
+- CMake build with Qt 6, vendored cfitsio, and OpenMP linked. HEALPix C++ and
+  libsharp are built from the vendored sources into the build tree, so no
+  prebuilt libraries or absolute paths are kept in the repository.
+- The project is named `hpvis`.
 - Sample data in `samples/` (WMAP nside 32, Planck dust nside 2048, and two
   test masks).

@@ -26,6 +26,8 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QStatusBar>
+#include <QTimer>
+#include <iostream>
 #include <QVBoxLayout>
 #include <cmath>
 
@@ -42,13 +44,99 @@ HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
 void
 HpVis::parseArgs(const argparse::ArgumentParser &parser)
 {
-    if (parser.is_used("files"))
+    auto fail = [](const std::string &what)
     {
-        auto files = parser.get<std::vector<std::string>>("files");
-        for (const auto &file : files)
+        std::cerr << what << std::endl;
+    };
+
+    if (auto name = parser.present<std::string>("--colormap"))
+    {
+        static const QStringList names
+            = {"grayscale", "inferno", "magma",  "plasma", "viridis",
+               "cubehelix", "jet",     "hsv",    "hot",    "cool",
+               "spring",    "summer",  "autumn", "winter", "rainbow"};
+        QString n = QString::fromStdString(*name).toLower();
+        if (n == "gray" || n == "grey")
+            n = "grayscale";
+        const int i = names.indexOf(n);
+        if (i >= 0)
+            m_cli.colormap = Colormap(i);
+        else
+            fail("Unknown colormap '" + *name + "' (choose from "
+                 + names.join(", ").toStdString() + ")");
+    }
+
+    if (auto scale = parser.present<std::string>("--scale"))
+        m_cli.scale = (*scale == "log") ? ColormapScale::LOG
+                                        : ColormapScale::LINEAR;
+
+    if (auto proj = parser.present<std::string>("--projection"))
+    {
+        static const QStringList names
+            = {"mollweide", "plate_carree", "orthographic",
+               "azimuthal_equidistant", "gnomonic"};
+        const int i = names.indexOf(QString::fromStdString(*proj));
+        if (i >= 0)
+            m_cli.projection = Projection(i);
+    }
+
+    m_cli.min       = parser.present<double>("--min");
+    m_cli.max       = parser.present<double>("--max");
+    m_cli.reverse   = parser.get<bool>("--reverse");
+    m_cli.graticule = parser.get<bool>("--graticule");
+
+    if (parser.is_used("--mask"))
+        for (const auto &m : parser.get<std::vector<std::string>>("--mask"))
+            m_cli.masks << QString::fromStdString(m);
+
+    if (auto out = parser.present<std::string>("--export"))
+        m_cli.exportPath = QString::fromStdString(*out);
+
+    const int hdu    = parser.present<int>("--hdu").value_or(0);
+    const int column = parser.present<int>("--column").value_or(0);
+
+    for (const auto &file : parser.get<std::vector<std::string>>("files"))
+    {
+        const QString path = QString::fromStdString(file);
+        m_cliPaths.insert(path);
+        OpenFile(path, hdu, column);
+    }
+}
+
+// Applies the command-line options on top of the defaults, then exports and
+// quits when --export was given
+void
+HpVis::applyCliOptions(View *view)
+{
+    OpenGLWidget *gl = view->glWidget();
+
+    if (m_cli.colormap)
+        gl->setColormap(*m_cli.colormap);
+    if (m_cli.reverse)
+        gl->setColormapInvert(true);
+    if (m_cli.scale)
+        gl->setColormapScale(*m_cli.scale);
+    if (m_cli.projection)
+        gl->setProjection(*m_cli.projection);
+    if (m_cli.graticule)
+        gl->setGraticuleEnabled(true);
+    if (m_cli.min)
+        gl->setColormapMin(*m_cli.min);
+    if (m_cli.max)
+        gl->setColormapMax(*m_cli.max);
+    if (!m_cli.masks.isEmpty())
+        gl->addMaskFiles(m_cli.masks);
+
+    if (!m_cli.exportPath.isEmpty())
+    {
+        const QString out = m_cli.exportPath;
+        m_cli.exportPath.clear(); // only the first file
+        // Give the GPU a moment to upload and draw the map (and masks)
+        QTimer::singleShot(1000, this, [this, gl, out]()
         {
-            OpenFile(QString::fromStdString(file));
-        }
+            gl->exportImage(out);
+            QApplication::quit();
+        });
     }
 }
 
@@ -132,8 +220,8 @@ HpVis::initMenubar()
     m_fileOpenRecentMenu = m_fileMenu->addMenu("&Open Recent");
     updateRecentMenu();
 
-    m_fileExportAction = m_fileMenu->addAction(
-        "&Export", this, &HpVis::onExportActionTriggered);
+    m_fileExportAction = m_fileMenu->addAction("&Export", this,
+                                               &HpVis::onExportActionTriggered);
 
     m_headerAction = m_fileMenu->addAction("FITS &Header...", this, [this]()
     {
@@ -363,7 +451,7 @@ HpVis::updateRecentMenu()
 }
 
 void
-HpVis::OpenFile(const QString &filePath)
+HpVis::OpenFile(const QString &filePath, int hdu, int column)
 {
     QString resolvedPath;
     if (filePath.isEmpty())
@@ -385,6 +473,7 @@ HpVis::OpenFile(const QString &filePath)
     if (filePath.startsWith("~"))
         resolvedPath = QDir::homePath() + filePath.mid(1);
 
+    const bool fromCli     = m_cliPaths.remove(filePath);
     const QString filename = QFileInfo(resolvedPath).fileName();
     m_statusBar->showMessage(QString("Loading %1...").arg(filename));
 
@@ -393,7 +482,7 @@ HpVis::OpenFile(const QString &filePath)
     view->hide();
 
     connect(view, &View::loadFinished, this,
-            [this, view, filename, resolvedPath](bool ok, const QString &error)
+            [this, view, filename, resolvedPath, fromCli](bool ok, const QString &error)
     {
         if (!ok)
         {
@@ -409,6 +498,8 @@ HpVis::OpenFile(const QString &filePath)
         }
 
         applyDefaults(view);
+        if (fromCli)
+            applyCliOptions(view);
         m_tabWidget->addTab(view, filename);
         // Show it now so the GPU upload happens at open time, not on the
         // first tab switch
@@ -429,7 +520,7 @@ HpVis::OpenFile(const QString &filePath)
         m_toolBar->setEnabled(true);
     });
 
-    view->loadMap(resolvedPath);
+    view->loadMap(resolvedPath, hdu, column);
 }
 
 void

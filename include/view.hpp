@@ -47,7 +47,8 @@ public:
     void setHduIndex(int index);
 
     // Asynchronous: reads the file in the background and emits loadFinished
-    void loadMap(const QString &filename);
+    // hdu / column are 1-based; 0 picks the first map HDU / column
+    void loadMap(const QString &filename, int hdu = 0, int column = 0);
     // Same file, another table HDU / column (both 1-based). Asynchronous;
     // emits hduLoaded.
     void loadHdu(int hdu, int column);

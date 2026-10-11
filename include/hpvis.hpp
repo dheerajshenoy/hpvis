@@ -12,7 +12,9 @@
 #include "viewtoolbar.hpp"
 
 #include <QMainWindow>
+#include <QSet>
 #include <QTabWidget>
+#include <optional>
 
 class HpVis : public QMainWindow
 {
@@ -21,13 +23,30 @@ public:
     explicit HpVis(const argparse::ArgumentParser &parser,
                       QWidget *parent = nullptr);
 
-    void OpenFile(const QString &filePath = QString());
+    // hdu / column are 1-based; 0 picks the first map HDU / column
+    void OpenFile(const QString &filePath = QString(), int hdu = 0,
+                  int column = 0);
 
 protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dropEvent(QDropEvent *event) override;
 
 private:
+    // Command-line overrides of the saved settings, applied to every map
+    // opened from the command line
+    struct CliOptions
+    {
+        std::optional<Colormap> colormap;
+        std::optional<ColormapScale> scale;
+        std::optional<Projection> projection;
+        std::optional<double> min, max;
+        bool reverse   = false;
+        bool graticule = false;
+        QStringList masks;
+        QString exportPath;
+    };
+    void applyCliOptions(View *view);
+
     void parseArgs(const argparse::ArgumentParser &parser);
     void initUI();
     void initConnections();
@@ -70,6 +89,9 @@ private slots:
     void onColormapRangeActionTriggered();
 
 private:
+    CliOptions m_cli;
+    QSet<QString> m_cliPaths; // files opened from the command line
+
     QMenu *m_editMenu = nullptr;
 
     QMenu *m_fileMenu           = nullptr;

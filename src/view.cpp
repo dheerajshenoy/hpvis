@@ -148,10 +148,10 @@ View::startLoad(int hdu, int column, bool initial)
 }
 
 void
-View::loadMap(const QString &filename)
+View::loadMap(const QString &filename, int hdu, int column)
 {
     m_filePath = filename;
-    startLoad(0, 0, true);
+    startLoad(hdu, column, true);
 }
 
 // Switch to another HDU / column of the same file; ignored while a load is
