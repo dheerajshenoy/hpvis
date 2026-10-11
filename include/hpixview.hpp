@@ -41,6 +41,9 @@ private:
     void updateControlsFromView(const View *view);
     void rebuildMasksMenu(const View *view);
     void initShortcuts();
+    void applyInterfaceSettings();
+    QString startDirectory() const;
+    void rememberDirectory(const QString &path) const;
 
 private slots:
     void onPixelOrderingChanged(PixelOrdering ordering);

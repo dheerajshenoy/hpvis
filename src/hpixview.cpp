@@ -24,6 +24,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSettings>
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <cmath>
@@ -77,6 +78,7 @@ HpixView::initUI()
     statusBar()->addWidget(m_statusBar, 1);
 
     initConnections();
+    applyInterfaceSettings();
 }
 
 void
@@ -367,9 +369,11 @@ HpixView::OpenFile(const QString &filePath)
     if (filePath.isEmpty())
     {
         auto files = QFileDialog::getOpenFileNames(
-            this, "Open FITS File", QDir::homePath(),
+            this, "Open FITS File", startDirectory(),
             "FITS Files (*.fits *.fit *.fts);;All Files (*)");
 
+        if (!files.isEmpty())
+            rememberDirectory(files.first());
         for (const auto &file : files)
             OpenFile(file);
 
@@ -723,11 +727,12 @@ HpixView::onExportActionTriggered()
         return;
 
     const QString filePath
-        = QFileDialog::getSaveFileName(this, "Export Image", QDir::homePath(),
+        = QFileDialog::getSaveFileName(this, "Export Image", startDirectory(),
                                        "PNG Files (*.png);;All Files (*)");
 
     if (!filePath.isEmpty())
     {
+        rememberDirectory(filePath);
         m_view->glWidget()->exportImage(filePath);
     }
 }
@@ -749,6 +754,7 @@ HpixView::applySavedSettings()
     m_settings                 = AppSettings::load();
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     updateRecentMenu();
+    applyInterfaceSettings();
 
     // Apply what changed to the maps that are already open too. Only the
     // changed options are touched, so per-map tweaks to the others survive.
@@ -792,11 +798,52 @@ HpixView::applySavedSettings()
 
         if (s.limbDarkening != previous.limbDarkening)
             gl->setLimbDarkening(s.limbDarkening);
+
+        if (s.projection != previous.projection)
+            gl->setProjection(s.projection);
+
+        if (s.graticuleColor != previous.graticuleColor)
+            gl->setGraticuleColor(s.graticuleColor);
+
+        if (s.maskMode != previous.maskMode)
+            gl->setMaskMode(s.maskMode);
+
+        if (s.maskOpacityPercent != previous.maskOpacityPercent)
+            gl->setMaskOpacity(s.maskOpacityPercent / 100.0f);
     }
 
     // Refresh the toolbar and menu check marks for the current tab
     if (m_view)
         onTabChanged(m_tabWidget->currentIndex());
+}
+
+void
+HpixView::applyInterfaceSettings()
+{
+    m_toolBar->setVisible(m_settings.showToolbar);
+    statusBar()->setVisible(m_settings.showStatusBar);
+}
+
+// Folder the file dialogs start in
+QString
+HpixView::startDirectory() const
+{
+    if (m_settings.rememberLastDir)
+    {
+        const QString dir
+            = QSettings().value("general/lastDirectory").toString();
+        if (!dir.isEmpty() && QDir(dir).exists())
+            return dir;
+    }
+    return QDir::homePath();
+}
+
+void
+HpixView::rememberDirectory(const QString &path) const
+{
+    if (m_settings.rememberLastDir && !path.isEmpty())
+        QSettings().setValue("general/lastDirectory",
+                             QFileInfo(path).absolutePath());
 }
 
 // Gives a newly loaded map the user's default view options
@@ -815,6 +862,10 @@ HpixView::applyDefaults(View *view)
     gl->setGraticuleStep(m_settings.graticuleStep);
     gl->setGlobeShadow(m_settings.globeShadow);
     gl->setLimbDarkening(m_settings.limbDarkening);
+    gl->setProjection(m_settings.projection);
+    gl->setGraticuleColor(m_settings.graticuleColor);
+    gl->setMaskMode(m_settings.maskMode);
+    gl->setMaskOpacity(m_settings.maskOpacityPercent / 100.0f);
 }
 
 void

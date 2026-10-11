@@ -12,6 +12,7 @@
 #include <QListView>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSlider>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QStringListModel>
@@ -36,12 +37,17 @@ SettingsDialog::initUI()
     m_listModel->setStringList({
         "General",
         "Appearance",
+        "Overlays",
         "About",
     });
     m_pageKeywords = {
-        "general recent files history list",
-        "appearance new maps defaults colormap color scale linear log reverse "
-        "background unseen color bar minimap graticule grid spacing globe shadow limb darkening orthographic",
+        "general files recent history list folder directory remember last "
+        "interface toolbar status bar show hide",
+        "appearance new maps defaults projection mollweide orthographic colormap "
+        "color scale linear log reverse background unseen globe shadow limb "
+        "darkening",
+        "overlays color bar minimap graticule grid spacing color masks mask mode "
+        "hide dim strength opacity",
         "about version author license",
     };
 
@@ -58,6 +64,7 @@ SettingsDialog::initUI()
 
     m_stackedWidget->addWidget(createGeneralSettingsPage());
     m_stackedWidget->addWidget(createAppearanceSettingsPage());
+    m_stackedWidget->addWidget(createOverlaysSettingsPage());
     m_stackedWidget->addWidget(createAboutPage());
 
     hlayout->addWidget(m_listView);
@@ -106,9 +113,13 @@ SettingsDialog::initConnections()
     connect(m_recentMaxSpin, &QSpinBox::valueChanged, this, changed);
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_projectionCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_maskModeCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_maskOpacitySlider, &QSlider::valueChanged, this, changed);
     connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
             changed);
-    for (QCheckBox *box : {m_reverseCheck, m_colorBarCheck, m_minimapCheck,
+    for (QCheckBox *box : {m_rememberDirCheck, m_showToolbarCheck,
+                           m_showStatusBarCheck, m_reverseCheck, m_colorBarCheck, m_minimapCheck,
                            m_graticuleCheck, m_globeShadowCheck,
                            m_limbDarkeningCheck})
         connect(box, &QCheckBox::toggled, this, changed);
@@ -186,6 +197,13 @@ SettingsDialog::currentSettings() const
 {
     AppSettings a;
     a.recentFilesMax  = m_recentMaxSpin->value();
+    a.rememberLastDir = m_rememberDirCheck->isChecked();
+    a.showToolbar     = m_showToolbarCheck->isChecked();
+    a.showStatusBar   = m_showStatusBarCheck->isChecked();
+    a.projection      = Projection(m_projectionCombo->currentIndex());
+    a.graticuleColor  = m_graticuleColor;
+    a.maskMode        = m_maskModeCombo->currentIndex();
+    a.maskOpacityPercent = m_maskOpacitySlider->value();
     a.colormap        = Colormap(m_colormapCombo->currentIndex());
     a.reverseColormap = m_reverseCheck->isChecked();
     a.scale           = ColormapScale(m_scaleCombo->currentIndex());
@@ -218,6 +236,15 @@ SettingsDialog::loadSettings()
     const AppSettings a = AppSettings::load();
 
     m_recentMaxSpin->setValue(a.recentFilesMax);
+
+    m_rememberDirCheck->setChecked(a.rememberLastDir);
+    m_showToolbarCheck->setChecked(a.showToolbar);
+    m_showStatusBarCheck->setChecked(a.showStatusBar);
+    m_projectionCombo->setCurrentIndex(int(a.projection));
+    m_graticuleColor = a.graticuleColor;
+    setColorButton(m_graticuleColorButton, m_graticuleColor);
+    m_maskModeCombo->setCurrentIndex(a.maskMode);
+    m_maskOpacitySlider->setValue(a.maskOpacityPercent);
 
     m_colormapCombo->setCurrentIndex(int(a.colormap));
     m_reverseCheck->setChecked(a.reverseColormap);
@@ -269,11 +296,12 @@ SettingsDialog::pickColor(QPushButton *button, QColor &color,
 QWidget *
 SettingsDialog::createGeneralSettingsPage()
 {
-    QWidget *page       = new QWidget();
-    QVBoxLayout *outer  = new QVBoxLayout(page);
+    QWidget *page      = new QWidget();
+    QVBoxLayout *outer = new QVBoxLayout(page);
 
-    auto *box           = new QGroupBox("Files");
-    auto *form          = new QFormLayout(box);
+    // --- Files ---
+    auto *box  = new QGroupBox("Files");
+    auto *form = new QFormLayout(box);
 
     m_recentMaxSpin = new QSpinBox();
     m_recentMaxSpin->setRange(0, 50);
@@ -281,7 +309,22 @@ SettingsDialog::createGeneralSettingsPage()
                                 "(0 turns it off)");
     form->addRow("Recent files:", m_recentMaxSpin);
 
+    m_rememberDirCheck = new QCheckBox("Open and export dialogs start in the "
+                                       "last used folder");
+    form->addRow(m_rememberDirCheck);
     outer->addWidget(box);
+
+    // --- Interface ---
+    auto *uiBox  = new QGroupBox("Interface");
+    auto *uiForm = new QFormLayout(uiBox);
+
+    m_showToolbarCheck = new QCheckBox("Show toolbar");
+    uiForm->addRow(m_showToolbarCheck);
+
+    m_showStatusBarCheck = new QCheckBox("Show status bar");
+    uiForm->addRow(m_showStatusBarCheck);
+    outer->addWidget(uiBox);
+
     outer->addStretch();
     return page;
 }
@@ -295,6 +338,16 @@ SettingsDialog::createAppearanceSettingsPage()
     outer->addWidget(new QLabel(
         "Changes here apply to all open maps and to maps you open later. Only "
         "the options you change are applied, so other per-map tweaks are kept."));
+
+    // --- Projection ---
+    auto *projBox  = new QGroupBox("Projection");
+    auto *projForm = new QFormLayout(projBox);
+    m_projectionCombo = new QComboBox();
+    m_projectionCombo->addItems({"Mollweide", "Plate Carr\u00e9e",
+                                 "Orthographic", "Azimuthal Equidistant",
+                                 "Gnomonic"});
+    projForm->addRow("Default projection:", m_projectionCombo);
+    outer->addWidget(projBox);
 
     // --- Color ---
     auto *colorBox = new QGroupBox("Color");
@@ -328,36 +381,83 @@ SettingsDialog::createAppearanceSettingsPage()
 
     outer->addWidget(colorBox);
 
-    // --- Overlays ---
-    auto *overlayBox  = new QGroupBox("Overlays");
-    auto *overlayForm = new QFormLayout(overlayBox);
+    // --- Orthographic ---
+    auto *orthoBox  = new QGroupBox("Orthographic");
+    auto *orthoForm = new QFormLayout(orthoBox);
+
+    m_globeShadowCheck = new QCheckBox("Shadow around globe");
+    orthoForm->addRow(m_globeShadowCheck);
+
+    m_limbDarkeningCheck = new QCheckBox("Limb darkening");
+    orthoForm->addRow(m_limbDarkeningCheck);
+
+    outer->addWidget(orthoBox);
+    outer->addStretch();
+    return page;
+}
+
+QWidget *
+SettingsDialog::createOverlaysSettingsPage()
+{
+    QWidget *page      = new QWidget();
+    QVBoxLayout *outer = new QVBoxLayout(page);
+
+    // --- Display ---
+    auto *displayBox  = new QGroupBox("Display");
+    auto *displayForm = new QFormLayout(displayBox);
 
     m_colorBarCheck = new QCheckBox("Show color bar");
-    overlayForm->addRow(m_colorBarCheck);
+    displayForm->addRow(m_colorBarCheck);
 
     m_minimapCheck = new QCheckBox("Show minimap");
-    overlayForm->addRow(m_minimapCheck);
+    displayForm->addRow(m_minimapCheck);
+
+    outer->addWidget(displayBox);
+
+    // --- Graticule ---
+    auto *gratBox  = new QGroupBox("Graticule");
+    auto *gratForm = new QFormLayout(gratBox);
 
     m_graticuleCheck = new QCheckBox("Show graticule");
-    overlayForm->addRow(m_graticuleCheck);
+    gratForm->addRow(m_graticuleCheck);
 
     m_graticuleStepCombo = new QComboBox();
     for (double deg : {10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0})
         m_graticuleStepCombo->addItem(QString("%1\u00b0").arg(deg), deg);
-    overlayForm->addRow("Grid spacing:", m_graticuleStepCombo);
+    gratForm->addRow("Grid spacing:", m_graticuleStepCombo);
+
+    m_graticuleColorButton = new QPushButton();
+    m_graticuleColorButton->setFixedHeight(22);
+    connect(m_graticuleColorButton, &QPushButton::clicked, this, [this]()
+    { pickColor(m_graticuleColorButton, m_graticuleColor, "Graticule Color"); });
+    gratForm->addRow("Color:", m_graticuleColorButton);
 
     // The spacing only matters while the graticule is on
     m_graticuleStepCombo->setEnabled(false);
     connect(m_graticuleCheck, &QCheckBox::toggled, m_graticuleStepCombo,
             &QWidget::setEnabled);
 
-    m_globeShadowCheck = new QCheckBox("Orthographic: shadow around globe");
-    overlayForm->addRow(m_globeShadowCheck);
+    outer->addWidget(gratBox);
 
-    m_limbDarkeningCheck = new QCheckBox("Orthographic: limb darkening");
-    overlayForm->addRow(m_limbDarkeningCheck);
+    // --- Masks ---
+    auto *maskBox  = new QGroupBox("Masks");
+    auto *maskForm = new QFormLayout(maskBox);
 
-    outer->addWidget(overlayBox);
+    m_maskModeCombo = new QComboBox();
+    m_maskModeCombo->addItems({"Hide", "Dim"});
+    maskForm->addRow("Masked pixels:", m_maskModeCombo);
+
+    m_maskOpacitySlider = new QSlider(Qt::Horizontal);
+    m_maskOpacitySlider->setRange(0, 100);
+    maskForm->addRow("Dim strength:", m_maskOpacitySlider);
+
+    // The strength only applies to "Dim"
+    m_maskOpacitySlider->setEnabled(false);
+    connect(m_maskModeCombo, &QComboBox::currentIndexChanged,
+            m_maskOpacitySlider, [this](int mode)
+    { m_maskOpacitySlider->setEnabled(mode == 1); });
+
+    outer->addWidget(maskBox);
     outer->addStretch();
     return page;
 }

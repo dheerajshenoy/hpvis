@@ -1,6 +1,7 @@
 #pragma once
 
 #include "colormap.hpp"
+#include "projection.hpp"
 
 #include <QColor>
 
@@ -9,7 +10,10 @@
 struct AppSettings
 {
     // General
-    int recentFilesMax = 10;
+    int recentFilesMax    = 10;
+    bool rememberLastDir  = true; // file dialogs start in the last used folder
+    bool showToolbar      = true;
+    bool showStatusBar    = true;
 
     // New maps
     Colormap colormap         = Colormap::VIRIDIS;
@@ -17,6 +21,10 @@ struct AppSettings
     ColormapScale scale       = ColormapScale::LINEAR;
     QColor background         = QColor(10, 10, 15);
     QColor unseen             = QColor(0, 0, 0);
+    Projection projection     = Projection::MOLLWEIDE;
+    QColor graticuleColor     = QColor(255, 255, 255);
+    int maskMode              = 0;  // 0 = hide, 1 = dim
+    int maskOpacityPercent    = 80; // dim strength
     bool colorBar             = true;
     bool minimap              = false;
     bool graticule            = false;

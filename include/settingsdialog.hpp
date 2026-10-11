@@ -10,6 +10,7 @@ class QComboBox;
 class QLineEdit;
 class QListView;
 class QPushButton;
+class QSlider;
 class QSpinBox;
 class QStackedWidget;
 class QStringListModel;
@@ -42,6 +43,7 @@ private:
     void updateSaveEnabled();
     QWidget *createGeneralSettingsPage();
     QWidget *createAppearanceSettingsPage();
+    QWidget *createOverlaysSettingsPage();
     QWidget *createAboutPage();
 
     void setColorButton(QPushButton *button, const QColor &color);
@@ -59,9 +61,17 @@ private:
     QStringList m_pageKeywords;
 
     // General
-    QSpinBox *m_recentMaxSpin = nullptr;
+    QSpinBox *m_recentMaxSpin       = nullptr;
+    QCheckBox *m_rememberDirCheck   = nullptr;
+    QCheckBox *m_showToolbarCheck   = nullptr;
+    QCheckBox *m_showStatusBarCheck = nullptr;
 
     // Appearance (defaults for new maps)
+    QComboBox *m_projectionCombo     = nullptr;
+    QPushButton *m_graticuleColorButton = nullptr;
+    QComboBox *m_maskModeCombo       = nullptr;
+    QSlider *m_maskOpacitySlider     = nullptr;
+    QColor m_graticuleColor;
     QComboBox *m_colormapCombo       = nullptr;
     QCheckBox *m_reverseCheck        = nullptr;
     QComboBox *m_scaleCombo          = nullptr;
