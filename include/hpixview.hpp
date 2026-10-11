@@ -39,6 +39,7 @@ private:
     void updateStatusBarFromView(const View *view);
     void updateMaskListFromView(const View *view);
     void updateSidePanelStateFromView(const View *view);
+    void initShortcuts();
 
 private slots:
     void onPixelOrderingChanged(PixelOrdering ordering);

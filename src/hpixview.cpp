@@ -24,6 +24,7 @@ HpixView::HpixView(const argparse::ArgumentParser &parser, QWidget *parent)
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     initUI();
     parseArgs(parser);
+    initShortcuts();
     this->show();
 }
 
@@ -51,10 +52,8 @@ HpixView::initUI()
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_sidePanel = new SidePanel();
     m_statusBar = new StatusBar();
-
-    m_statusBar->showMessage("Welcome to HpixView!", 5000);
+    m_sidePanel->setVisible(false);
     initMenubar();
-
     layout->addWidget(m_tabWidget);
     setCentralWidget(widget);
 
@@ -181,11 +180,8 @@ HpixView::initMenubar()
 
     m_fileOpenAction
         = m_fileMenu->addAction("&Open", this, [this]() { OpenFile(); });
-    m_fileOpenAction->setShortcut(QKeySequence("Ctrl+O"));
 
     m_fileOpenRecentMenu = m_fileMenu->addMenu("&Open Recent");
-    m_fileOpenRecentMenu->menuAction()->setShortcut(
-        QKeySequence("Ctrl+Shift+O"));
     updateRecentMenu();
 
     m_fileExportAction = m_fileMenu->addAction(
@@ -197,7 +193,6 @@ HpixView::initMenubar()
         if (index >= 0)
             onTabCloseRequested(index);
     });
-    m_fileCloseTabAction->setShortcut(QKeySequence("Ctrl+W"));
 
     m_fileMenu->addAction("&Exit", this, &HpixView::close);
 
@@ -376,6 +371,8 @@ HpixView::OpenFile(const QString &filePath)
         m_recentFiles.add(resolvedPath);
         updateRecentMenu();
         m_statusBar->showMessage(QString("Loaded %1").arg(filename), 3000);
+
+        m_sidePanel->setVisible(true);
     });
 
     view->loadMap(resolvedPath);
@@ -667,20 +664,28 @@ HpixView::onSettingsActionTriggered()
 
         if (s.colormap != previous.colormap)
             gl->setColormap(s.colormap);
+
         if (s.reverseColormap != previous.reverseColormap)
             gl->setColormapInvert(s.reverseColormap);
+
         if (s.scale != previous.scale)
             gl->setColormapScale(s.scale);
+
         if (s.background != previous.background)
             gl->setBackgroundColor(s.background);
+
         if (s.unseen != previous.unseen)
             gl->setUnseenColor(s.unseen);
+
         if (s.colorBar != previous.colorBar)
             gl->setColorBarVisible(s.colorBar);
+
         if (s.minimap != previous.minimap)
             gl->setMinimapEnabled(s.minimap);
+
         if (s.graticule != previous.graticule)
             gl->setGraticuleEnabled(s.graticule);
+
         if (s.graticuleStep != previous.graticuleStep)
             gl->setGraticuleStep(s.graticuleStep);
     }
@@ -730,4 +735,15 @@ HpixView::dropEvent(QDropEvent *event)
             OpenFile(url.toLocalFile());
         }
     }
+}
+
+void
+HpixView::initShortcuts()
+{
+    m_fileCloseTabAction->setShortcut(QKeySequence("Ctrl+W"));
+    m_fileOpenRecentMenu->menuAction()->setShortcut(
+        QKeySequence("Ctrl+Shift+O"));
+    m_fileOpenAction->setShortcut(QKeySequence("Ctrl+O"));
+    m_viewMinimapAction->setShortcut(QKeySequence("M"));
+    m_viewColorBarAction->setShortcut(QKeySequence("C"));
 }
