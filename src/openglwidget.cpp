@@ -12,6 +12,7 @@
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QVector3D>
 #include <QWheelEvent>
 #include <algorithm>
@@ -355,6 +356,20 @@ OpenGLWidget::resizeGL(int w, int h)
     glViewport(0, 0, qRound(w * dpr), qRound(h * dpr));
 }
 
+// Text is drawn as filled outlines instead of with QPainter::drawText. On a
+// QOpenGLWidget drawText goes through Qt's GL glyph cache, which is attached
+// to the (global) font engine and is destroyed during process exit, after
+// Qt's per-thread GL state is already gone, so exit() could segfault when a
+// style plugin keeps a font alive.
+static void
+drawTextPath(QPainter &p, const QPointF &baseline, const QString &text,
+             const QColor &color)
+{
+    QPainterPath path;
+    path.addText(baseline, p.font(), text);
+    p.fillPath(path, color);
+}
+
 void
 OpenGLWidget::paintGL()
 {
@@ -486,7 +501,7 @@ OpenGLWidget::paintGL()
         return;
 
     QPainter p(this);
-    p.setRenderHint(QPainter::TextAntialiasing);
+    p.setRenderHint(QPainter::Antialiasing);
 
     if (showMinimap)
     {
@@ -585,7 +600,8 @@ OpenGLWidget::paintGL()
     for (const Tick &t : ticks)
     {
         p.drawLine(QPointF(t.x, bottom), QPointF(t.x, bottom + 5));
-        p.drawText(QPointF(t.x - t.w / 2, bottom + 18), t.label);
+        drawTextPath(p, QPointF(t.x - t.w / 2, bottom + 18), t.label,
+                     Qt::white);
     }
 }
 
@@ -1274,10 +1290,9 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
                          fm.horizontalAdvance(text), fm.height());
         if (!bounds.contains(box))
             return;
-        p.setPen(QColor(0, 0, 0, 200)); // shadow keeps it readable on any map
-        p.drawText(origin + QPointF(1, 1), text);
-        p.setPen(Qt::white);
-        p.drawText(origin, text);
+        // shadow keeps it readable on any map
+        drawTextPath(p, origin + QPointF(1, 1), text, QColor(0, 0, 0, 200));
+        drawTextPath(p, origin, text, Qt::white);
     };
 
     // Longitudes along the equator (0 at the center, increasing to the left)
