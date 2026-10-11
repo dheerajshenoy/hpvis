@@ -16,6 +16,7 @@
 #include <QLabel>
 #include <QLineSeries>
 #include <QProgressBar>
+#include <QSettings>
 #include <QPushButton>
 #include <QTimer>
 #include <QElapsedTimer>
@@ -30,6 +31,14 @@
 #include <atomic>
 #include <cmath>
 #include <memory>
+
+// Highest multipole for the lmax choice: 0 = 3 nside - 1 (the most the map
+// holds), 1 = 2 nside, 2 = nside
+static int
+lmaxFor(int nside, int mode)
+{
+    return mode == 0 ? 3 * nside - 1 : mode == 1 ? 2 * nside : nside;
+}
 
 // The maps behind one computation; Q and U are empty for an intensity map
 struct Stokes
@@ -122,8 +131,11 @@ struct PowerSpectrumJob
 {
     // Reading + converting the map, the first transform, then a synthesis and
     // an analysis for each refinement iteration
-    static constexpr int kIterations = 3;
-    static constexpr int kSteps      = 1 + 1 + 2 * kIterations;
+    int iterations = 1;
+    int totalSteps() const
+    {
+        return 1 + 1 + 2 * iterations;
+    }
 
     std::atomic<int> step{0}; // finished steps
     std::atomic<const char *> stage{"Starting"};
@@ -153,7 +165,7 @@ computeCl(const Stokes &s, int lmax, PowerSpectrumJob &job)
     const int nside = s.T.Nside();
     arr<double> weights(2 * nside);
     weights.fill(1.0); // or load HEALPix ring weights
-    const int iter = PowerSpectrumJob::kIterations;
+    const int iter = job.iterations;
 
     Alm<xcomplex<double>> aT(lmax, lmax);
     if (!s.polarized)
@@ -260,7 +272,6 @@ PowerSpectrumDock::initUI()
     });
 
     m_progressBar = new QProgressBar();
-    m_progressBar->setRange(0, PowerSpectrumJob::kSteps);
     m_progressBar->setFormat("%v of %m steps");
     m_progressLabel = new QLabel();
     m_progressLabel->setAlignment(Qt::AlignCenter);
@@ -299,13 +310,62 @@ PowerSpectrumDock::initUI()
     m_chartContainer = QWidget::createWindowContainer(m_chartView);
     m_chartContainer->setMinimumSize(320, 220);
 
+    // How much work to do: fewer refinement rounds and a lower lmax are faster
+    m_accuracyCombo = new QComboBox();
+    m_accuracyCombo->addItem("Fast", 0);
+    m_accuracyCombo->addItem("Normal", 1);
+    m_accuracyCombo->addItem("Accurate", 3);
+    m_accuracyCombo->setToolTip(
+        "Refinement rounds after the first transform: 0, 1 or 3.\n"
+        "Each round costs two more transforms and improves accuracy.");
+    m_lmaxCombo = new QComboBox();
+    m_lmaxCombo->addItem("2 \u00d7 nside", 1);
+    m_lmaxCombo->addItem("3 \u00d7 nside \u2212 1 (maximum)", 0);
+    m_lmaxCombo->addItem("nside", 2);
+    m_lmaxCombo->setToolTip(
+        "Highest multipole. The cost grows roughly with its cube, and above\n"
+        "about 2 \u00d7 nside the spectrum is mostly noise and aliasing.");
+    {
+        QSettings settings;
+        const int a = m_accuracyCombo->findData(
+            settings.value("powerspectrum/iterations", 1).toInt());
+        const int l = m_lmaxCombo->findData(
+            settings.value("powerspectrum/lmaxMode", 1).toInt());
+        m_accuracyCombo->setCurrentIndex(a >= 0 ? a : 1);
+        m_lmaxCombo->setCurrentIndex(l >= 0 ? l : 0);
+    }
+    connect(m_accuracyCombo, &QComboBox::currentIndexChanged, this, [this]()
+    {
+        QSettings().setValue("powerspectrum/iterations",
+                             m_accuracyCombo->currentData());
+        refresh();
+    });
+    connect(m_lmaxCombo, &QComboBox::currentIndexChanged, this, [this]()
+    {
+        QSettings().setValue("powerspectrum/lmaxMode",
+                             m_lmaxCombo->currentData());
+        refresh();
+    });
+
+    m_infoLabel = new QLabel();
+    m_infoLabel->setAlignment(Qt::AlignCenter);
+
+    auto *options = new QHBoxLayout();
+    options->addWidget(new QLabel("Accuracy:"));
+    options->addWidget(m_accuracyCombo);
+    options->addWidget(new QLabel("lmax:"));
+    options->addWidget(m_lmaxCombo);
+    options->addStretch();
+
     auto *top = new QHBoxLayout();
     top->addWidget(m_spectrumCombo, 1);
     top->addStretch();
     top->addWidget(m_computeButton);
 
+    layout->addLayout(options);
     layout->addLayout(top);
     layout->addWidget(m_warningLabel);
+    layout->addWidget(m_infoLabel);
     layout->addWidget(m_progressBar);
     layout->addWidget(m_progressLabel);
     layout->addWidget(m_statusLabel);
@@ -344,6 +404,10 @@ PowerSpectrumDock::refresh()
 
     m_computeButton->setEnabled(have);
     m_computeButton->setText(busy ? "Cancel" : done ? "Recompute" : "Compute");
+
+    m_accuracyCombo->setEnabled(!busy);
+    m_lmaxCombo->setEnabled(!busy);
+    m_infoLabel->setVisible(false);
 
     m_progressBar->setVisible(busy);
     m_progressLabel->setVisible(busy);
@@ -396,6 +460,16 @@ PowerSpectrumDock::refresh()
         notes << "The map's HDU, column or masks changed since this was "
                  "computed. Press Recompute to update it.";
 
+    m_infoLabel->setText(
+        QString("lmax = %1, %2 refinement round(s)")
+            .arg(it->lmax)
+            .arg(it->iterations));
+    m_infoLabel->setVisible(true);
+    if (it->iterations != m_accuracyCombo->currentData().toInt()
+        || it->lmax != lmaxFor(it->nside, m_lmaxCombo->currentData().toInt()))
+        notes << "The accuracy or lmax setting changed since this was "
+                 "computed. Press Recompute to apply it.";
+
     m_warningLabel->setText(notes.join("\n"));
     m_warningLabel->setVisible(!notes.isEmpty());
 
@@ -447,7 +521,10 @@ PowerSpectrumDock::compute()
         input.maskActive |= gl->maskEnabled(i);
     const int column = view->column();
 
-    auto job = std::make_shared<PowerSpectrumJob>();
+    const int iterations = m_accuracyCombo->currentData().toInt();
+    const int lmaxMode   = m_lmaxCombo->currentData().toInt();
+    auto job             = std::make_shared<PowerSpectrumJob>();
+    job->iterations      = iterations;
     job->clock.start();
     m_jobs.insert(view, job);
     m_busy.insert(view);
@@ -456,7 +533,7 @@ PowerSpectrumDock::compute()
     QPointer<View> guard(view);
     auto *watcher = new QFutureWatcher<CalcResult>(this);
     connect(watcher, &QFutureWatcher<CalcResult>::finished, this,
-            [this, watcher, guard, input, column]()
+            [this, watcher, guard, input, column, iterations, r_lmax = lmaxFor(int(input.map->Nside()), lmaxMode)]()
     {
         const CalcResult r = watcher->result();
         watcher->deleteLater();
@@ -493,6 +570,9 @@ PowerSpectrumDock::compute()
         res.maskActive = input.maskActive;
         res.hdu        = input.hdu;
         res.column     = column;
+        res.iterations = iterations;
+        res.lmax       = r_lmax;
+        res.nside      = int(input.map->Nside());
         m_results.insert(guard.data(), res);
         if (m_view.data() == guard.data())
             refresh();
@@ -500,7 +580,7 @@ PowerSpectrumDock::compute()
 
     // The worker owns copies / shared data, so it stays valid even if the
     // tab is closed before it finishes
-    watcher->setFuture(QtConcurrent::run([input, job]() -> CalcResult
+    watcher->setFuture(QtConcurrent::run([input, job, lmaxMode]() -> CalcResult
     {
         try
         {
@@ -512,7 +592,7 @@ PowerSpectrumDock::compute()
                 st.T         = toDouble(*input.map, st.unseen);
             }
             job->done();
-            const int lmax = st.T.Nside() * 3 - 1;
+            const int lmax = lmaxFor(st.T.Nside(), lmaxMode);
             CalcResult r;
             r.spectra = fromPowSpec(computeCl(st, lmax, *job));
             r.unseen  = st.unseen;
@@ -555,6 +635,7 @@ PowerSpectrumDock::updateProgress()
     const QString elapsed
         = QString("%1:%2").arg(secs / 60).arg(secs % 60, 2, 10, QChar('0'));
 
+    m_progressBar->setRange(0, job.totalSteps());
     m_progressBar->setValue(job.step);
     m_progressLabel->setText(
         job.cancelled

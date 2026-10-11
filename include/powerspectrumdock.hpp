@@ -54,6 +54,9 @@ private:
         bool maskActive = false;
         int hdu         = 0;
         int column      = 0;
+        int iterations  = 0; // refinement rounds used
+        int lmax        = 0;
+        int nside       = 0;
     };
 
     void initUI();
@@ -76,6 +79,9 @@ private:
     QLabel *m_statusLabel      = nullptr;
     QLabel *m_warningLabel     = nullptr;
     QComboBox *m_spectrumCombo = nullptr;
+    QComboBox *m_accuracyCombo = nullptr;
+    QComboBox *m_lmaxCombo     = nullptr;
+    QLabel *m_infoLabel        = nullptr;
     QPushButton *m_computeButton = nullptr;
     QProgressBar *m_progressBar  = nullptr;
     QLabel *m_progressLabel      = nullptr;

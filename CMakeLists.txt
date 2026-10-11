@@ -40,10 +40,17 @@ include(ExternalProject)
 set(HEALPIX_PREFIX ${CMAKE_BINARY_DIR}/healpix)
 file(MAKE_DIRECTORY ${HEALPIX_PREFIX}/include ${HEALPIX_PREFIX}/include/healpix_cxx)
 
+# The spherical harmonic transforms dominate the power spectrum, so build the
+# libraries with -O3 (their configure otherwise defaults to -g -O2; it adds
+# -fopenmp itself)
+set(HEALPIX_OPT_FLAGS "-O3")
+
 ExternalProject_Add(libsharp_ext
     PREFIX ${CMAKE_BINARY_DIR}/libsharp
     SOURCE_DIR ${HEALPIX_ROOT}/src/common_libraries/libsharp
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${HEALPIX_PREFIX}
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+        "CFLAGS=${HEALPIX_OPT_FLAGS}"
+        <SOURCE_DIR>/configure --prefix=${HEALPIX_PREFIX}
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND $(MAKE) install
     BUILD_BYPRODUCTS ${HEALPIX_PREFIX}/lib/libsharp.so)
@@ -53,6 +60,8 @@ ExternalProject_Add(healpix_cxx_ext
     SOURCE_DIR ${HEALPIX_ROOT}/src/cxx
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
         "PKG_CONFIG_PATH=${HEALPIX_PREFIX}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}"
+        "CFLAGS=${HEALPIX_OPT_FLAGS}"
+        "CXXFLAGS=${HEALPIX_OPT_FLAGS}"
         <SOURCE_DIR>/configure --prefix=${HEALPIX_PREFIX}
     BUILD_COMMAND $(MAKE)
     INSTALL_COMMAND $(MAKE) install
