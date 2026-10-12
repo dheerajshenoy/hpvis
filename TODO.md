@@ -1,7 +1,8 @@
 # TODO
 
+- [ ] Flip longitude toggle
+
 ## Rendering
-- [x] Tiled rendering for large maps (streaming above a configurable nside)
 - [ ] Smooth/bilinear interpolation option
 - [ ] HDR
 
@@ -19,8 +20,7 @@
 
 ## Data & files
 - [ ] Polarization display (Q/U → amplitude, vectors)
-- [ ] Map operations: difference, ratio, smoothing, ud_grade
-- [ ] Histogram view of map values
+- [ ] Map operations: smoothing, ud_grade
 
 ## Export
 - [ ] Copy view to clipboard
@@ -29,17 +29,7 @@
 - [ ] Side-by-side / linked views (synced zoom, rotation, color range)
 - [ ] Packaging (AppImage / Arch PKGBUILD) and README with screenshots
 
-## Quality
-- [ ] Unit tests for projection and index math
-- [ ] CI build (CMake + Qt6 + cfitsio + healpix_cxx)
-- [ ] macOS fallback path (OpenGL 4.1 core profile check)
-
-### Projection & view
-- [ ] Projection combo (Mollweide, Hammer, Gnomonic, Orthographic)
-- [ ] Flip longitude toggle
-
 ### Data
-- [ ] Column/field selector (TT, QQ, UU, ...)
 - [ ] Smoothing FWHM spinbox
 
 ### Analysis
