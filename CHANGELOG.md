@@ -5,6 +5,7 @@
 First development release.
 
 ### Rendering
+- Add colorbar tick label antialiasing.
 - GPU Mollweide projection of HEALPix maps, computed per pixel in a fragment
   shader (inverse projection plus HEALPix pixel lookup).
 - Eleven projections (Mollweide, Hammer, Equirectangular, Mercator, Sinusoidal,

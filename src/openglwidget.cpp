@@ -597,7 +597,26 @@ drawTextPath(QPainter &p, const QPointF &baseline, const QString &text,
 {
     QPainterPath path;
     path.addText(baseline, p.font(), text);
-    p.fillPath(path, color);
+
+    // The GL paint engine only smooths path edges when the surface is
+    // multisampled, which it usually is not, leaving jagged text. Rasterize
+    // the outline with the software engine (always antialiased) at the
+    // device resolution and draw the result.
+    const QRectF bounds = path.boundingRect().adjusted(-2, -2, 2, 2);
+    if (bounds.isEmpty())
+        return;
+    const qreal dpr = p.device()->devicePixelRatioF();
+    QImage img(QSizeF(bounds.size() * dpr).toSize() + QSize(1, 1),
+               QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    img.setDevicePixelRatio(dpr);
+    {
+        QPainter ip(&img);
+        ip.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
+        ip.translate(-bounds.topLeft());
+        ip.fillPath(path, color);
+    }
+    p.drawImage(bounds.topLeft(), img);
 }
 
 void
