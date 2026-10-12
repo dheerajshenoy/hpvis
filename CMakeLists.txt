@@ -136,6 +136,8 @@ add_executable(${PROJECT_NAME}
     src/mapoperation.cpp
     src/histogram.cpp
     src/mapoperationdialog.cpp
+    src/resolution.cpp
+    src/downgradedialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
     src/tilecache.cpp
@@ -164,6 +166,8 @@ add_executable(${PROJECT_NAME}
     include/mapoperation.hpp
     include/histogram.hpp
     include/mapoperationdialog.hpp
+    include/resolution.hpp
+    include/downgradedialog.hpp
     include/openglwidget.hpp
     include/tilecache.hpp
     include/argparse.hpp

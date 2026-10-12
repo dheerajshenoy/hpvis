@@ -1,6 +1,7 @@
 #include "hpvis.hpp"
 
 #include "colormapregistry.hpp"
+#include "downgradedialog.hpp"
 #include "fitsheaderdialog.hpp"
 #include "mapoperationdialog.hpp"
 #include "pixelordering.hpp"
@@ -550,6 +551,8 @@ HpVis::initMenubar()
 
     m_toolsMenu->addAction("&Operate on Maps...", this,
                            &HpVis::onOperateTriggered);
+    m_toolsMenu->addAction("Change &Resolution...", this,
+                           &HpVis::onDowngradeTriggered);
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
@@ -1400,6 +1403,23 @@ HpVis::onOperateTriggered()
     m_operateDialog->show();
     m_operateDialog->raise();
     m_operateDialog->activateWindow();
+}
+
+// The Change Resolution dialog: works on the current tab
+void
+HpVis::onDowngradeTriggered()
+{
+    if (!m_downgradeDialog)
+    {
+        m_downgradeDialog
+            = new DowngradeDialog([this]() { return m_view; }, this);
+        connect(m_downgradeDialog, &DowngradeDialog::mapReady, this,
+                &HpVis::openComputedMap);
+    }
+    m_downgradeDialog->refresh();
+    m_downgradeDialog->show();
+    m_downgradeDialog->raise();
+    m_downgradeDialog->activateWindow();
 }
 
 // Opens a map that was computed from other maps as a new tab

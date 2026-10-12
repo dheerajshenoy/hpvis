@@ -110,6 +110,14 @@ First development release.
 - The histogram can plot the region next to the whole map (the "Region"
   option of the Statistics dock, remembered between sessions).
 
+### Resolution
+- Tools > Change Resolution lowers the nside of the current map and opens the
+  result as a new tab. "Average the pixels" is healpy's ud_grade (optionally
+  marking a pixel UNSEEN when any sub-pixel is). "Through the harmonics" does
+  map2alm (iterated), drops the a_lm above the new resolution and runs
+  alm2map, which filters out the power the new resolution cannot hold instead
+  of aliasing it. The pixel window functions are not corrected for.
+
 ### Masks
 - Load one or more HEALPix mask files, and add more at any time.
 - A Masks menu: Add Mask..., Clear All, and a submenu per mask with Enabled,
