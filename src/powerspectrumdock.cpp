@@ -506,6 +506,33 @@ void
 PowerSpectrumDock::setView(View *view)
 {
     m_view = view;
+
+    // The accuracy and lmax of a tab are those its spectrum was computed with
+    // (so they are not reported as "changed" after a tab switch); a tab
+    // without a spectrum gets the saved defaults. Not persisted: the combos
+    // are only set to show them.
+    int iterations = -1, lmaxMode = -1;
+    const auto it = m_results.constFind(view);
+    if (view && it != m_results.constEnd())
+    {
+        iterations = it->iterations;
+        lmaxMode   = it->lmaxMode;
+    }
+    else
+    {
+        QSettings settings;
+        iterations = settings.value("powerspectrum/iterations", 1).toInt();
+        lmaxMode   = settings.value("powerspectrum/lmaxMode", 1).toInt();
+    }
+    {
+        QSignalBlocker a(m_accuracyCombo), b(m_lmaxCombo);
+        const int ia = m_accuracyCombo->findData(iterations);
+        const int il = m_lmaxCombo->findData(lmaxMode);
+        if (ia >= 0)
+            m_accuracyCombo->setCurrentIndex(ia);
+        if (il >= 0)
+            m_lmaxCombo->setCurrentIndex(il);
+    }
     refresh();
 }
 
@@ -662,7 +689,7 @@ PowerSpectrumDock::compute()
     QPointer<View> guard(view);
     auto *watcher = new QFutureWatcher<CalcResult>(this);
     connect(watcher, &QFutureWatcher<CalcResult>::finished, this,
-            [this, watcher, guard, input, column, iterations,
+            [this, watcher, guard, input, column, iterations, lmaxMode,
              r_lmax = lmaxFor(int(input.map->Nside()), lmaxMode)]()
     {
         const CalcResult r = watcher->result();
@@ -701,6 +728,7 @@ PowerSpectrumDock::compute()
         res.hdu        = input.hdu;
         res.column     = column;
         res.iterations = iterations;
+        res.lmaxMode   = lmaxMode;
         res.lmax       = r_lmax;
         res.nside      = int(input.map->Nside());
         m_results.insert(guard.data(), res);

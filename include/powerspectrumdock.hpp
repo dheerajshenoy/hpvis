@@ -75,6 +75,7 @@ private:
         int hdu         = 0;
         int column      = 0;
         int iterations  = 0; // refinement rounds used
+        int lmaxMode    = 1; // the choice of the lmax combo (not the lmax)
         int lmax        = 0;
         int nside       = 0;
     };
