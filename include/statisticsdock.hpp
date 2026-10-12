@@ -78,6 +78,8 @@ private:
     QCheckBox *m_logCheck        = nullptr;
     QCheckBox *m_maskCheck       = nullptr;
     QCheckBox *m_clipCheck       = nullptr;
+    QCheckBox *m_regionCheck     = nullptr;
+    int m_regionRevision         = 0; // of the region the histogram shows
     QToolButton *m_compareButton = nullptr;
     QComboBox *m_modeCombo       = nullptr;
     QToolButton *m_exportButton  = nullptr;

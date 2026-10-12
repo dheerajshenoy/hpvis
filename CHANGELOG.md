@@ -106,6 +106,9 @@ First development release.
   sky fraction, min, max, average, RMS and standard deviation, using the same
   validity and mask rules as the whole map. The region stays fixed on the sky
   and is outlined on the map; View > Clear Statistics Region removes it.
+  The numbers are computed on a worker thread.
+- The histogram can plot the region next to the whole map (the "Region"
+  option of the Statistics dock, remembered between sessions).
 
 ### Masks
 - Load one or more HEALPix mask files, and add more at any time.

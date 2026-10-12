@@ -3,6 +3,7 @@
 #include "healpix_map.h"
 
 #include <QString>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -17,6 +18,12 @@ struct HistogramSource
     int column = 0; // 1-based
     // 1 = use the pixel; empty = use every valid pixel (no masks)
     std::shared_ptr<const std::vector<uint8_t>> keep;
+    // Alternative to keep, called on the worker thread (e.g. to select the
+    // pixels of a region without blocking the GUI); wins over keep
+    std::function<std::vector<uint8_t>()> makeKeep;
+    // An empty source (no valid pixels) gives an empty curve instead of an
+    // error, and does not affect the range
+    bool optional = false;
 };
 
 struct HistogramCurve

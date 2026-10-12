@@ -9,6 +9,7 @@
 #include "tilecache.hpp"
 
 #include <QElapsedTimer>
+#include <QFutureWatcher>
 #include <QOpenGLBuffer>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
@@ -17,7 +18,9 @@
 #include <QQuaternion>
 #include <QTimer>
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <healpix_map.h>
 #include <memory>
 #include <qobject.h>
@@ -164,6 +167,23 @@ public:
     {
         return m_regionStats;
     }
+    // True while the statistics of the region are being computed (they are
+    // computed on a worker thread; regionChanged() fires when they are done)
+    bool regionBusy() const
+    {
+        return m_regionBusy;
+    }
+    // Changes whenever the pixels inside the region change (new or cleared
+    // region, other pixel ordering); not when only the numbers are updated
+    int regionRevision() const
+    {
+        return m_regionRevision;
+    }
+    // A function that builds the 0 / 1 mask of the region's pixels (1 =
+    // inside, and kept by the enabled masks when withMasks). It owns copies
+    // of what it needs, so it can run on any thread later. Empty when there
+    // is no region.
+    std::function<std::vector<uint8_t>()> regionKeepBuilder(bool withMasks) const;
 
     double mapAverage() const
     {
@@ -382,6 +402,10 @@ private:
     void uploadColormapLut();
     void recomputeDataRange();
     void recomputeRegionStats();
+    void startRegionJob();
+    // Stops the running computation; with wait, returns only once the worker
+    // no longer touches the map
+    void cancelRegionJob(bool wait);
     void setStatsRegionFromRect(const QRectF &widgetRect);
     void paintStatsRegion(QPainter &p);
     void applyMaskChange(bool texturesChanged);
@@ -463,6 +487,18 @@ private:
     };
     StatsRegion m_statsRegion;
     RegionStats m_regionStats;
+
+    // The worker thread of the region statistics: one job at a time, a newer
+    // request cancels the running one and starts when it has stopped
+    QFutureWatcher<RegionStats> *m_regionWatcher = nullptr;
+    std::shared_ptr<std::atomic<bool>> m_regionCancel;
+    bool m_regionRunning = false;
+    bool m_regionPending = false;
+    bool m_regionBusy    = false;
+    int m_regionRevision = 0;
+    // Old maps the region worker may still be reading after setMap() swapped
+    // them out; freed when the worker is done
+    std::vector<std::shared_ptr<Healpix_Map<float>>> m_retiredMaps;
     QPoint m_regionStart;
     QPoint m_regionEnd;
 

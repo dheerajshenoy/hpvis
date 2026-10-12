@@ -93,6 +93,7 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 
 OpenGLWidget::~OpenGLWidget()
 {
+    cancelRegionJob(true);
     makeCurrent();
     deleteMapTextures();
     deleteMaskTextures();
@@ -113,6 +114,12 @@ void
 OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
 {
     m_pixelOrdering = ordering;
+    if (m_statsRegion.active) // the pixels inside the region changed
+    {
+        ++m_regionRevision;
+        recomputeRegionStats();
+        emit regionChanged();
+    }
     emitCursorData();
     update();
 }
@@ -334,7 +341,10 @@ OpenGLWidget::recomputeDataRange()
 
     // The map or the masks changed: the region's numbers did too
     if (m_statsRegion.active)
+    {
         recomputeRegionStats();
+        emit regionChanged(); // "computing" until the worker is done
+    }
 }
 
 void
@@ -343,7 +353,17 @@ OpenGLWidget::setMap(Healpix_Map<float> &&map)
     // Masks only make sense for the resolution they were loaded for
     const bool sizeChanged = map.Npix() != m_pendingMap.Npix();
 
+    // The region worker may still be reading the old buffer for a moment: it
+    // is told to stop and the old map is kept alive until it has
+    cancelRegionJob(false);
+
     m_pendingMap.swap(map); // takes the buffer without copying it
+    if (m_regionRunning)
+    {
+        auto old = std::make_shared<Healpix_Map<float>>();
+        old->swap(map); // `map` now holds the previous pixels
+        m_retiredMaps.push_back(std::move(old));
+    }
     m_hasPendingMap = true;
 
     m_pixelOrdering = static_cast<PixelOrdering>(m_pendingMap.Scheme());
@@ -2035,8 +2055,11 @@ OpenGLWidget::clearStatsRegion()
 {
     if (!m_statsRegion.active)
         return;
+    cancelRegionJob(false);
+    ++m_regionRevision;
     m_statsRegion.active = false;
     m_regionStats        = RegionStats();
+    m_regionBusy         = false;
     emit regionChanged();
     update();
 }
@@ -2081,100 +2104,207 @@ OpenGLWidget::setStatsRegionFromRect(const QRectF &r)
     }
 
     m_statsRegion = region;
-    setCursor(Qt::WaitCursor);
+    ++m_regionRevision;
     recomputeRegionStats();
-    setCursor(Qt::CrossCursor);
-    emit regionChanged();
+    emit regionChanged(); // shows "computing" until the worker is done
     update();
 }
 
-// Same pixel selection as recomputeDataRange() (finite, not UNSEEN, not
-// masked), restricted to the pixels whose centre is inside the region
+// Whether the centre of pixel i is inside the region
+template <class Region>
+static inline bool
+regionContainsPixel(const Region &reg, const Healpix_Base &base, long i)
+{
+    const double *m = reg.toView;
+    const vec3 d    = base.pix2vec(i);
+    const double x  = m[0] * d.x + m[1] * d.y + m[2] * d.z;
+    const double y  = m[3] * d.x + m[4] * d.y + m[5] * d.z;
+    const double z  = m[6] * d.x + m[7] * d.y + m[8] * d.z;
+
+    QVector2D p;
+    if (!projectionmath::forward(reg.projection,
+                                 std::asin(std::clamp(z, -1.0, 1.0)),
+                                 std::atan2(y, x), p, reg.outside))
+        return false;
+    return p.x() >= reg.lo.x() && p.x() <= reg.hi.x() && p.y() >= reg.lo.y()
+           && p.y() <= reg.hi.y();
+}
+
+std::function<std::vector<uint8_t>()>
+OpenGLWidget::regionKeepBuilder(bool withMasks) const
+{
+    if (!m_statsRegion.active || m_pendingMap.Npix() == 0)
+        return {};
+
+    const long npix = m_pendingMap.Npix();
+    const int nside = static_cast<int>(m_nside);
+    const Healpix_Ordering_Scheme scheme
+        = m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING;
+    const StatsRegion reg = m_statsRegion;
+    std::vector<uint8_t> masks;
+    if (withMasks)
+        masks = keepMask();
+
+    return [reg, npix, nside, scheme, masks = std::move(masks)]()
+    {
+        const Healpix_Base base(nside, scheme, SET_NSIDE);
+        std::vector<uint8_t> keep(size_t(npix), 0);
+        uint8_t *out = keep.data();
+        parallel::forRange(npix, [&](long begin, long end)
+        {
+            for (long i = begin; i < end; ++i)
+                if ((masks.empty() || masks[size_t(i)])
+                    && regionContainsPixel(reg, base, i))
+                    out[i] = 1;
+        });
+        return keep;
+    };
+}
+
+void
+OpenGLWidget::cancelRegionJob(bool wait)
+{
+    if (m_regionCancel)
+        m_regionCancel->store(true);
+    m_regionPending = false;
+    if (wait && m_regionWatcher)
+        m_regionWatcher->waitForFinished();
+}
+
+// Asks for the region statistics to be (re)computed: starts the worker, or
+// restarts it when the one running is out of date
 void
 OpenGLWidget::recomputeRegionStats()
 {
-    m_regionStats = RegionStats();
-    const long npix = m_pendingMap.Npix();
-    if (!m_statsRegion.active || npix == 0)
+    m_regionBusy = m_statsRegion.active && m_pendingMap.Npix() > 0;
+    if (!m_regionBusy)
+    {
+        m_regionStats = RegionStats();
         return;
+    }
+    if (m_regionRunning)
+    {
+        m_regionCancel->store(true);
+        m_regionPending = true;
+        return;
+    }
+    startRegionJob();
+}
 
-    const std::vector<uint8_t> keep = keepMask();
-    const uint8_t *keepData         = keep.empty() ? nullptr : keep.data();
-    const float *data               = m_pendingMap.Map().begin();
-    const Healpix_Base base(
-        static_cast<int>(m_nside),
-        m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING, SET_NSIDE);
+// Same pixel selection as recomputeDataRange() (finite, not UNSEEN, not
+// masked), restricted to the pixels whose centre is inside the region. The
+// worker gets copies of everything except the map, which it reads in place:
+// setMap() keeps the old map alive until the worker is done, and the
+// destructor waits for it.
+void
+OpenGLWidget::startRegionJob()
+{
+    const long npix = m_pendingMap.Npix();
+    auto cancel     = std::make_shared<std::atomic<bool>>(false);
+    m_regionCancel  = cancel;
+    m_regionRunning = true;
+
+    std::vector<uint8_t> keep = keepMask();
+    const float *data         = m_pendingMap.Map().begin();
+    const int nside           = static_cast<int>(m_nside);
+    const Healpix_Ordering_Scheme scheme
+        = m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING;
     const StatsRegion reg = m_statsRegion;
 
-    struct Acc
+    auto *watcher = new QFutureWatcher<RegionStats>(this);
+    m_regionWatcher = watcher;
+    connect(watcher, &QFutureWatcher<RegionStats>::finished, this,
+            [this, watcher, cancel]()
     {
-        long pixels  = 0;
-        long valid   = 0;
-        double sum   = 0.0;
-        double sumSq = 0.0;
-        float min    = std::numeric_limits<float>::max();
-        float max    = std::numeric_limits<float>::lowest();
-    };
+        const RegionStats result = watcher->result();
+        watcher->deleteLater();
+        if (m_regionWatcher == watcher)
+            m_regionWatcher = nullptr;
+        m_regionRunning = false;
+        m_retiredMaps.clear(); // the worker is done with them
 
-    const Acc acc = parallel::reduceRange<Acc>(npix,
-                                               [&](long begin, long end)
-    {
-        Acc a;
-        const double *m = reg.toView;
-        for (long i = begin; i < end; ++i)
+        if (m_regionPending) // asked again meanwhile: the result is stale
         {
-            const vec3 d = base.pix2vec(i);
-            const double x = m[0] * d.x + m[1] * d.y + m[2] * d.z;
-            const double y = m[3] * d.x + m[4] * d.y + m[5] * d.z;
-            const double z = m[6] * d.x + m[7] * d.y + m[8] * d.z;
-
-            QVector2D p;
-            if (!projectionmath::forward(reg.projection,
-                                         std::asin(std::clamp(z, -1.0, 1.0)),
-                                         std::atan2(y, x), p, reg.outside))
-                continue;
-            if (p.x() < reg.lo.x() || p.x() > reg.hi.x() || p.y() < reg.lo.y()
-                || p.y() > reg.hi.y())
-                continue;
-
-            ++a.pixels;
-            const float v = data[i];
-            if (!std::isfinite(v) || v < -1e30f)
-                continue;
-            if (keepData && !keepData[i])
-                continue;
-            ++a.valid;
-            a.sum += v;
-            a.sumSq += double(v) * v;
-            a.min = std::min(a.min, v);
-            a.max = std::max(a.max, v);
+            m_regionPending = false;
+            if (m_statsRegion.active && m_pendingMap.Npix() > 0)
+                startRegionJob();
+            return;
         }
-        return a;
-    }, [](Acc &t, const Acc &p)
-    {
-        t.pixels += p.pixels;
-        t.valid += p.valid;
-        t.sum += p.sum;
-        t.sumSq += p.sumSq;
-        t.min = std::min(t.min, p.min);
-        t.max = std::max(t.max, p.max);
+        if (cancel->load() || !m_statsRegion.active)
+            return;
+        m_regionStats = result;
+        m_regionBusy  = false;
+        emit regionChanged();
     });
 
-    RegionStats s;
-    s.pixels   = acc.pixels;
-    s.valid    = acc.valid;
-    s.skyFrac  = double(acc.pixels) / double(npix);
-    s.areaDeg2 = s.skyFrac * 4.0 * M_PI * (180.0 / M_PI) * (180.0 / M_PI);
-    if (acc.valid > 0)
+    watcher->setFuture(QtConcurrent::run(
+        [keep = std::move(keep), data, npix, nside, scheme, reg, cancel]()
     {
-        s.min     = acc.min;
-        s.max     = acc.max;
-        s.average = acc.sum / acc.valid;
-        s.rms     = std::sqrt(acc.sumSq / acc.valid);
-        s.std     = std::sqrt(
-            std::max(0.0, acc.sumSq / acc.valid - s.average * s.average));
-    }
-    m_regionStats = s;
+        const uint8_t *keepData = keep.empty() ? nullptr : keep.data();
+        const Healpix_Base base(nside, scheme, SET_NSIDE);
+
+        struct Acc
+        {
+            long pixels  = 0;
+            long valid   = 0;
+            double sum   = 0.0;
+            double sumSq = 0.0;
+            float min    = std::numeric_limits<float>::max();
+            float max    = std::numeric_limits<float>::lowest();
+        };
+
+        const Acc acc = parallel::reduceRange<Acc>(npix,
+                                                   [&](long begin, long end)
+        {
+            Acc a;
+            for (long i = begin; i < end; ++i)
+            {
+                // Stop early when superseded (the result is dropped)
+                if ((i & 0xFFFF) == 0 && cancel->load(std::memory_order_relaxed))
+                    break;
+
+                if (!regionContainsPixel(reg, base, i))
+                    continue;
+
+                ++a.pixels;
+                const float v = data[i];
+                if (!std::isfinite(v) || v < -1e30f)
+                    continue;
+                if (keepData && !keepData[i])
+                    continue;
+                ++a.valid;
+                a.sum += v;
+                a.sumSq += double(v) * v;
+                a.min = std::min(a.min, v);
+                a.max = std::max(a.max, v);
+            }
+            return a;
+        }, [](Acc &t, const Acc &p)
+        {
+            t.pixels += p.pixels;
+            t.valid += p.valid;
+            t.sum += p.sum;
+            t.sumSq += p.sumSq;
+            t.min = std::min(t.min, p.min);
+            t.max = std::max(t.max, p.max);
+        });
+
+        RegionStats s;
+        s.pixels   = acc.pixels;
+        s.valid    = acc.valid;
+        s.skyFrac  = double(acc.pixels) / double(npix);
+        s.areaDeg2 = s.skyFrac * 4.0 * M_PI * (180.0 / M_PI) * (180.0 / M_PI);
+        if (acc.valid > 0)
+        {
+            s.min     = acc.min;
+            s.max     = acc.max;
+            s.average = acc.sum / acc.valid;
+            s.rms     = std::sqrt(acc.sumSq / acc.valid);
+            s.std     = std::sqrt(
+                std::max(0.0, acc.sumSq / acc.valid - s.average * s.average));
+        }
+        return s;
+    }));
 }
 
 // Outline of the region in the current view: the rectangle's edges, mapped to

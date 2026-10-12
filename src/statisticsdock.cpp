@@ -176,11 +176,17 @@ StatisticsDock::initHistogramUI(QWidget *parent)
                             "quantile, leaving out the extreme pixels");
     m_clipCheck->setChecked(settings.value("histogram/clip", false).toBool());
 
+    m_regionCheck = new QCheckBox("Region");
+    m_regionCheck->setToolTip("Also plot the pixels inside the selected "
+                              "region (Ctrl + Shift + drag on the map)");
+    m_regionCheck->setChecked(settings.value("histogram/region", true).toBool());
+
     auto *row2 = new QHBoxLayout();
     row2->addWidget(m_densityCheck);
     row2->addWidget(m_logCheck);
     row2->addWidget(m_maskCheck);
     row2->addWidget(m_clipCheck);
+    row2->addWidget(m_regionCheck);
     row2->addStretch();
     boxForm->addLayout(row2);
 
@@ -241,6 +247,7 @@ StatisticsDock::initHistogramUI(QWidget *parent)
         s.setValue("histogram/log", m_logCheck->isChecked());
         s.setValue("histogram/masks", m_maskCheck->isChecked());
         s.setValue("histogram/clip", m_clipCheck->isChecked());
+        s.setValue("histogram/region", m_regionCheck->isChecked());
         s.setValue("histogram/mode", m_modeCombo->currentData());
     };
     // Bins, field, masks and clipping change the numbers; density, log and the
@@ -252,7 +259,7 @@ StatisticsDock::initHistogramUI(QWidget *parent)
     });
     connect(m_fieldCombo, &QComboBox::activated, this,
             [this](int) { scheduleUpdate(); });
-    for (QCheckBox *c : {m_maskCheck, m_clipCheck})
+    for (QCheckBox *c : {m_maskCheck, m_clipCheck, m_regionCheck})
         connect(c, &QCheckBox::toggled, this, [this, changed](bool)
         {
             changed();
@@ -350,6 +357,10 @@ void
 StatisticsDock::updateRegion()
 {
     updateTable();
+    // The histogram follows the region itself, not its numbers
+    if (m_view && m_regionCheck->isChecked()
+        && m_view->glWidget()->regionRevision() != m_regionRevision)
+        scheduleUpdate();
 }
 
 void
@@ -395,7 +406,13 @@ StatisticsDock::updateTable()
         }
     }
 
-    if (hasRegion)
+    if (hasRegion && gl->regionBusy())
+    {
+        for (int r = 0; r < kRowCount; ++r)
+            if (r != RowNside)
+                set(r, 2, "computing...");
+    }
+    else if (hasRegion)
     {
         const OpenGLWidget::RegionStats &s = gl->regionStats();
         // Valid pixels, fraction and area are those of the valid pixels, as
@@ -518,6 +535,23 @@ StatisticsDock::updateHistogram()
     sources.push_back(
         makeSource(current, m_fieldCombo->currentData().toInt(), name));
     colors << m_plotLine;
+
+    // The region of the current map, next to it in the same plot
+    m_regionRevision = current->glWidget()->regionRevision();
+    if (m_regionCheck->isChecked())
+    {
+        auto builder = current->glWidget()->regionKeepBuilder(masks);
+        if (builder)
+        {
+            HistogramSource region = sources.front();
+            region.name += " [region]";
+            region.keep.reset();
+            region.optional = true;
+            region.makeKeep = std::move(builder);
+            sources.push_back(std::move(region));
+            colors << QColor(80, 200, 255); // the outline's color on the map
+        }
+    }
 
     int next = 0;
     for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())

@@ -157,17 +157,31 @@ computeHistograms(const std::vector<HistogramSource> &sources, int bins,
     try
     {
         std::vector<MapPtr> maps;
+        std::vector<std::shared_ptr<const std::vector<uint8_t>>> keeps;
         std::vector<Range> ranges;
         std::vector<std::pair<double, double>> spans; // what each contributes
         for (const HistogramSource &src : sources)
         {
             MapPtr map
                 = src.map ? src.map : readColumn(src.path, src.hdu, src.column);
+            std::shared_ptr<const std::vector<uint8_t>> keepOwner = src.keep;
+            if (src.makeKeep)
+                keepOwner = std::make_shared<const std::vector<uint8_t>>(
+                    src.makeKeep());
             const std::vector<uint8_t> *keep
-                = (src.keep && src.keep->size() == size_t(map->Npix()))
-                      ? src.keep.get()
+                = (keepOwner && keepOwner->size() == size_t(map->Npix()))
+                      ? keepOwner.get()
                       : nullptr;
+            keeps.push_back(keepOwner);
             const Range r = valueRange(*map, keep);
+            if (r.n == 0 && src.optional)
+            {
+                maps.push_back(map);
+                ranges.push_back(r);
+                spans.push_back({std::numeric_limits<double>::max(),
+                                 std::numeric_limits<double>::lowest()});
+                continue;
+            }
             if (r.n == 0)
                 throw PlanckError(QString("%1 has no valid pixels")
                                       .arg(src.name)
@@ -222,16 +236,20 @@ computeHistograms(const std::vector<HistogramSource> &sources, int bins,
         {
             const HistogramSource &src = sources[i];
             const std::vector<uint8_t> *keep
-                = (src.keep && src.keep->size() == size_t(maps[i]->Npix()))
-                      ? src.keep.get()
+                = (keeps[i] && keeps[i]->size() == size_t(maps[i]->Npix()))
+                      ? keeps[i].get()
                       : nullptr;
             HistogramCurve curve;
             curve.name   = src.name;
             curve.counts = binCounts(*maps[i], keep, lo, hi, result.bins);
             curve.valid  = ranges[i].n;
-            curve.mean   = ranges[i].sum / ranges[i].n;
-            curve.std = std::sqrt(std::max(0.0, ranges[i].sumSq / ranges[i].n
-                                                    - curve.mean * curve.mean));
+            if (ranges[i].n > 0)
+            {
+                curve.mean = ranges[i].sum / ranges[i].n;
+                curve.std
+                    = std::sqrt(std::max(0.0, ranges[i].sumSq / ranges[i].n
+                                                  - curve.mean * curve.mean));
+            }
             result.curves.push_back(std::move(curve));
         }
     }
