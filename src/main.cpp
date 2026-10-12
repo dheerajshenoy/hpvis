@@ -22,7 +22,7 @@ addArguments(argparse::ArgumentParser &parser)
     parser.add_argument("-H", "--hdu")
         .metavar("HDU")
         .scan<'i', int>()
-        .help("HDU to visualize (default: first map HDU; .npy has only HDU 1)");
+        .help("HDU to visualize (default: first map HDU; ignored for .npy)");
 
     parser.add_argument("-c", "--column")
         .metavar("COLUMN")
@@ -92,13 +92,9 @@ printInfo(const QString &path)
 {
     if (isNpyPath(path.toStdString()))
     {
-        int count = 0;
-        const auto map
-            = readNpyMap(path.toStdString(), 0, kMaxSupportedNside, &count);
-        std::cout << path.toStdString() << ": 1 HDU(s), 1 with a map\n"
-                  << "  HDU 1\n";
-        for (int i = 1; i <= count; ++i)
-            std::cout << "    column " << i << ": row " << i - 1 << "\n";
+        std::cout << path.toStdString()
+                  << ": .npy file, no HDUs to list (use --column for a 2-D "
+                     "array)\n";
         return;
     }
     fitshandle file;
@@ -126,9 +122,6 @@ printStats(const QString &path, int hdu, int column)
     Healpix_Map<float> map;
     if (isNpyPath(path.toStdString()))
     {
-        if (hdu > 1)
-            throw std::runtime_error(".npy files have a single HDU");
-        hdu    = 1;
         column = std::max(column, 1);
         map    = std::move(
             *readNpyMap(path.toStdString(), column, kMaxSupportedNside));
@@ -172,8 +165,12 @@ printStats(const QString &path, int hdu, int column)
     const double rms  = std::sqrt(sum2 / n);
     const double std  = std::sqrt(std::max(0.0, sum2 / n - mean * mean));
 
-    std::cout << path.toStdString() << " (HDU " << hdu << ", column " << column
-              << ")\n"
+    std::cout << path.toStdString();
+    if (isNpyPath(path.toStdString()))
+        std::cout << " (column " << column << ")\n";
+    else
+        std::cout << " (HDU " << hdu << ", column " << column << ")\n";
+    std::cout
               << "  nside   " << map.Nside() << "\n"
               << "  npix    " << map.Npix() << "\n"
               << "  valid   " << n << "\n"

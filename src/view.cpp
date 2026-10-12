@@ -112,12 +112,8 @@ View::startLoad(int hdu, int column, bool initial)
         {
             if (isNpyPath(filename.toStdString()))
             {
-                if (hdu > 1)
-                    throw PlanckError(
-                        ".npy files have a single HDU (use --hdu 1 or omit it)");
-                int count = 0;
-                auto map  = readNpyMap(filename.toStdString(), column,
-                                       kMaxSupportedNside, &count);
+                auto map = readNpyMap(filename.toStdString(), column,
+                                      kMaxSupportedNside);
                 markBinaryMaskUnseen(*map);
                 result.map    = std::move(map);
                 result.hdu    = 0;
