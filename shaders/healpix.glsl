@@ -1,9 +1,11 @@
-int ang2pix_nest(int ns, float theta, float phi) {
+// Direction -> (ix, iy, face) of the containing pixel. The map is stored as 12
+// face textures of nside x nside texels, so no pixel number (and hence no
+// RING/NEST distinction) is needed to look a value up.
+ivec3 ang2xyf(int ns, float theta, float phi) {
     float nside_val = float(ns);
     float z = cos(theta);
     float za = abs(z);
     float tt = mod(phi, 2.0 * PI) / (0.5 * PI); // [0, 4)
-    int npix_i = 12 * ns * ns;
 
     int face_num, ix, iy;
 
@@ -36,13 +38,5 @@ int ang2pix_nest(int ns, float theta, float phi) {
         }
     }
 
-    // Interleave bits: ix -> even bits, iy -> odd bits
-    int pix_within_face = 0;
-    for (int i = 0; i < 15; i++) {
-        pix_within_face |= ((ix >> i) & 1) << (2 * i);
-        pix_within_face |= ((iy >> i) & 1) << (2 * i + 1);
-    }
-
-    int pix = face_num * ns * ns + pix_within_face;
-    return clamp(pix, 0, npix_i - 1);
+    return ivec3(ix, iy, face_num);
 }

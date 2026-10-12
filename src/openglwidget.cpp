@@ -436,9 +436,9 @@ OpenGLWidget::paintGL()
 
     m_camera->uploadUniforms(m_shaderProgram);
 
-    // 1. Bind the 1D HEALPix map texture to texture unit 0
+    // 1. Bind the HEALPix map (array of face textures) to texture unit 0
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_mapTexture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTexture);
     m_shaderProgram.setUniformValue("mapTexture", 0);
 
     // Mask textures on units 1..4; their samplers are only read for masks
@@ -446,7 +446,7 @@ OpenGLWidget::paintGL()
     for (int g = 0; g < 4; ++g)
     {
         glActiveTexture(GL_TEXTURE1 + g);
-        glBindTexture(GL_TEXTURE_2D, m_maskTextures[g]);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_maskTextures[g]);
         m_shaderProgram.setUniformValue(
             QByteArray("maskTex" + QByteArray::number(g)).constData(), 1 + g);
     }
@@ -466,14 +466,11 @@ OpenGLWidget::paintGL()
 
     // 2. Pass map metadata uniforms to the shader
     m_shaderProgram.setUniformValue("nside", static_cast<int>(m_nside));
-    m_shaderProgram.setUniformValue("npix", static_cast<int>(m_npix));
     m_shaderProgram.setUniformValue("vmin", m_vmin);
     m_shaderProgram.setUniformValue("vmax", m_vmax);
     m_shaderProgram.setUniformValue("colormap", static_cast<int>(m_colormap));
     m_shaderProgram.setUniformValue("colormap_scale",
                                     static_cast<int>(m_colormapScale));
-    m_shaderProgram.setUniformValue("pixel_ordering",
-                                    static_cast<int>(m_pixelOrdering));
     m_shaderProgram.setUniformValue(
         "bg_color",
         QVector3D(m_bgColor.redF(), m_bgColor.greenF(), m_bgColor.blueF()));
@@ -509,7 +506,7 @@ OpenGLWidget::paintGL()
     glDrawArrays(GL_TRIANGLES, 0, 6);
     m_vao.release();
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
     // Minimap: the whole map in a small 2:1 viewport (bottom-right corner)
     const double dpr        = devicePixelRatioF();
@@ -534,11 +531,11 @@ OpenGLWidget::paintGL()
         m_shaderProgram.setUniformValue("view_scale", QVector2D(1.0f, 1.0f));
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, m_mapTexture);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTexture);
         for (int g = 0; g < 4; ++g)
         {
             glActiveTexture(GL_TEXTURE1 + g);
-            glBindTexture(GL_TEXTURE_2D, m_maskTextures[g]);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, m_maskTextures[g]);
         }
         glActiveTexture(GL_TEXTURE0);
 
@@ -898,6 +895,22 @@ OpenGLWidget::uploadColormapLut()
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+// The texel of face f at (x, y) holds map pixel xyf2pix(x, y, f), so the GPU
+// never deals with pixel numbers: it finds (x, y, f) from the direction and
+// reads that texel, whatever the map's ordering. Calls put(texel, pixel) for
+// every texel of `face` (row-major, nside wide), in parallel.
+template <class Put>
+static void
+gatherFace(const Healpix_Base &base, int face, Put put)
+{
+    const int ns = base.Nside();
+    parallel::forRange(ns, [&](long y0, long y1) {
+        for (long y = y0; y < y1; ++y)
+            for (int x = 0; x < ns; ++x)
+                put(size_t(y) * ns + x, base.xyf2pix(x, int(y), face));
+    });
+}
+
 void
 OpenGLWidget::uploadMaskToGPU()
 {
@@ -906,34 +919,48 @@ OpenGLWidget::uploadMaskToGPU()
     m_maskTextures.fill(0);
     m_maskDirty = false;
 
-    const size_t npix = size_t(m_npix);
-    const int W       = 4096;
-    const int H       = int((npix + W - 1) / W);
+    if (m_masks.empty())
+        return;
 
+    const int ns = int(m_nside);
+    const Healpix_Base base(ns, m_pixelOrdering == PixelOrdering::NESTED ? NEST
+                                                                         : RING,
+                            SET_NSIDE);
+    std::vector<uint8_t> buf(size_t(ns) * ns * 4);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     for (size_t g = 0; g * 4 < m_masks.size(); ++g)
     {
-        // Unused channels stay 255 (keep)
-        std::vector<uint8_t> buf(size_t(W) * H * 4, 255);
-        for (size_t c = 0; c < 4 && g * 4 + c < m_masks.size(); ++c)
-        {
-            const std::vector<uint8_t> &d = m_masks[g * 4 + c].data;
-            for (size_t i = 0; i < d.size(); ++i)
-                buf[i * 4 + c] = d[i];
-        }
-
         glGenTextures(1, &m_maskTextures[g]);
-        glBindTexture(GL_TEXTURE_2D, m_maskTextures[g]);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, W, H, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, buf.data());
-        // Restore the default: Qt's text renderer relies on it
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_maskTextures[g]);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, ns, ns, 12, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, nullptr);
+
+        for (int face = 0; face < 12; ++face)
+        {
+            // Unused channels stay 255 (keep)
+            gatherFace(base, face, [&](size_t texel, int pix) {
+                for (size_t c = 0; c < 4; ++c)
+                {
+                    const size_t m = g * 4 + c;
+                    buf[texel * 4 + c]
+                        = m < m_masks.size() ? m_masks[m].data[size_t(pix)]
+                                             : uint8_t(255);
+                }
+            });
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, face, ns, ns, 1,
+                            GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+        }
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
+                        GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
+                        GL_CLAMP_TO_EDGE);
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
+    // Restore the default: Qt's text renderer relies on it
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
 void
@@ -957,36 +984,61 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
         m_mapTexture = 0;
     }
 
-    glGenTextures(1, &m_mapTexture);
-    glBindTexture(GL_TEXTURE_2D, m_mapTexture);
+    const int ns = int(m_nside);
+    GLint maxSize = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+    if (ns > maxSize)
+    {
+        QMessageBox::warning(
+            this, "Map too large",
+            QString("nside %1 needs %1x%1 textures, but this GPU supports "
+                    "at most %2.")
+                .arg(ns)
+                .arg(maxSize));
+        return;
+    }
 
-    // 1D textures are limited (~16k texels); pack the map into a 2D texture
-    const int W = 4096;
-    const int H = (m_npix + W - 1) / W;
-    // Allocate the padded texture, then upload straight from the map: whole
-    // rows first, then the partial last row (no intermediate CPU copy)
+    glGenTextures(1, &m_mapTexture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTexture);
+
+    // One nside x nside layer per base face
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, W, H, 0, GL_RED, GL_FLOAT, nullptr);
-    const int fullRows = int(m_npix / W);
-    const int rest     = int(m_npix % W);
-    if (fullRows > 0)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, W, fullRows, GL_RED, GL_FLOAT,
-                        mapDataPtr);
-    if (rest > 0)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, fullRows, rest, 1, GL_RED,
-                        GL_FLOAT, mapDataPtr + size_t(fullRows) * W);
+    glGetError(); // clear
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R32F, ns, ns, 12, 0, GL_RED,
+                 GL_FLOAT, nullptr);
+    if (glGetError() == GL_OUT_OF_MEMORY)
+    {
+        glDeleteTextures(1, &m_mapTexture);
+        m_mapTexture = 0;
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        QMessageBox::warning(this, "Out of GPU memory",
+                             QString("nside %1 needs %2 MB of video memory.")
+                                 .arg(ns)
+                                 .arg(12.0 * ns * ns * 4 / 1048576.0, 0, 'f',
+                                      0));
+        return;
+    }
+
+    const Healpix_Base base(ns, map.Scheme(), SET_NSIDE);
+    std::vector<float> buf(size_t(ns) * ns); // one face at a time
+    for (int face = 0; face < 12; ++face)
+    {
+        gatherFace(base, face, [&](size_t texel, int pix) {
+            buf[texel] = mapDataPtr[pix];
+        });
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, face, ns, ns, 1, GL_RED,
+                        GL_FLOAT, buf.data());
+    }
     // Restore the default: Qt's text renderer relies on it
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
-    // 5. Set basic texture filtering parameters (NEAREST keeps crisp pixel
-    // edges)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // NEAREST keeps crisp pixel edges
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    // Unbind
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
 // Call this inside initializeGL() after initializeOpenGLFunctions():

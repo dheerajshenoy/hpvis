@@ -9,7 +9,7 @@
 
 #include <QElapsedTimer>
 #include <QOpenGLBuffer>
-#include <QOpenGLFunctions>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
@@ -21,11 +21,12 @@
 #include <qobject.h>
 #include <vector>
 
-// Largest nside the viewer can show: the map is packed into one 2D texture
-// (4096 wide), whose height is limited by the GPU (nside 2048 needs 12288 rows)
-constexpr int kMaxSupportedNside = 2048;
+// Largest nside the viewer can show. The map is stored as a 12-layer 2D array
+// texture (one nside x nside layer per base face), so the GPU's maximum texture
+// size (usually 16384) is the real limit. nside 8192 needs 3.2 GB of VRAM.
+constexpr int kMaxSupportedNside = 8192;
 
-class OpenGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
+class OpenGLWidget : public QOpenGLWidget, protected QOpenGLExtraFunctions
 {
     Q_OBJECT
 

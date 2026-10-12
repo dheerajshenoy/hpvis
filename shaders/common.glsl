@@ -1,11 +1,10 @@
 uniform vec2 viewport_size;
 uniform vec2 view_scale; // window NDC -> map NDC (inset by the padding)
-uniform sampler2D mapTexture;
+// One layer per HEALPix base face, nside x nside texels each
+uniform sampler2DArray mapTexture;
 uniform int nside;
-uniform int npix;
 uniform float vmin;
 uniform float vmax;
-uniform int pixel_ordering;
 uniform int colormap;
 uniform int colormap_scale; // 0 = linear, 1 = log
 uniform bool invert_colormap;
@@ -14,10 +13,10 @@ uniform sampler2D colormapLut;
 uniform int lut_rows;
 uniform vec3 bg_color;
 // Up to 16 masks, packed 4 per RGBA8 texture (one mask per channel)
-uniform sampler2D maskTex0;
-uniform sampler2D maskTex1;
-uniform sampler2D maskTex2;
-uniform sampler2D maskTex3;
+uniform sampler2DArray maskTex0;
+uniform sampler2DArray maskTex1;
+uniform sampler2DArray maskTex2;
+uniform sampler2DArray maskTex3;
 uniform int mask_bits;       // bit i set = mask i enabled
 uniform int mask_invert_bits; // bit i set = mask i inverted (1 - m)
 uniform int mask_mode;       // 0 = hide, 1 = dim
