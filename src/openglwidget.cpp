@@ -111,32 +111,133 @@ OpenGLWidget::~OpenGLWidget()
 
 // Reads the map's pixel values as the other ordering, for files whose ORDERING
 // keyword is wrong: the values stay where they are, only the sky position
-// they stand for changes. Re-uploads the map; loaded masks are converted so
-// they keep covering the same part of the sky.
-// TODO: Make this async so that the UI doesn't freeze with large maps
+// they stand for changes. Loaded masks are re-indexed (on a worker thread, as
+// they can be large) so they keep covering the same part of the sky; then the
+// map is re-uploaded, which needs the GL context and happens on the GUI
+// thread, as when a map is loaded.
 void
 OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
 {
-    if (ordering == m_pixelOrdering)
+    if (m_pendingMap.Npix() == 0)
+    {
+        m_pixelOrdering   = ordering;
+        m_orderingRequested = ordering;
         return;
+    }
+    if (ordering == m_orderingRequested)
+        return;
+    m_orderingRequested = ordering;
+    const int job       = ++m_orderingJob; // supersedes a running request
+    setCursor(Qt::CrossCursor);            // (a busy cursor of the old one)
+    if (ordering == m_pixelOrdering)
+        return; // back to what is shown: the running request is dropped
+
+    const long npix = m_pendingMap.Npix();
     const Healpix_Ordering_Scheme oldScheme
         = m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING;
     const Healpix_Ordering_Scheme newScheme
         = ordering == PixelOrdering::NESTED ? NEST : RING;
-    m_pixelOrdering = ordering;
-    if (m_pendingMap.Npix() == 0)
-        return;
 
-    // Only the scheme flag changes (swap_scheme() would move the values)
-    m_pendingMap.Healpix_Base::SetNside(m_pendingMap.Nside(), newScheme);
-
-    // The masks are indexed like the map: re-index them (old index -> new)
-    const long npix = m_pendingMap.Npix();
-    const Healpix_Base base(int(m_pendingMap.Nside()), oldScheme, SET_NSIDE);
-    for (MaskEntry &m : m_masks)
+    // Copies of the masks: the list can change while the worker runs
+    struct Snapshot
     {
+        std::vector<std::vector<uint8_t>> masks;
+    };
+    auto snap = std::make_shared<Snapshot>();
+    for (const MaskEntry &m : m_masks)
+        snap->masks.push_back(m.data.size() == size_t(npix)
+                                  ? m.data
+                                  : std::vector<uint8_t>());
+    if (std::all_of(snap->masks.begin(), snap->masks.end(),
+                    [](const std::vector<uint8_t> &d) { return d.empty(); }))
+    {
+        applyPixelOrdering(ordering, nullptr); // nothing slow to wait for
+        return;
+    }
+
+    const int nside       = int(m_pendingMap.Nside());
+    const int mapRevision = m_mapRevision;
+    QStringList maskKeys;
+    for (const MaskEntry &m : m_masks)
+        maskKeys << m.path;
+    setCursor(Qt::BusyCursor);
+
+    auto *watcher
+        = new QFutureWatcher<std::shared_ptr<std::vector<std::vector<uint8_t>>>>(
+            this);
+    connect(watcher,
+            &QFutureWatcher<
+                std::shared_ptr<std::vector<std::vector<uint8_t>>>>::finished,
+            this,
+            [this, watcher, job, ordering, mapRevision, maskKeys]()
+    {
+        auto moved = watcher->result();
+        watcher->deleteLater();
+        if (job != m_orderingJob)
+            return; // superseded
+        setCursor(Qt::CrossCursor);
+        if (mapRevision != m_mapRevision)
+            return; // another map was loaded meanwhile
+        // Masks added, removed or replaced meanwhile: re-index the current
+        // ones instead
+        QStringList now;
+        for (const MaskEntry &m : m_masks)
+            now << m.path;
+        applyPixelOrdering(ordering, now == maskKeys ? moved.get() : nullptr);
+    });
+    watcher->setFuture(QtConcurrent::run(
+        [snap, nside, npix, oldScheme, newScheme]()
+    {
+        const Healpix_Base base(nside, oldScheme, SET_NSIDE);
+        auto out = std::make_shared<std::vector<std::vector<uint8_t>>>();
+        for (const std::vector<uint8_t> &in : snap->masks)
+        {
+            if (in.empty())
+            {
+                out->emplace_back();
+                continue;
+            }
+            std::vector<uint8_t> moved(static_cast<size_t>(npix));
+            const uint8_t *src = in.data();
+            uint8_t *dst       = moved.data();
+            parallel::forRange(npix, [&](long begin, long end)
+            {
+                for (long i = begin; i < end; ++i)
+                    dst[oldScheme == RING ? base.ring2nest(i)
+                                          : base.nest2ring(i)]
+                        = src[i];
+            });
+            out->push_back(std::move(moved));
+        }
+        (void)newScheme;
+        return out;
+    }));
+}
+
+// The GUI part of an ordering change: the scheme flag (swap_scheme() would
+// move the values), the re-indexed masks, the re-upload. newMasks holds one
+// array per mask (empty = leave it), or null to re-index the masks here.
+void
+OpenGLWidget::applyPixelOrdering(PixelOrdering ordering,
+                                 std::vector<std::vector<uint8_t>> *newMasks)
+{
+    const long npix = m_pendingMap.Npix();
+    const Healpix_Ordering_Scheme oldScheme
+        = m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING;
+    const Healpix_Ordering_Scheme newScheme
+        = ordering == PixelOrdering::NESTED ? NEST : RING;
+    const Healpix_Base base(int(m_pendingMap.Nside()), oldScheme, SET_NSIDE);
+
+    for (size_t k = 0; k < m_masks.size(); ++k)
+    {
+        MaskEntry &m = m_masks[k];
         if (m.data.size() != size_t(npix))
             continue;
+        if (newMasks && k < newMasks->size() && !(*newMasks)[k].empty())
+        {
+            m.data = std::move((*newMasks)[k]);
+            continue;
+        }
         std::vector<uint8_t> moved(static_cast<size_t>(npix));
         const uint8_t *in = m.data.data();
         uint8_t *out      = moved.data();
@@ -149,6 +250,9 @@ OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
         m.data = std::move(moved);
     }
     m_maskDirty = !m_masks.empty();
+
+    m_pendingMap.Healpix_Base::SetNside(m_pendingMap.Nside(), newScheme);
+    m_pixelOrdering = ordering;
 
     if (isValid())
         uploadMapToGPU(m_pendingMap);
@@ -409,6 +513,9 @@ OpenGLWidget::setMap(Healpix_Map<float> &&map)
 
     m_pixelOrdering = static_cast<PixelOrdering>(m_pendingMap.Scheme());
     m_loadedOrdering = m_pixelOrdering;
+    m_orderingRequested = m_pixelOrdering;
+    ++m_orderingJob; // an ordering change still running is obsolete
+    ++m_mapRevision;
     if (sizeChanged && !m_masks.empty())
     {
         m_masks.clear();
@@ -808,7 +915,7 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
 
     auto *watcher = new QFutureWatcher<Result>(this);
     connect(watcher, &QFutureWatcher<Result>::finished, this,
-            [this, watcher, mapNpix]()
+            [this, watcher, mapNpix, mapNside, mapScheme]()
     {
         Result result = watcher->result();
         watcher->deleteLater();
@@ -816,6 +923,21 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
         // The map may have been replaced while the masks were loading
         if (m_pendingMap.Npix() != mapNpix)
             return;
+
+        // ...or its pixel ordering changed: the masks were made for the old one
+        if (m_pendingMap.Scheme() != mapScheme)
+        {
+            const Healpix_Base base(int(mapNside), mapScheme, SET_NSIDE);
+            for (MaskEntry &entry : result.masks)
+            {
+                std::vector<uint8_t> moved(entry.data.size());
+                for (long i = 0; i < long(entry.data.size()); ++i)
+                    moved[size_t(mapScheme == RING ? base.ring2nest(i)
+                                                   : base.nest2ring(i))]
+                        = entry.data[size_t(i)];
+                entry.data = std::move(moved);
+            }
+        }
 
         int added = 0;
         for (MaskEntry &entry : result.masks)

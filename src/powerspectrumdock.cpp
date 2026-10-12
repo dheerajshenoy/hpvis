@@ -124,6 +124,11 @@ readStokes(const PowerSpectrumInput &in, Stokes &out)
         {
             file.goto_hdu(in.hdu);
             read_Healpix_map_from_fits(file, maps[k], cols[k]);
+            // The view may show the map with another pixel ordering than the
+            // file says (View > Pixel Ordering): read the values the same way
+            if (in.map && maps[k].Scheme() != in.map->Scheme())
+                maps[k].Healpix_Base::SetNside(maps[k].Nside(),
+                                               in.map->Scheme());
         }
         if (maps[1].Nside() != maps[0].Nside()
             || maps[2].Nside() != maps[0].Nside())

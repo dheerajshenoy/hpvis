@@ -411,6 +411,8 @@ private:
     void uploadColormapLut();
     void recomputeDataRange();
     void recomputeRegionStats();
+    void applyPixelOrdering(PixelOrdering ordering,
+                            std::vector<std::vector<uint8_t>> *newMasks);
     void startRegionJob();
     // Stops the running computation; with wait, returns only once the worker
     // no longer touches the map
@@ -506,6 +508,11 @@ private:
     bool m_regionPending = false;
     bool m_regionBusy    = false;
     int m_regionRevision = 0;
+    // Pixel ordering changes: the masks are re-indexed on a worker thread; a
+    // newer request makes the older result obsolete
+    int m_orderingJob                 = 0;
+    PixelOrdering m_orderingRequested = PixelOrdering::RING;
+    int m_mapRevision                 = 0; // changes with every new map
     // Old maps the region worker may still be reading after setMap() swapped
     // them out; freed when the worker is done
     std::vector<std::shared_ptr<Healpix_Map<float>>> m_retiredMaps;
