@@ -1,5 +1,6 @@
 #include "openglwidget.hpp"
 
+#include "appsettings.hpp"
 #include "colormapregistry.hpp"
 #include "fitsinfo.hpp"
 #include "npyreader.hpp"
@@ -75,6 +76,9 @@ formatTick(double v, double step, double maxAbs)
 OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
     m_camera = new MapCamera();
+    // Must be set before the widget is first shown
+    if (AppSettings::load().hdrRendering)
+        setTextureFormat(GL_RGBA16F);
     setMouseTracking(true);
     setFocusPolicy(Qt::ClickFocus);
     m_globeTimer.setInterval(16);

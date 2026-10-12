@@ -120,8 +120,7 @@ printInfo(const QString &path)
 
 // --stats: statistics over the valid pixels of the selected HDU / column
 static void
-printStats(const QString &path, int hdu, int column,
-           const QString &columnName)
+printStats(const QString &path, int hdu, int column, const QString &columnName)
 {
     Healpix_Map<float> map;
     if (isNpyPath(path.toStdString()))
@@ -189,8 +188,7 @@ printStats(const QString &path, int hdu, int column,
         std::cout << " (column " << column << ")\n";
     else
         std::cout << " (HDU " << hdu << ", column " << column << ")\n";
-    std::cout
-              << "  nside   " << map.Nside() << "\n"
+    std::cout << "  nside   " << map.Nside() << "\n"
               << "  npix    " << map.Npix() << "\n"
               << "  valid   " << n << "\n"
               << "  min     " << min << "\n"
@@ -203,6 +201,11 @@ printStats(const QString &path, int hdu, int column,
 int
 main(int argc, char *argv[])
 {
+    QSurfaceFormat format;
+    format.setVersion(3, 3);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(format);
+
     argparse::ArgumentParser parser(PROJECT_NAME, PROJECT_VERSION,
                                     argparse::default_arguments::all);
     addArguments(parser);

@@ -44,7 +44,8 @@ SettingsDialog::initUI()
     });
     m_pageKeywords = {
         "general files recent history list folder directory remember last "
-        "interface toolbar status bar show hide",
+        "interface toolbar status bar show hide hdr rendering float "
+        "framebuffer banding",
         "appearance power spectrum plot background foreground line colors new "
         "maps defaults projection perspective inside outside sky globe mirror "
         "orientation free galactic ecliptic equatorial frame coordinates "
@@ -135,7 +136,7 @@ SettingsDialog::initConnections()
          {m_rememberDirCheck, m_showToolbarCheck, m_showStatusBarCheck,
           m_reverseCheck, m_colorBarCheck, m_minimapCheck, m_graticuleCheck,
           m_globeShadowCheck, m_limbDarkeningCheck, m_animateCheck,
-          m_animateProjectionCheck})
+          m_animateProjectionCheck, m_hdrCheck})
         connect(box, &QCheckBox::toggled, this, changed);
 }
 
@@ -234,6 +235,7 @@ SettingsDialog::currentSettings() const
     a.limbDarkening      = m_limbDarkeningCheck->isChecked();
     a.animateOrthoGlobe  = m_animateCheck->isChecked();
     a.animateProjection  = m_animateProjectionCheck->isChecked();
+    a.hdrRendering       = m_hdrCheck->isChecked();
     a.plotBackground     = m_plotBackground;
     a.plotForeground     = m_plotForeground;
     a.plotLine           = m_plotLine;
@@ -288,6 +290,7 @@ SettingsDialog::loadSettings()
     m_limbDarkeningCheck->setChecked(a.limbDarkening);
     m_animateCheck->setChecked(a.animateOrthoGlobe);
     m_animateProjectionCheck->setChecked(a.animateProjection);
+    m_hdrCheck->setChecked(a.hdrRendering);
     m_plotBackground = a.plotBackground;
     m_plotForeground = a.plotForeground;
     m_plotLine       = a.plotLine;
@@ -365,6 +368,16 @@ SettingsDialog::createGeneralSettingsPage()
         "coarse resolution while streaming. Applies to open maps too.");
     bigForm->addRow("Stream maps above nside:", m_streamCombo);
     outer->addWidget(bigBox);
+
+    auto *renderBox  = new QGroupBox("Rendering");
+    auto *renderForm = new QFormLayout(renderBox);
+    m_hdrCheck = new QCheckBox("HDR rendering (16-bit float framebuffer)");
+    m_hdrCheck->setToolTip(
+        "Avoids banding and clipping on smooth gradients. Turn off if the "
+        "display glitches on old GPUs. Applies to newly opened tabs after a "
+        "restart.");
+    renderForm->addRow(m_hdrCheck);
+    outer->addWidget(renderBox);
 
     // --- Interface ---
     auto *uiBox  = new QGroupBox("Interface");

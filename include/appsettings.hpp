@@ -18,6 +18,8 @@ struct AppSettings
     // Maps with a larger nside are streamed (coarse map + visible tiles)
     // instead of being kept on the GPU in full
     int streamingNside   = 4096;
+    // Render into a 16-bit float framebuffer (no banding); needs a restart
+    bool hdrRendering    = true;
 
     // New maps
     Colormap colormap       = Colormap::VIRIDIS;

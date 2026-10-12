@@ -92,6 +92,7 @@ private:
     QComboBox *m_graticuleStepCombo = nullptr;
     QCheckBox *m_globeShadowCheck   = nullptr;
     QCheckBox *m_limbDarkeningCheck = nullptr;
+    QCheckBox *m_hdrCheck           = nullptr;
     QCheckBox *m_animateCheck       = nullptr;
     QCheckBox *m_animateProjectionCheck = nullptr;
     QColor m_background;
