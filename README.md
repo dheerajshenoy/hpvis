@@ -41,7 +41,7 @@ OpenGLWidgets, Concurrent, Graphs), OpenMP and cfitsio. HEALPix C++ and
 libsharp are built from the vendored sources as part of the normal build.
 
 ```sh
-git clone --recurse-submodules <repository-url> hpvis
+git clone --recurse-submodules https://github.com/dheerajshenoy/hpvis hpvis
 cd hpvis
 cmake -B build -S .
 cmake --build build -j
