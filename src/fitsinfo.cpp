@@ -3,6 +3,8 @@
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
 
+#include <QStringList>
+
 const FitsHdu *
 FitsInfo::find(int hduIndex) const
 {
@@ -10,6 +12,24 @@ FitsInfo::find(int hduIndex) const
         if (h.index == hduIndex)
             return &h;
     return nullptr;
+}
+
+int
+findColumn(const FitsHdu &hdu, const QString &name)
+{
+    for (const FitsColumn &c : hdu.columns)
+        if (c.name.trimmed().compare(name.trimmed(), Qt::CaseInsensitive) == 0)
+            return c.index;
+    return 0;
+}
+
+QString
+columnNames(const FitsHdu &hdu)
+{
+    QStringList names;
+    for (const FitsColumn &c : hdu.columns)
+        names << c.name.trimmed();
+    return names.join(", ");
 }
 
 FitsInfo

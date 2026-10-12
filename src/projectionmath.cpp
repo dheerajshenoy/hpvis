@@ -29,13 +29,22 @@ aspect(Projection projection)
     switch (projection)
     {
         case Projection::MOLLWEIDE:
-        case Projection::PLATE_CARREE:
+        case Projection::EQUIRECTANGULAR:
             return 2.0;
         case Projection::ORTHOGRAPHIC:
         case Projection::AZIMUTHAL_EQUIDISTANT:
             return 1.0;
         case Projection::GNOMONIC:
+        case Projection::MERCATOR:
+        case Projection::STEREOGRAPHIC:
             return 1.0;
+        case Projection::SINUSOIDAL:
+        case Projection::HAMMER:
+            return 2.0;
+        case Projection::LAMBERT_CYLINDRICAL:
+            return M_PI;
+        case Projection::GALL_PETERS:
+            return M_PI / 2.0;
     }
     return 2.0;
 }
@@ -68,7 +77,7 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
             return true;
         }
 
-        case Projection::PLATE_CARREE:
+        case Projection::EQUIRECTANGULAR:
             colat = M_PI / 2.0 - py * M_PI / 2.0;
             phi   = wrap2Pi(-px * M_PI);
             return true;
@@ -105,6 +114,59 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
             phi   = wrap2Pi(std::atan2(dy, dx));
             return true;
         }
+
+        case Projection::MERCATOR:
+            colat = M_PI / 2.0 - std::atan(std::sinh(py * M_PI));
+            phi   = wrap2Pi(-px * M_PI);
+            return true;
+
+        case Projection::SINUSOIDAL:
+        {
+            const double lat = py * M_PI / 2.0;
+            const double c   = std::cos(lat);
+            const double x   = -px; // lon * cos(lat) / pi
+            if (std::abs(x) > c)
+                return false;
+            colat = M_PI / 2.0 - lat;
+            phi   = wrap2Pi(c > 1e-6 ? x * M_PI / c : 0.0);
+            return true;
+        }
+
+        case Projection::LAMBERT_CYLINDRICAL:
+        case Projection::GALL_PETERS:
+            colat = M_PI / 2.0 - std::asin(std::clamp(py, -1.0, 1.0));
+            phi   = wrap2Pi(-px * M_PI);
+            return true;
+
+        case Projection::STEREOGRAPHIC:
+        {
+            // Plane radius tan(c / 2): the 90 degree circle is the unit
+            // circle, every plane point is valid
+            const double r = std::hypot(px, py);
+            const double c = 2.0 * std::atan(r);
+            const double ux = r > 1e-9 ? px / r : 0.0;
+            const double uy = r > 1e-9 ? py / r : 0.0;
+            const double dx = std::cos(c), dy = -std::sin(c) * ux,
+                         dz = std::sin(c) * uy;
+            colat = std::atan2(std::hypot(dx, dy), dz);
+            phi   = wrap2Pi(std::atan2(dy, dx));
+            return true;
+        }
+
+        case Projection::HAMMER:
+        {
+            const double x = -px * 2.0 * kSqrt2;
+            const double y = py * kSqrt2;
+            if ((x * x / 8.0) + (y * y / 2.0) > 1.0)
+                return false;
+            const double z = std::sqrt(
+                std::max(0.0, 1.0 - x * x / 16.0 - y * y / 4.0));
+            const double lon
+                = 2.0 * std::atan2(z * x, 2.0 * (2.0 * z * z - 1.0));
+            colat = M_PI / 2.0 - std::asin(std::clamp(z * y, -1.0, 1.0));
+            phi   = wrap2Pi(lon);
+            return true;
+        }
     }
     return false;
 }
@@ -130,7 +192,7 @@ forwardInside(Projection projection, double lat, double lon, QVector2D &plane)
             return true;
         }
 
-        case Projection::PLATE_CARREE:
+        case Projection::EQUIRECTANGULAR:
             plane = QVector2D(float(-wrapPi(lon) / M_PI),
                               float(lat / (M_PI / 2.0)));
             return true;
@@ -160,6 +222,47 @@ forwardInside(Projection projection, double lat, double lon, QVector2D &plane)
                 return false; // 90 degrees or more from the center
             plane = QVector2D(float(-std::cos(lat) * std::sin(lon) / z),
                               float(std::sin(lat) / z));
+            return true;
+        }
+
+        case Projection::MERCATOR:
+        {
+            const double y = std::asinh(std::tan(lat)) / M_PI;
+            if (!std::isfinite(y) || std::abs(y) > 1.0)
+                return false; // beyond about 85 degrees latitude
+            plane = QVector2D(float(-wrapPi(lon) / M_PI), float(y));
+            return true;
+        }
+
+        case Projection::SINUSOIDAL:
+            plane = QVector2D(float(-wrapPi(lon) * std::cos(lat) / M_PI),
+                              float(lat / (M_PI / 2.0)));
+            return true;
+
+        case Projection::LAMBERT_CYLINDRICAL:
+        case Projection::GALL_PETERS:
+            plane = QVector2D(float(-wrapPi(lon) / M_PI),
+                              float(std::sin(lat)));
+            return true;
+
+        case Projection::STEREOGRAPHIC:
+        {
+            const double z = std::cos(lat) * std::cos(lon);
+            if (z <= -1.0 + 1e-6)
+                return false; // the antipode, at infinity
+            plane = QVector2D(float(-std::cos(lat) * std::sin(lon) / (1.0 + z)),
+                              float(std::sin(lat) / (1.0 + z)));
+            return true;
+        }
+
+        case Projection::HAMMER:
+        {
+            const double l = wrapPi(lon);
+            const double d
+                = std::sqrt(1.0 + std::cos(lat) * std::cos(l / 2.0));
+            // Hammer's x / (2 sqrt 2) and y / sqrt 2
+            plane = QVector2D(float(-std::cos(lat) * std::sin(l / 2.0) / d),
+                              float(std::sin(lat) / d));
             return true;
         }
     }
@@ -194,7 +297,7 @@ labelMeridianInside(Projection projection)
     switch (projection)
     {
         case Projection::MOLLWEIDE:
-        case Projection::PLATE_CARREE:
+        case Projection::EQUIRECTANGULAR:
             return M_PI; // the left edge
         case Projection::ORTHOGRAPHIC:
             return 80.0 * M_PI / 180.0; // near the left limb
@@ -202,6 +305,14 @@ labelMeridianInside(Projection projection)
             return M_PI / 2.0; // the left side of the disk
         case Projection::GNOMONIC:
             return 35.0 * M_PI / 180.0; // left part of the visible area
+        case Projection::MERCATOR:
+        case Projection::SINUSOIDAL:
+        case Projection::LAMBERT_CYLINDRICAL:
+        case Projection::GALL_PETERS:
+        case Projection::HAMMER:
+            return M_PI; // the left edge
+        case Projection::STEREOGRAPHIC:
+            return 60.0 * M_PI / 180.0; // left part of the visible area
     }
     return M_PI;
 }

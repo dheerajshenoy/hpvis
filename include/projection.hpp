@@ -3,15 +3,14 @@
 enum class Projection
 {
     MOLLWEIDE = 0,
-    PLATE_CARREE,
+    EQUIRECTANGULAR,
     ORTHOGRAPHIC,
     AZIMUTHAL_EQUIDISTANT,
     GNOMONIC,
-    // TODO: Add more projections
-    // EQUIRECTANGULAR,
-    // MERCATOR,
-    // GALL_PETERS,
-    // SINUSOIDAL,
-    // LAMBERT_CYLINDRICAL,
-    // STEREOGRAPHIC
+    MERCATOR,
+    SINUSOIDAL,
+    LAMBERT_CYLINDRICAL,
+    GALL_PETERS,
+    STEREOGRAPHIC,
+    HAMMER // keep last: the settings range check uses it
 };

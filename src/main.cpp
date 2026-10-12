@@ -26,8 +26,8 @@ addArguments(argparse::ArgumentParser &parser)
 
     parser.add_argument("-c", "--column")
         .metavar("COLUMN")
-        .scan<'i', int>()
-        .help("Column to visualize (default: first column; for a 2-D .npy, the row)");
+        .help("Column to visualize, by number or name such as TT (default: "
+              "first column; for a 2-D .npy, the row number)");
 
     // Appearance
     parser.add_argument("-m", "--colormap")
@@ -48,11 +48,14 @@ addArguments(argparse::ArgumentParser &parser)
         "Upper end of the color range");
 
     parser.add_argument("-p", "--projection")
-        .choices("mollweide", "plate_carree", "orthographic",
-                 "azimuthal_equidistant", "gnomonic")
+        .choices("mollweide", "equirectangular", "orthographic",
+                 "azimuthal_equidistant", "gnomonic", "mercator", "sinusoidal",
+                 "lambert_cylindrical", "gall_peters", "stereographic",
+                 "hammer")
         .metavar("PROJECTION")
-        .help("Projection: mollweide, plate_carree, orthographic, "
-              "azimuthal_equidistant or gnomonic");
+        .help("Projection: mollweide, equirectangular, orthographic, "
+              "azimuthal_equidistant, gnomonic, mercator, sinusoidal, "
+              "lambert_cylindrical, gall_peters, stereographic or hammer");
 
     parser.add_argument("-o", "--orientation")
         .choices("free", "galactic", "ecliptic", "equatorial")
@@ -117,11 +120,15 @@ printInfo(const QString &path)
 
 // --stats: statistics over the valid pixels of the selected HDU / column
 static void
-printStats(const QString &path, int hdu, int column)
+printStats(const QString &path, int hdu, int column,
+           const QString &columnName)
 {
     Healpix_Map<float> map;
     if (isNpyPath(path.toStdString()))
     {
+        if (!columnName.isEmpty())
+            throw std::runtime_error(".npy columns have no names, give a "
+                                     "number");
         column = std::max(column, 1);
         map    = std::move(
             *readNpyMap(path.toStdString(), column, kMaxSupportedNside));
@@ -137,6 +144,18 @@ printStats(const QString &path, int hdu, int column)
 
         if (hdu <= 0)
             hdu = info.hdus.first().index;
+        if (!columnName.isEmpty())
+        {
+            const FitsHdu *h = info.find(hdu);
+            if (!h)
+                throw std::runtime_error("HDU " + std::to_string(hdu)
+                                         + " does not hold a map");
+            column = findColumn(*h, columnName);
+            if (!column)
+                throw std::runtime_error(
+                    "no column named " + columnName.toStdString()
+                    + " (available: " + columnNames(*h).toStdString() + ")");
+        }
         if (column <= 0)
             column = 1;
         file.goto_hdu(hdu);
@@ -216,8 +235,22 @@ main(int argc, char *argv[])
                 if (parser.get<bool>("--info"))
                     printInfo(path);
                 if (parser.get<bool>("--stats"))
+                {
+                    int column = 0;
+                    QString columnName;
+                    if (auto c = parser.present<std::string>("--column"))
+                    {
+                        bool isNumber = false;
+                        column = QString::fromStdString(*c).toInt(&isNumber);
+                        if (!isNumber)
+                        {
+                            column     = 0;
+                            columnName = QString::fromStdString(*c);
+                        }
+                    }
                     printStats(path, parser.present<int>("--hdu").value_or(0),
-                               parser.present<int>("--column").value_or(0));
+                               column, columnName);
+                }
             }
             catch (const std::exception &e)
             {

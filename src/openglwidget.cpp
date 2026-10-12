@@ -1782,7 +1782,8 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
     // projections rotate with a plain left drag (panning them is pointless)
     const bool disk = m_projection == Projection::ORTHOGRAPHIC
                       || m_projection == Projection::AZIMUTHAL_EQUIDISTANT
-                      || m_projection == Projection::GNOMONIC;
+                      || m_projection == Projection::GNOMONIC
+                      || m_projection == Projection::STEREOGRAPHIC;
     const bool wantsRotate
         = e->button() == Qt::MiddleButton
           || (e->button() == Qt::LeftButton

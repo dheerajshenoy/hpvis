@@ -31,7 +31,7 @@ public:
 
     // hdu / column are 1-based; 0 picks the first map HDU / column
     void OpenFile(const QString &filePath = QString(), int hdu = 0,
-                  int column = 0);
+                  int column = 0, const QString &columnName = QString());
 
 protected:
     void dragEnterEvent(QDragEnterEvent *event) override;

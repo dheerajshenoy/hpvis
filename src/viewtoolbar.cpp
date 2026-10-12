@@ -40,8 +40,8 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
     m_projectionCombo = new QComboBox();
     m_projectionCombo->addItem("Mollweide",
                                static_cast<int>(Projection::MOLLWEIDE));
-    m_projectionCombo->addItem("Plate Carrée",
-                               static_cast<int>(Projection::PLATE_CARREE));
+    m_projectionCombo->addItem("Equirectangular",
+                               static_cast<int>(Projection::EQUIRECTANGULAR));
     m_projectionCombo->addItem("Orthographic",
                                static_cast<int>(Projection::ORTHOGRAPHIC));
     m_projectionCombo->addItem(
@@ -49,6 +49,19 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
         static_cast<int>(Projection::AZIMUTHAL_EQUIDISTANT));
     m_projectionCombo->addItem("Gnomonic",
                                static_cast<int>(Projection::GNOMONIC));
+    m_projectionCombo->addItem("Mercator",
+                               static_cast<int>(Projection::MERCATOR));
+    m_projectionCombo->addItem("Sinusoidal",
+                               static_cast<int>(Projection::SINUSOIDAL));
+    m_projectionCombo->addItem(
+        "Lambert Cylindrical",
+        static_cast<int>(Projection::LAMBERT_CYLINDRICAL));
+    m_projectionCombo->addItem("Gall-Peters",
+                               static_cast<int>(Projection::GALL_PETERS));
+    m_projectionCombo->addItem("Stereographic",
+                               static_cast<int>(Projection::STEREOGRAPHIC));
+    m_projectionCombo->addItem("Hammer",
+                               static_cast<int>(Projection::HAMMER));
     addLabeled("Projection", m_projectionCombo);
 
     // --- Orientation ---

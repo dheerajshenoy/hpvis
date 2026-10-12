@@ -396,9 +396,11 @@ SettingsDialog::createAppearanceSettingsPage()
     auto *projBox     = new QGroupBox("Projection");
     auto *projForm    = new QFormLayout(projBox);
     m_projectionCombo = new QComboBox();
-    m_projectionCombo->addItems({"Mollweide", "Plate Carr\u00e9e",
+    m_projectionCombo->addItems({"Mollweide", "Equirectangular",
                                  "Orthographic", "Azimuthal Equidistant",
-                                 "Gnomonic"});
+                                 "Gnomonic", "Mercator", "Sinusoidal",
+                                 "Lambert Cylindrical", "Gall-Peters",
+                                 "Stereographic", "Hammer"});
     projForm->addRow("Default projection:", m_projectionCombo);
 
     m_perspectiveCombo = new QComboBox();

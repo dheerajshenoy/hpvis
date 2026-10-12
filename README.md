@@ -16,8 +16,9 @@ shader, so large maps (nside 2048 and above) stay responsive.
 
 - Galactic, Ecliptic and Equatorial orientations (converted on the GPU from
   the map's own `COORDSYS`), or a free trackball.
-- Five projections: Mollweide, Plate Carrée, Orthographic, Azimuthal
-  equidistant and Gnomonic, with interactive sky rotation, seen from the
+- Eleven projections: Mollweide, Hammer, Equirectangular, Mercator, Sinusoidal,
+  Lambert cylindrical, Gall-Peters, Orthographic, Azimuthal equidistant,
+  Gnomonic and Stereographic, with interactive sky rotation, seen from the
   inside (the sky) or the outside (like a globe).
 - RING and NESTED pixel ordering.
 - 15 colormaps plus your own (CSV or JSON), linear and logarithmic scales, an adjustable color range and a
@@ -65,12 +66,12 @@ hpvis [options] [FILE...]
 | Option | Description |
 | --- | --- |
 | `-H, --hdu N` | HDU to show (1-based, default: first map HDU) |
-| `-c, --column N` | Column to show (1-based, default: first) |
+| `-c, --column N\|NAME` | Column to show, by number (1-based) or name such as `TT` (default: first) |
 | `-m, --colormap NAME` | e.g. `viridis`, `inferno`, `jet`, a custom colormap name, or a colormap file |
 | `-r, --reverse` | Reverse the colormap |
 | `-s, --scale linear\|log` | Color scale |
 | `--min V`, `--max V` | Color range |
-| `-p, --projection P` | `mollweide`, `plate_carree`, `orthographic`, `azimuthal_equidistant`, `gnomonic` |
+| `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer` |
 | `-o, --orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial`: the frame to show the sky in |
 | `--view inside\|outside` | Perspective: the sky seen from the inside (longitude increases to the left, the default) or from the outside like a globe (mirrored) |
 | `-g, --graticule` | Show the coordinate grid |
@@ -96,7 +97,7 @@ Files can also be opened from File > Open or by dropping them on the window.
 | --- | --- |
 | Zoom | Mouse wheel, pinch, or Ctrl + scroll (toward the cursor) |
 | Pan | Left-drag, or two-finger scroll |
-| Rotate the sky | Ctrl + left-drag or middle-drag (plain left-drag in Orthographic and Azimuthal views) |
+| Rotate the sky | Ctrl + left-drag or middle-drag (plain left-drag in the Orthographic, Azimuthal, Gnomonic and Stereographic views) |
 | Zoom to a region | Shift + left-drag |
 | Reset view | Double-click, or `0` |
 | Toggle minimap | `M` |

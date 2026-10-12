@@ -85,8 +85,10 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
     if (auto proj = parser.present<std::string>("--projection"))
     {
         static const QStringList names
-            = {"mollweide", "plate_carree", "orthographic",
-               "azimuthal_equidistant", "gnomonic"};
+            = {"mollweide", "equirectangular", "orthographic",
+               "azimuthal_equidistant", "gnomonic", "mercator", "sinusoidal",
+               "lambert_cylindrical", "gall_peters", "stereographic",
+               "hammer"};
         const int i = names.indexOf(QString::fromStdString(*proj));
         if (i >= 0)
             m_cli.projection = Projection(i);
@@ -117,13 +119,25 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
         m_cli.exportPath = QString::fromStdString(*out);
 
     const int hdu    = parser.present<int>("--hdu").value_or(0);
-    const int column = parser.present<int>("--column").value_or(0);
+    // --column takes a number or a column name (TT, QQ, ...)
+    int column = 0;
+    QString columnName;
+    if (auto c = parser.present<std::string>("--column"))
+    {
+        bool isNumber = false;
+        column        = QString::fromStdString(*c).toInt(&isNumber);
+        if (!isNumber)
+        {
+            column     = 0;
+            columnName = QString::fromStdString(*c);
+        }
+    }
 
     for (const auto &file : parser.get<std::vector<std::string>>("files"))
     {
         const QString path = QString::fromStdString(file);
         m_cliPaths.insert(path);
-        OpenFile(path, hdu, column);
+        OpenFile(path, hdu, column, columnName);
     }
 }
 
@@ -578,7 +592,8 @@ HpVis::updateRecentMenu()
 }
 
 void
-HpVis::OpenFile(const QString &filePath, int hdu, int column)
+HpVis::OpenFile(const QString &filePath, int hdu, int column,
+                const QString &columnName)
 {
     QString resolvedPath;
     if (filePath.isEmpty())
@@ -649,7 +664,7 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column)
         m_toolBar->setEnabled(true);
     });
 
-    view->loadMap(resolvedPath, hdu, column);
+    view->loadMap(resolvedPath, hdu, column, columnName);
 }
 
 void

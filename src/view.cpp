@@ -70,7 +70,8 @@ markBinaryMaskUnseen(Healpix_Map<float> &map)
 // widget on the GUI thread once it is done. hdu <= 0 means "scan the file and
 // use the first table with a numeric column".
 void
-View::startLoad(int hdu, int column, bool initial)
+View::startLoad(int hdu, int column, const QString &columnName,
+                bool initial)
 {
     m_loading              = true;
     const QString filename = m_filePath;
@@ -105,13 +106,16 @@ View::startLoad(int hdu, int column, bool initial)
             emit hduLoaded(true, QString());
     });
 
-    watcher->setFuture(QtConcurrent::run([filename, hdu, column]()
+    watcher->setFuture(QtConcurrent::run([filename, hdu, column, columnName]()
     {
         LoadResult result;
         try
         {
             if (isNpyPath(filename.toStdString()))
             {
+                if (!columnName.isEmpty())
+                    throw PlanckError(".npy columns have no names, give a "
+                                      "number");
                 auto map = readNpyMap(filename.toStdString(), column,
                                       kMaxSupportedNside);
                 markBinaryMaskUnseen(*map);
@@ -125,7 +129,7 @@ View::startLoad(int hdu, int column, bool initial)
             file.open(filename.toStdString());
 
             int useHdu = hdu, useCol = column;
-            if (hdu <= 0)
+            if (hdu <= 0 || !columnName.isEmpty())
             {
                 result.info = scanFits(file);
                 if (result.info.hdus.isEmpty())
@@ -133,8 +137,25 @@ View::startLoad(int hdu, int column, bool initial)
                         "No HEALPix map found (needs a table with NSIDE and "
                         "ORDERING\n"
                         "keywords and a column of 12*nside^2 values)");
-                useHdu = result.info.hdus.first().index;
-                useCol = result.info.hdus.first().columns.first().index;
+                if (hdu <= 0)
+                    useHdu = result.info.hdus.first().index;
+                const FitsHdu *h = result.info.find(useHdu);
+                if (!h)
+                    throw PlanckError(("HDU " + std::to_string(useHdu)
+                                       + " does not hold a map")
+                                          .c_str());
+                if (!columnName.isEmpty())
+                {
+                    useCol = findColumn(*h, columnName);
+                    if (!useCol)
+                        throw PlanckError(
+                            ("no column named " + columnName.toStdString()
+                             + " (available: " + columnNames(*h).toStdString()
+                             + ")")
+                                .c_str());
+                }
+                else if (useCol <= 0)
+                    useCol = h->columns.first().index;
             }
 
             file.goto_hdu(useHdu);
@@ -171,10 +192,11 @@ View::startLoad(int hdu, int column, bool initial)
 }
 
 void
-View::loadMap(const QString &filename, int hdu, int column)
+View::loadMap(const QString &filename, int hdu, int column,
+              const QString &columnName)
 {
     m_filePath = filename;
-    startLoad(hdu, column, true);
+    startLoad(hdu, column, columnName, true);
 }
 
 // Switch to another HDU / column of the same file; ignored while a load is
@@ -183,7 +205,7 @@ void
 View::loadHdu(int hdu, int column)
 {
     if (!m_loading)
-        startLoad(hdu, column, false);
+        startLoad(hdu, column, QString(), false);
 }
 
 void

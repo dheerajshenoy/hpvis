@@ -62,7 +62,10 @@ public:
 
     // Asynchronous: reads the file in the background and emits loadFinished
     // hdu / column are 1-based; 0 picks the first map HDU / column
-    void loadMap(const QString &filename, int hdu = 0, int column = 0);
+    // columnName (if not empty) selects the column by name and takes
+    // precedence over column
+    void loadMap(const QString &filename, int hdu = 0, int column = 0,
+                 const QString &columnName = QString());
     // Same file, another table HDU / column (both 1-based). Asynchronous;
     // emits hduLoaded.
     void loadHdu(int hdu, int column);
@@ -86,7 +89,8 @@ public:
 
 private:
     void initConnections();
-    void startLoad(int hdu, int column, bool initial);
+    void startLoad(int hdu, int column, const QString &columnName,
+                   bool initial);
 
 signals:
     void loadFinished(bool ok, const QString &error); // first load only

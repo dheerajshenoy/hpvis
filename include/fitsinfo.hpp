@@ -35,3 +35,12 @@ struct FitsInfo
 // HDU, so call goto_hdu() afterwards.
 FitsInfo
 scanFits(fitshandle &file);
+
+// 1-based index of the column called name (case-insensitive, ignoring
+// surrounding spaces), or 0 when the HDU has no such column
+int
+findColumn(const FitsHdu &hdu, const QString &name);
+
+// The column names of the HDU, for error messages ("TT, QQ, UU")
+QString
+columnNames(const FitsHdu &hdu);

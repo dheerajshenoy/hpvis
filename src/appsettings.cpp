@@ -32,7 +32,7 @@ AppSettings::load()
     a.viewFromOutside = s.value("view/fromOutside", d.viewFromOutside).toBool();
 
     const int pj = s.value("view/projection", int(d.projection)).toInt();
-    a.projection = (pj >= 0 && pj <= int(Projection::GNOMONIC)) ? Projection(pj)
+    a.projection = (pj >= 0 && pj <= int(Projection::HAMMER)) ? Projection(pj)
                                                                 : d.projection;
     a.graticuleColor = QColor(
         s.value("view/graticuleColor", d.graticuleColor.name()).toString());
