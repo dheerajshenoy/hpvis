@@ -471,6 +471,7 @@ Item {
                 view.panBy(translation.x - lastX, translation.y - lastY)
                 lastX = translation.x
                 lastY = translation.y
+                cursorShape = Qt.ClosedHandCursor
             }
         }
 
