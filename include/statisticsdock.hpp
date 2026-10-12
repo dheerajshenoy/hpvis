@@ -32,6 +32,8 @@ public:
     void setView(View *view);
     // Drops what refers to a view that is going away
     void forget(const View *view);
+    // Refreshes the numbers of the view's statistics region
+    void updateRegion();
 
     // The open maps, to compare their histograms with the current one
     void setOpenMapsProvider(std::function<QList<OpenMap>()> provider)
@@ -64,6 +66,18 @@ private:
     QLabel *m_rms     = nullptr;
     QLabel *m_std     = nullptr;
     QLabel *m_fsky    = nullptr;
+
+    // Statistics of the selected region
+    QLabel *m_regionHint   = nullptr;
+    QLabel *m_regionPixels = nullptr;
+    QLabel *m_regionArea   = nullptr;
+    QLabel *m_regionFsky   = nullptr;
+    QLabel *m_regionMin    = nullptr;
+    QLabel *m_regionMax    = nullptr;
+    QLabel *m_regionAvg    = nullptr;
+    QLabel *m_regionRms    = nullptr;
+    QLabel *m_regionStd    = nullptr;
+    QToolButton *m_regionClear = nullptr;
 
     // Histogram
     QPointer<View> m_view;

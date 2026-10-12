@@ -100,6 +100,13 @@ First development release.
 - The OpenGL viewport accounts for the display scale factor, so the anchor
   point stays under the cursor on scaled (HiDPI) screens.
 
+### Region statistics
+- Ctrl + Shift + drag (or View > Select Statistics Region) picks a rectangle
+  in the current projection. The Statistics dock shows its pixel count, area,
+  sky fraction, min, max, average, RMS and standard deviation, using the same
+  validity and mask rules as the whole map. The region stays fixed on the sky
+  and is outlined on the map; View > Clear Statistics Region removes it.
+
 ### Masks
 - Load one or more HEALPix mask files, and add more at any time.
 - A Masks menu: Add Mask..., Clear All, and a submenu per mask with Enabled,

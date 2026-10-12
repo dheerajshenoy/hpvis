@@ -53,9 +53,40 @@ StatisticsDock::StatisticsDock(QWidget *parent)
     add("Std dev:", m_std);
     add("Sky fraction:", m_fsky);
 
+    // The statistics of a region picked on the map
+    auto *regionBox  = new QGroupBox("Region");
+    auto *regionForm = new QFormLayout(regionBox);
+    m_regionHint = new QLabel("Ctrl + Shift + drag on the map, or View > "
+                              "Select Statistics Region.");
+    m_regionHint->setWordWrap(true);
+    regionForm->addRow(m_regionHint);
+    auto addRegion = [regionForm](const QString &name, QLabel *&label)
+    {
+        label = new QLabel("-");
+        label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        regionForm->addRow(name, label);
+    };
+    addRegion("Pixels (valid):", m_regionPixels);
+    addRegion("Area:", m_regionArea);
+    addRegion("Sky fraction:", m_regionFsky);
+    addRegion("Min:", m_regionMin);
+    addRegion("Max:", m_regionMax);
+    addRegion("Average:", m_regionAvg);
+    addRegion("RMS:", m_regionRms);
+    addRegion("Std dev:", m_regionStd);
+    m_regionClear = new QToolButton();
+    m_regionClear->setText("Clear region");
+    connect(m_regionClear, &QToolButton::clicked, this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->clearStatsRegion();
+    });
+    regionForm->addRow(m_regionClear);
+
     auto *whole = new QWidget();
     auto *outer = new QVBoxLayout(whole);
     outer->addWidget(content);
+    outer->addWidget(regionBox);
     initHistogramUI(whole);
     setWidget(whole);
 
@@ -278,6 +309,7 @@ StatisticsDock::setView(View *view)
         for (QLabel *l :
              {m_nside, m_npix, m_min, m_max, m_average, m_rms, m_std, m_fsky})
             l->setText("-");
+        updateRegion();
         fillFields();
         m_result = HistogramResult();
         m_histStatus->setText("Open a map to see its histogram.");
@@ -299,8 +331,41 @@ StatisticsDock::setView(View *view)
     m_std->setText(num(gl->mapStd()));
     m_fsky->setText(QString::number(gl->fsky(), 'f', 6));
 
+    updateRegion();
     fillFields();
     scheduleUpdate();
+}
+
+void
+StatisticsDock::updateRegion()
+{
+    const OpenGLWidget *gl = m_view ? m_view->glWidget() : nullptr;
+    const bool has         = gl && gl->hasStatsRegion();
+
+    m_regionHint->setVisible(!has);
+    m_regionClear->setVisible(has);
+    for (QLabel *l : {m_regionPixels, m_regionArea, m_regionFsky, m_regionMin,
+                      m_regionMax, m_regionAvg, m_regionRms, m_regionStd})
+        l->setText("-");
+    if (!has)
+        return;
+
+    const OpenGLWidget::RegionStats &s = gl->regionStats();
+    auto num = [](double v)
+    {
+        return QString::number(v, 'g', 6);
+    };
+    m_regionPixels->setText(
+        QString("%1 (%2)").arg(s.pixels).arg(s.valid));
+    m_regionArea->setText(QString("%1 deg\u00b2").arg(s.areaDeg2, 0, 'g', 6));
+    m_regionFsky->setText(QString::number(s.skyFrac, 'f', 6));
+    if (s.valid == 0)
+        return; // nothing valid inside: the other numbers stay empty
+    m_regionMin->setText(num(s.min));
+    m_regionMax->setText(num(s.max));
+    m_regionAvg->setText(num(s.average));
+    m_regionRms->setText(num(s.rms));
+    m_regionStd->setText(num(s.std));
 }
 
 void

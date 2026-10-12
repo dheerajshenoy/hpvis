@@ -331,6 +331,10 @@ OpenGLWidget::recomputeDataRange()
     {
         m_dataMax = m_dataMin + 1.0f;
     }
+
+    // The map or the masks changed: the region's numbers did too
+    if (m_statsRegion.active)
+        recomputeRegionStats();
 }
 
 void
@@ -575,7 +579,7 @@ OpenGLWidget::paintGL()
     m_shaderProgram.release();
 
     if (!m_colorBarVisible && !showMinimap && !m_isRegionSelecting
-        && !m_graticuleEnabled)
+        && !m_graticuleEnabled && !m_statsRegion.active)
         return;
 
     QPainter p(this);
@@ -610,10 +614,14 @@ OpenGLWidget::paintGL()
     if (m_graticuleEnabled && !m_projectionFading)
         paintGraticuleLabels(p);
 
+    paintStatsRegion(p);
+
     if (m_isRegionSelecting)
     {
-        p.setPen(QPen(QColor(255, 80, 80), 1.5));
-        p.setBrush(QColor(255, 80, 80, 40));
+        const QColor c = m_selectingStats ? QColor(80, 200, 255)
+                                          : QColor(255, 80, 80);
+        p.setPen(QPen(c, 1.5));
+        p.setBrush(QColor(c.red(), c.green(), c.blue(), 40));
         QRectF r(m_regionStart, m_regionEnd);
         r = QRectF(std::min(r.left(), r.right()), std::min(r.top(), r.bottom()),
                    std::abs(r.width()), std::abs(r.height()));
@@ -1759,10 +1767,18 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
     stopGlobeAnimation();
 
     // Region Selection: Shift + Left drag, or the next drag after
-    // View > Zoom > Zoom To Region
-    if (e->button() == Qt::LeftButton
-        && (e->modifiers() == Qt::ShiftModifier || m_zoomRegionArmed))
+    // View > Zoom > Zoom To Region, zooms. Ctrl + Shift + Left drag, or the
+    // next drag after View > Select Statistics Region, picks the region the
+    // statistics are computed over.
+    const bool selectStats
+        = e->button() == Qt::LeftButton
+          && (m_statsRegionArmed
+              || e->modifiers() == (Qt::ControlModifier | Qt::ShiftModifier));
+    if (selectStats
+        || (e->button() == Qt::LeftButton
+            && (e->modifiers() == Qt::ShiftModifier || m_zoomRegionArmed)))
     {
+        m_selectingStats    = selectStats;
         m_isRegionSelecting = true;
         m_regionStart       = e->pos();
         m_regionEnd         = e->pos();
@@ -1849,6 +1865,7 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
     {
         m_isRegionSelecting = false;
         m_zoomRegionArmed   = false;
+        m_statsRegionArmed  = false;
         setCursor(Qt::CrossCursor);
         // unsetCursor();
         processSelectionRegion();
@@ -1993,10 +2010,225 @@ OpenGLWidget::processSelectionRegion()
     if (r.width() < 4 || r.height() < 4) // a click, not a drag
         return;
 
+    if (m_selectingStats)
+    {
+        setStatsRegionFromRect(r);
+        return;
+    }
+
     m_camera->zoomToRect(toNdc(r.topLeft()), toNdc(r.bottomRight()),
                          viewScale());
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
+}
+
+void
+OpenGLWidget::beginStatsRegion()
+{
+    m_statsRegionArmed = true;
+    m_zoomRegionArmed  = false;
+    setCursor(Qt::CrossCursor);
+}
+
+void
+OpenGLWidget::clearStatsRegion()
+{
+    if (!m_statsRegion.active)
+        return;
+    m_statsRegion.active = false;
+    m_regionStats        = RegionStats();
+    emit regionChanged();
+    update();
+}
+
+// Fixes the rectangle on the sky: remembers the projection and the view
+// rotation it was drawn with, so it can be tested and drawn in any later view
+void
+OpenGLWidget::setStatsRegionFromRect(const QRectF &r)
+{
+    if (m_pendingMap.Npix() == 0)
+        return;
+
+    auto plane = [this](const QPointF &w)
+    {
+        return toNdc(w) / m_camera->zoom + m_camera->panOffset;
+    };
+    const QVector2D a = plane(r.topLeft()), b = plane(r.bottomRight());
+
+    StatsRegion region;
+    region.active     = true;
+    region.projection = m_projection;
+    region.outside    = m_viewOutside;
+    region.lo         = QVector2D(std::max(-1.0f, std::min(a.x(), b.x())),
+                                  std::max(-1.0f, std::min(a.y(), b.y())));
+    region.hi         = QVector2D(std::min(1.0f, std::max(a.x(), b.x())),
+                                  std::min(1.0f, std::max(a.y(), b.y())));
+    if (region.lo.x() >= region.hi.x() || region.lo.y() >= region.hi.y())
+        return; // outside the picture
+
+    // Map frame -> display frame -> the view frame (inverse of the shader's
+    // rotation); column i is the image of the i-th map axis
+    const auto toMap     = skyframe::rotation(displayFrame(), m_mapFrame);
+    const auto fromMap   = toMap.transposed(); // a rotation: inverse = transpose
+    const QQuaternion inv = m_rotation.inverted();
+    for (int i = 0; i < 3; ++i)
+    {
+        QVector3D e(i == 0, i == 1, i == 2);
+        const QVector3D v = inv.rotatedVector(skyframe::apply(fromMap, e));
+        region.toView[0 + i] = v.x();
+        region.toView[3 + i] = v.y();
+        region.toView[6 + i] = v.z();
+    }
+
+    m_statsRegion = region;
+    setCursor(Qt::WaitCursor);
+    recomputeRegionStats();
+    setCursor(Qt::CrossCursor);
+    emit regionChanged();
+    update();
+}
+
+// Same pixel selection as recomputeDataRange() (finite, not UNSEEN, not
+// masked), restricted to the pixels whose centre is inside the region
+void
+OpenGLWidget::recomputeRegionStats()
+{
+    m_regionStats = RegionStats();
+    const long npix = m_pendingMap.Npix();
+    if (!m_statsRegion.active || npix == 0)
+        return;
+
+    const std::vector<uint8_t> keep = keepMask();
+    const uint8_t *keepData         = keep.empty() ? nullptr : keep.data();
+    const float *data               = m_pendingMap.Map().begin();
+    const Healpix_Base base(
+        static_cast<int>(m_nside),
+        m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING, SET_NSIDE);
+    const StatsRegion reg = m_statsRegion;
+
+    struct Acc
+    {
+        long pixels  = 0;
+        long valid   = 0;
+        double sum   = 0.0;
+        double sumSq = 0.0;
+        float min    = std::numeric_limits<float>::max();
+        float max    = std::numeric_limits<float>::lowest();
+    };
+
+    const Acc acc = parallel::reduceRange<Acc>(npix,
+                                               [&](long begin, long end)
+    {
+        Acc a;
+        const double *m = reg.toView;
+        for (long i = begin; i < end; ++i)
+        {
+            const vec3 d = base.pix2vec(i);
+            const double x = m[0] * d.x + m[1] * d.y + m[2] * d.z;
+            const double y = m[3] * d.x + m[4] * d.y + m[5] * d.z;
+            const double z = m[6] * d.x + m[7] * d.y + m[8] * d.z;
+
+            QVector2D p;
+            if (!projectionmath::forward(reg.projection,
+                                         std::asin(std::clamp(z, -1.0, 1.0)),
+                                         std::atan2(y, x), p, reg.outside))
+                continue;
+            if (p.x() < reg.lo.x() || p.x() > reg.hi.x() || p.y() < reg.lo.y()
+                || p.y() > reg.hi.y())
+                continue;
+
+            ++a.pixels;
+            const float v = data[i];
+            if (!std::isfinite(v) || v < -1e30f)
+                continue;
+            if (keepData && !keepData[i])
+                continue;
+            ++a.valid;
+            a.sum += v;
+            a.sumSq += double(v) * v;
+            a.min = std::min(a.min, v);
+            a.max = std::max(a.max, v);
+        }
+        return a;
+    }, [](Acc &t, const Acc &p)
+    {
+        t.pixels += p.pixels;
+        t.valid += p.valid;
+        t.sum += p.sum;
+        t.sumSq += p.sumSq;
+        t.min = std::min(t.min, p.min);
+        t.max = std::max(t.max, p.max);
+    });
+
+    RegionStats s;
+    s.pixels   = acc.pixels;
+    s.valid    = acc.valid;
+    s.skyFrac  = double(acc.pixels) / double(npix);
+    s.areaDeg2 = s.skyFrac * 4.0 * M_PI * (180.0 / M_PI) * (180.0 / M_PI);
+    if (acc.valid > 0)
+    {
+        s.min     = acc.min;
+        s.max     = acc.max;
+        s.average = acc.sum / acc.valid;
+        s.rms     = std::sqrt(acc.sumSq / acc.valid);
+        s.std     = std::sqrt(
+            std::max(0.0, acc.sumSq / acc.valid - s.average * s.average));
+    }
+    m_regionStats = s;
+}
+
+// Outline of the region in the current view: the rectangle's edges, mapped to
+// the sky with the projection they were drawn in and back to the screen
+void
+OpenGLWidget::paintStatsRegion(QPainter &p)
+{
+    if (!m_statsRegion.active || m_projectionFading)
+        return;
+    const StatsRegion &r = m_statsRegion;
+
+    const auto toDisplay = skyframe::rotation(m_mapFrame, displayFrame());
+    constexpr int kSteps = 48;
+    QVector<QVector2D> ring;
+    for (int i = 0; i < kSteps; ++i)
+        ring << QVector2D(r.lo.x() + (r.hi.x() - r.lo.x()) * i / kSteps, r.lo.y());
+    for (int i = 0; i < kSteps; ++i)
+        ring << QVector2D(r.hi.x(), r.lo.y() + (r.hi.y() - r.lo.y()) * i / kSteps);
+    for (int i = 0; i < kSteps; ++i)
+        ring << QVector2D(r.hi.x() - (r.hi.x() - r.lo.x()) * i / kSteps, r.hi.y());
+    for (int i = 0; i < kSteps; ++i)
+        ring << QVector2D(r.lo.x(), r.hi.y() - (r.hi.y() - r.lo.y()) * i / kSteps);
+    ring << ring.first();
+
+    p.setPen(QPen(QColor(80, 200, 255), 1.5, Qt::DashLine));
+    p.setBrush(Qt::NoBrush);
+    QPointF prev;
+    bool havePrev = false;
+    for (const QVector2D &q : ring)
+    {
+        double colat, phi;
+        QPointF w;
+        bool ok = projectionmath::inverse(r.projection, q, colat, phi,
+                                          r.outside);
+        if (ok)
+        {
+            // view frame it was drawn in -> map frame (transpose) -> display
+            const QVector3D v = directionFromAngles(colat, phi);
+            const double *m   = r.toView;
+            const QVector3D mapDir(
+                float(m[0] * v.x() + m[3] * v.y() + m[6] * v.z()),
+                float(m[1] * v.x() + m[4] * v.y() + m[7] * v.z()),
+                float(m[2] * v.x() + m[5] * v.y() + m[8] * v.z()));
+            double c2, p2;
+            anglesFromDirection(skyframe::apply(toDisplay, mapDir), c2, p2);
+            ok = projectToWindow(M_PI / 2.0 - c2, p2, w);
+        }
+        // A jump across the picture is the seam of the projection
+        if (ok && havePrev
+            && QLineF(prev, w).length() < 0.4 * std::max(width(), height()))
+            p.drawLine(prev, w);
+        havePrev = ok;
+        prev     = w;
+    }
 }
 
 void

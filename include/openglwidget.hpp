@@ -139,6 +139,32 @@ public:
     // Arms a rubber-band: the next left-drag zooms to the dragged rectangle
     void beginZoomToRegion();
 
+    // Statistics of a part of the sky. The region is a rectangle drawn in the
+    // current projection (Ctrl + Shift + drag, or armed with
+    // beginStatsRegion()); it stays fixed on the sky when the view moves.
+    struct RegionStats
+    {
+        long pixels      = 0; // pixels inside the region
+        long valid       = 0; // ... that are valid and not masked
+        double areaDeg2  = 0.0;
+        double skyFrac   = 0.0; // of the whole sky
+        double min       = 0.0;
+        double max       = 0.0;
+        double average   = 0.0;
+        double rms       = 0.0;
+        double std       = 0.0;
+    };
+    void beginStatsRegion();
+    void clearStatsRegion();
+    bool hasStatsRegion() const
+    {
+        return m_statsRegion.active;
+    }
+    const RegionStats &regionStats() const
+    {
+        return m_regionStats;
+    }
+
     double mapAverage() const
     {
         return m_mapAverage;
@@ -310,6 +336,7 @@ signals:
     void zoomChanged(float zoom);
     void rotationChanged(); // drag, reset or setRotationAngles
     void masksChanged();    // list or enabled flags changed
+    void regionChanged();   // statistics region set, cleared or recomputed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
     void colormapRangeChanged(float min, float max);
     // lonLat in degrees; value is NaN and index -1 when off the map
@@ -354,6 +381,9 @@ private:
     void tickGlobeAnimation();
     void uploadColormapLut();
     void recomputeDataRange();
+    void recomputeRegionStats();
+    void setStatsRegionFromRect(const QRectF &widgetRect);
+    void paintStatsRegion(QPainter &p);
     void applyMaskChange(bool texturesChanged);
     int maskBits(bool inverted = false) const;
     void setupGeometry();
@@ -419,6 +449,20 @@ private:
 
     bool m_isRegionSelecting = false;
     bool m_zoomRegionArmed   = false;
+    bool m_statsRegionArmed  = false;
+    bool m_selectingStats    = false; // the rubber-band is for statistics
+
+    struct StatsRegion
+    {
+        bool active = false;
+        Projection projection = Projection::MOLLWEIDE;
+        bool outside          = false;
+        // Map-frame direction -> the view frame it was drawn in (row-major)
+        double toView[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+        QVector2D lo, hi; // the rectangle on the projection plane
+    };
+    StatsRegion m_statsRegion;
+    RegionStats m_regionStats;
     QPoint m_regionStart;
     QPoint m_regionEnd;
 

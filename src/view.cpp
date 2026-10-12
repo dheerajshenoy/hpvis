@@ -213,6 +213,8 @@ View::initConnections()
 {
     connect(m_glWidget, &OpenGLWidget::zoomChanged, this, &View::zoomChanged);
     connect(m_glWidget, &OpenGLWidget::masksChanged, this, &View::masksChanged);
+    connect(m_glWidget, &OpenGLWidget::regionChanged, this,
+            &View::regionChanged);
     connect(m_glWidget, &OpenGLWidget::colormapRangeChanged, this,
             &View::colormapRangeChanged);
     connect(m_glWidget, &OpenGLWidget::cursorPosChanged, this,

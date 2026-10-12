@@ -100,6 +100,7 @@ signals:
                           qlonglong index);
     void zoomChanged(float zoom);
     void masksChanged();
+    void regionChanged(); // statistics region set, cleared or recomputed
     void colormapRangeChanged(float min, float max);
 
 private:

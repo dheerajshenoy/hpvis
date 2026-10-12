@@ -526,6 +526,17 @@ HpVis::initMenubar()
             m_view->glWidget()->resetZoom();
     });
 
+    m_viewMenu->addAction("Select &Statistics Region", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->beginStatsRegion();
+    });
+    m_viewMenu->addAction("Clear Statistics Re&gion", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->clearStatsRegion();
+    });
+
     m_viewResetViewAction = m_viewMenu->addAction("&Reset View", this, [this]()
     {
         if (m_view)
@@ -694,6 +705,12 @@ HpVis::initViewConnections(const View *view)
                                    view->column());
             updateDocks();
         }
+    });
+
+    connect(view, &View::regionChanged, this, [this, view]()
+    {
+        if (view == m_view)
+            m_statsDock->updateRegion();
     });
 
     connect(view, &View::masksChanged, this, [this, view]()
