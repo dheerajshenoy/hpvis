@@ -119,6 +119,10 @@ First development release.
   of aliasing it. The pixel window functions are not corrected for.
 
 ### Masks
+- Masks > Add Mask From Map Column... lists the columns of the open maps' files
+  (and of any other FITS or .npy file you add) so a mask stored next to the map,
+  or in another file, can be picked without leaving the viewer. Maps that only
+  exist in memory (results of operations) can be used too.
 - Load one or more HEALPix mask files, and add more at any time.
 - A Masks menu: Add Mask..., Clear All, and a submenu per mask with Enabled,
   Invert and Remove.

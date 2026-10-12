@@ -21,6 +21,11 @@ struct NpyArray
 NpyArray
 readNpy(const std::string &path);
 
+// Number of maps in the file (rows of a 2-D array, 1 for a 1-D one); only
+// reads the header
+int
+npyMapCount(const std::string &path);
+
 inline bool
 isNpyPath(const std::string &path)
 {

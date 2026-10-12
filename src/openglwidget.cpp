@@ -716,22 +716,39 @@ OpenGLWidget::paintGL()
 void
 OpenGLWidget::addMaskFiles(const QStringList &files)
 {
+    QList<MaskSource> sources;
+    for (const QString &f : files)
+    {
+        MaskSource s;
+        s.path = f;
+        sources << s;
+    }
+    addMasks(sources);
+}
+
+void
+OpenGLWidget::addMasks(const QList<MaskSource> &sources)
+{
     if (m_pendingMap.Npix() == 0)
     {
         QMessageBox::warning(this, "Mask", "Load a map before loading a mask.");
         return;
     }
 
-    // Skip files that are already loaded
-    QStringList todo;
-    for (const QString &file : files)
+    // Skip sources that are already loaded
+    QList<MaskSource> todo;
+    QStringList keys;
+    for (const MaskSource &src : sources)
     {
-        const QString path = QFileInfo(file).absoluteFilePath();
+        const QString key = src.key();
         const bool dup
             = std::any_of(m_masks.begin(), m_masks.end(),
-                          [&](const MaskEntry &m) { return m.path == path; });
-        if (!dup && !todo.contains(file))
-            todo << file;
+                          [&](const MaskEntry &m) { return m.path == key; });
+        if (!dup && !keys.contains(key))
+        {
+            todo << src;
+            keys << key;
+        }
     }
     if (todo.isEmpty())
         return;
@@ -787,30 +804,74 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
     watcher->setFuture(QtConcurrent::run([todo, mapNside, mapNpix, mapScheme]()
     {
         Result result;
-        for (const QString &file : todo)
+        for (const MaskSource &src : todo)
         {
+            const QString file = src.path;
+            QString shown      = src.label.isEmpty()
+                                     ? QFileInfo(file).fileName()
+                                     : src.label;
             try
             {
-                // Use the file's first HEALPix map HDU / column (masks have
-                // their own layout, independent of the map's selection)
                 Healpix_Map<float> mask;
-                if (isNpyPath(file.toStdString()))
-                    mask = std::move(
-                        *readNpyMap(file.toStdString(), 0, kMaxSupportedNside));
+                if (src.map)
+                    mask = *src.map;
+                else if (isNpyPath(file.toStdString()))
+                {
+                    mask = std::move(*readNpyMap(file.toStdString(),
+                                                 src.column,
+                                                 kMaxSupportedNside));
+                    if (src.column > 0 && src.label.isEmpty())
+                        shown += QString(" [column %1]").arg(src.column);
+                }
                 else
                 {
+                    // The requested HDU / column, else the file's first map
+                    // HDU / column (masks have their own layout, independent
+                    // of the map's selection)
                     fitshandle fits;
                     fits.open(file.toStdString());
                     const FitsInfo info = scanFits(fits);
-                    if (info.hdus.isEmpty())
+                    const FitsHdu *h
+                        = src.hdu > 0 ? info.find(src.hdu)
+                                      : (info.hdus.isEmpty()
+                                             ? nullptr
+                                             : &info.hdus.first());
+                    if (!h)
                     {
-                        result.errors << QString("%1: no HEALPix map found.")
-                                             .arg(QFileInfo(file).fileName());
+                        result.errors
+                            << QString(src.hdu > 0
+                                           ? "%1: HDU %2 holds no map."
+                                           : "%1: no HEALPix map found.")
+                                   .arg(shown)
+                                   .arg(src.hdu);
                         continue;
                     }
-                    fits.goto_hdu(info.hdus.first().index);
-                    read_Healpix_map_from_fits(
-                        fits, mask, info.hdus.first().columns.first().index);
+                    int column = h->columns.first().index;
+                    if (src.column > 0)
+                    {
+                        column = src.column;
+                        bool found = false;
+                        for (const FitsColumn &c : h->columns)
+                            if (c.index == column)
+                            {
+                                found = true;
+                                if (src.label.isEmpty())
+                                    shown += QString(" [%1]").arg(
+                                        c.name.trimmed().isEmpty()
+                                            ? QString::number(c.index)
+                                            : c.name.trimmed());
+                            }
+                        if (!found)
+                        {
+                            result.errors
+                                << QString("%1: column %2 holds no map.")
+                                       .arg(shown)
+                                       .arg(column);
+                            continue;
+                        }
+                    }
+                    fits.goto_hdu(h->index);
+                    read_Healpix_map_from_fits(fits, mask, column);
                 }
 
                 if (mask.Nside() != mapNside)
@@ -818,7 +879,7 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
                     result.warnings
                         << QString("%1: nside %2 does not match the map "
                                    "(nside %3).")
-                               .arg(QFileInfo(file).fileName())
+                               .arg(shown)
                                .arg(mask.Nside())
                                .arg(mapNside);
                     continue;
@@ -827,8 +888,8 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
                     mask.swap_scheme();
 
                 MaskEntry entry;
-                entry.name = QFileInfo(file).fileName();
-                entry.path = QFileInfo(file).absoluteFilePath();
+                entry.name = shown;
+                entry.path = src.key();
                 entry.data.resize(size_t(mapNpix));
                 const float *d = mask.Map().begin();
                 uint8_t *out   = entry.data.data();
@@ -849,12 +910,12 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
             catch (const PlanckError &e)
             {
                 result.errors << QString("Failed to load %1: %2")
-                                     .arg(file, QString(e.what()));
+                                     .arg(shown, QString(e.what()));
             }
             catch (const std::exception &e)
             {
                 result.errors << QString("Failed to load %1: %2")
-                                     .arg(file, QString(e.what()));
+                                     .arg(shown, QString(e.what()));
             }
         }
         return result;

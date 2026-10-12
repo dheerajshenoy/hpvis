@@ -23,8 +23,9 @@ convert(const char *src, size_t n, float *dst)
 }
 } // namespace
 
-NpyArray
-readNpy(const std::string &path)
+// headerOnly stops after the shape (data stays empty)
+static NpyArray
+load(const std::string &path, bool headerOnly)
 {
     std::ifstream in(path, std::ios::binary);
     if (!in)
@@ -84,6 +85,8 @@ readNpy(const std::string &path)
     }
     if (out.shape.empty() || out.shape.size() > 2)
         throw std::runtime_error("only 1-D and 2-D arrays are supported");
+    if (headerOnly)
+        return out;
 
     // dtype: byte order char + kind + size, e.g. "<f4"
     if (descr.size() < 3)
@@ -140,6 +143,19 @@ readNpy(const std::string &path)
     else
         out.data = std::move(data);
     return out;
+}
+
+NpyArray
+readNpy(const std::string &path)
+{
+    return load(path, false);
+}
+
+int
+npyMapCount(const std::string &path)
+{
+    const NpyArray a = load(path, true);
+    return a.shape.size() == 2 ? static_cast<int>(a.shape[0]) : 1;
 }
 
 std::shared_ptr<Healpix_Map<float>>

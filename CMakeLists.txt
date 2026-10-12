@@ -137,6 +137,8 @@ add_executable(${PROJECT_NAME}
     src/histogram.cpp
     src/mapoperationdialog.cpp
     src/resolution.cpp
+    src/masksource.cpp
+    src/masksourcedialog.cpp
     src/downgradedialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
@@ -167,6 +169,8 @@ add_executable(${PROJECT_NAME}
     include/histogram.hpp
     include/mapoperationdialog.hpp
     include/resolution.hpp
+    include/masksource.hpp
+    include/masksourcedialog.hpp
     include/downgradedialog.hpp
     include/openglwidget.hpp
     include/tilecache.hpp

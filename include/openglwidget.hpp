@@ -3,6 +3,7 @@
 #include "colormap.hpp"
 #include "exportoptions.hpp"
 #include "mapcamera.hpp"
+#include "masksource.hpp"
 #include "pixelordering.hpp"
 #include "projection.hpp"
 #include "skyframe.hpp"
@@ -215,6 +216,8 @@ public:
     // already in the list are skipped). Returns the number added.
     // Asynchronous: masks appear (and masksChanged fires) once they are read
     void addMaskFiles(const QStringList &files);
+    // The same for any column of a file, or a map in memory
+    void addMasks(const QList<MaskSource> &sources);
     void removeMask(int index);
     void clearMasks();
     void setMaskEnabled(int index, bool enabled);

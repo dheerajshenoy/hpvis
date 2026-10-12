@@ -3,6 +3,7 @@
 #include "colormapregistry.hpp"
 #include "downgradedialog.hpp"
 #include "fitsheaderdialog.hpp"
+#include "masksourcedialog.hpp"
 #include "mapoperationdialog.hpp"
 #include "pixelordering.hpp"
 #include "powerspectrumdock.hpp"
@@ -839,6 +840,17 @@ HpVis::rebuildMasksMenu(const View *view)
     });
     add->setEnabled(gl);
 
+    QAction *addColumn = m_masksMenu->addAction(
+        "Add Mask From &Map Column...", this, [this]()
+    {
+        if (!m_view)
+            return;
+        MaskSourceDialog dialog(openMaps(), m_view, this);
+        if (dialog.exec() == QDialog::Accepted && m_view)
+            m_view->glWidget()->addMasks(dialog.selected());
+    });
+    addColumn->setEnabled(gl);
+
     QAction *clear
         = m_masksMenu->addAction("&Clear All", this, &HpVis::onMaskCleared);
     clear->setEnabled(gl && gl->maskCount() > 0);
@@ -1457,11 +1469,27 @@ HpVis::onSaveMapTriggered()
         = m_view->isComputed()
               ? QString("result.fits")
               : QFileInfo(m_view->filePath()).completeBaseName() + "_copy.fits";
-    const QString path = QFileDialog::getSaveFileName(
-        this, "Save Map As", startDirectory() + "/" + suggestion,
-        "FITS Files (*.fits);;All Files (*)");
-    if (path.isEmpty())
+    QFileDialog dialog(this, "Save Map As", startDirectory() + "/" + suggestion,
+                       "FITS Files (*.fits);;All Files (*)");
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setDefaultSuffix("fits"); // added when the name has no extension
+    if (dialog.exec() != QDialog::Accepted || dialog.selectedFiles().isEmpty())
         return;
+    QString path = dialog.selectedFiles().first();
+
+    // Some native dialogs ignore the default suffix: add it here, and ask
+    // about overwriting since the dialog did not see the final name
+    if (QFileInfo(path).suffix().isEmpty())
+    {
+        path += ".fits";
+        if (QFileInfo::exists(path)
+            && QMessageBox::question(
+                   this, "Save Map",
+                   QString("%1 already exists. Overwrite it?")
+                       .arg(QFileInfo(path).fileName()))
+                   != QMessageBox::Yes)
+            return;
+    }
     rememberDirectory(path);
 
     QString error;
