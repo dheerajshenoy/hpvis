@@ -2224,7 +2224,44 @@ OpenGLWidget::exportImage(const QString &filePath, const ExportOptions &options)
     if (filePath.isEmpty())
         return;
 
-    const QImage image = grabFramebuffer();
+    QImage image = grabFramebuffer();
+    if (image.isNull())
+        return;
+    // The grab is in device pixels; drop the ratio so that drawing it below
+    // (and scaling) uses those pixels, not logical ones
+    image.setDevicePixelRatio(1.0);
+
+    if (options.width > 0 && options.width != image.width())
+        image = image.scaledToWidth(options.width, Qt::SmoothTransformation);
+
+    // No transparency unless asked for (the framebuffer has an alpha channel)
+    if (!options.includeAlpha)
+        image = image.convertToFormat(QImage::Format_RGB32);
+
+    if (!options.title.isEmpty())
+    {
+        const int pad = std::max(8, image.height() / 40);
+        QFont font;
+        font.setPixelSize(std::max(12, image.height() / 22));
+        font.setBold(true);
+        const QFontMetrics fm(font);
+        const int band = fm.height() + 2 * pad;
+
+        QImage out(image.width(), image.height() + band,
+                   options.includeAlpha ? QImage::Format_ARGB32
+                                        : QImage::Format_RGB32);
+        out.fill(options.includeAlpha ? Qt::transparent : Qt::white);
+        QPainter p(&out);
+        p.setFont(font);
+        p.setPen(Qt::black);
+        p.drawText(QRect(0, 0, out.width(), band), Qt::AlignCenter,
+                   fm.elidedText(options.title, Qt::ElideRight,
+                                 out.width() - 2 * pad));
+        p.drawImage(0, band, image);
+        p.end();
+        image = out;
+    }
+
     if (!image.save(filePath, nullptr, options.quality))
     {
         QMessageBox::critical(

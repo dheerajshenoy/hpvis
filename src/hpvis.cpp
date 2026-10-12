@@ -2,6 +2,7 @@
 
 #include "colormapregistry.hpp"
 #include "downgradedialog.hpp"
+#include "exportdialog.hpp"
 #include "smoothdialog.hpp"
 #include "fitsheaderdialog.hpp"
 #include "masksourcedialog.hpp"
@@ -1097,15 +1098,25 @@ HpVis::onExportActionTriggered()
     if (!m_view)
         return;
 
-    const QString filePath
-        = QFileDialog::getSaveFileName(this, "Export Image", startDirectory(),
-                                       "PNG Files (*.png);;All Files (*)");
+    // Preselect the size in device pixels, what the export really has
+    const auto *gl = m_view->glWidget();
+    ExportDialog dialog(gl->size() * gl->devicePixelRatioF(), this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
 
-    if (!filePath.isEmpty())
-    {
-        rememberDirectory(filePath);
-        m_view->glWidget()->exportImage(filePath);
-    }
+    const QString ext = dialog.format();
+    QString filePath  = QFileDialog::getSaveFileName(
+        this, "Export Image", startDirectory() + "/image." + ext,
+        QString("%1 Files (*.%2);;All Files (*)").arg(ext.toUpper(), ext));
+    if (filePath.isEmpty())
+        return;
+
+    // Add the extension of the chosen format when none was typed
+    if (QFileInfo(filePath).suffix().isEmpty())
+        filePath += "." + ext;
+
+    rememberDirectory(filePath);
+    m_view->glWidget()->exportImage(filePath, dialog.options());
 }
 
 void

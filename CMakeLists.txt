@@ -145,6 +145,7 @@ add_executable(${PROJECT_NAME}
     src/masksource.cpp
     src/masksourcedialog.cpp
     src/downgradedialog.cpp
+    src/exportdialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
     src/tilecache.cpp
@@ -180,6 +181,7 @@ add_executable(${PROJECT_NAME}
     include/masksource.hpp
     include/masksourcedialog.hpp
     include/downgradedialog.hpp
+    include/exportdialog.hpp
     include/openglwidget.hpp
     include/tilecache.hpp
     include/argparse.hpp
