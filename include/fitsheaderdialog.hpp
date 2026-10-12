@@ -21,8 +21,8 @@ private:
     void applyFilter(const QString &text);
 
     QString m_path;
-    QComboBox *m_hduCombo  = nullptr;
-    QLineEdit *m_filter    = nullptr;
-    QTableWidget *m_table  = nullptr;
-    QLabel *m_status       = nullptr;
+    QComboBox *m_hduCombo = nullptr;
+    QLineEdit *m_filter   = nullptr;
+    QTableWidget *m_table = nullptr;
+    QLabel *m_status      = nullptr;
 };

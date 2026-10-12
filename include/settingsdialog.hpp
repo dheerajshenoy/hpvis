@@ -67,9 +67,9 @@ private:
     QCheckBox *m_showStatusBarCheck = nullptr;
 
     // Appearance (defaults for new maps)
-    QPushButton *m_plotBgButton     = nullptr;
-    QPushButton *m_plotFgButton     = nullptr;
-    QPushButton *m_plotLineButton   = nullptr;
+    QPushButton *m_plotBgButton   = nullptr;
+    QPushButton *m_plotFgButton   = nullptr;
+    QPushButton *m_plotLineButton = nullptr;
     QColor m_plotBackground;
     QColor m_plotForeground;
     QColor m_plotLine;

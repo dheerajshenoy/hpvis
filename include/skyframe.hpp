@@ -26,22 +26,30 @@ enum class Orientation
 namespace skyframe
 {
 // Rotation taking a unit vector in `from` to the same direction in `to`
-QGenericMatrix<3, 3, float> rotation(SkyFrame from, SkyFrame to);
+QGenericMatrix<3, 3, float>
+rotation(SkyFrame from, SkyFrame to);
 
-QVector3D apply(const QGenericMatrix<3, 3, float> &m, const QVector3D &v);
+QVector3D
+apply(const QGenericMatrix<3, 3, float> &m, const QVector3D &v);
 
 // FITS COORDSYS keyword ("G", "E", "C", "Galactic", ...); Galactic when
 // missing or unknown, which is what most CMB maps use
-SkyFrame fromCoordSys(const QString &coordsys);
+SkyFrame
+fromCoordSys(const QString &coordsys);
 
 // The frame an orientation shows, given the map's own frame
-SkyFrame displayFrame(Orientation orientation, SkyFrame mapFrame);
+SkyFrame
+displayFrame(Orientation orientation, SkyFrame mapFrame);
 
 // FITS COORDSYS code: "G", "E" or "C"
-QString fitsCode(SkyFrame frame);
+QString
+fitsCode(SkyFrame frame);
 
-QString name(SkyFrame frame);
+QString
+name(SkyFrame frame);
 // Names of the longitude / latitude pair, e.g. "l", "b"
-QString lonName(SkyFrame frame);
-QString latName(SkyFrame frame);
+QString
+lonName(SkyFrame frame);
+QString
+latName(SkyFrame frame);
 } // namespace skyframe

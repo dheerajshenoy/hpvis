@@ -45,8 +45,10 @@ readColumn(const QString &path, int hdu, int column)
     }
 
     if (!info.exists())
-        throw PlanckError(
-            QString("%1 does not exist").arg(info.fileName()).toStdString().c_str());
+        throw PlanckError(QString("%1 does not exist")
+                              .arg(info.fileName())
+                              .toStdString()
+                              .c_str());
     fitshandle file;
     file.open(path.toStdString());
     file.goto_hdu(hdu > 0 ? hdu : 2);
@@ -151,8 +153,8 @@ computeHistograms(const std::vector<HistogramSource> &sources, int bins,
         std::vector<std::pair<double, double>> spans; // what each contributes
         for (const HistogramSource &src : sources)
         {
-            MapPtr map = src.map ? src.map
-                                 : readColumn(src.path, src.hdu, src.column);
+            MapPtr map
+                = src.map ? src.map : readColumn(src.path, src.hdu, src.column);
             const std::vector<uint8_t> *keep
                 = (src.keep && src.keep->size() == size_t(map->Npix()))
                       ? src.keep.get()
@@ -220,21 +222,21 @@ computeHistograms(const std::vector<HistogramSource> &sources, int bins,
             curve.counts = binCounts(*maps[i], keep, lo, hi, result.bins);
             curve.valid  = ranges[i].n;
             curve.mean   = ranges[i].sum / ranges[i].n;
-            curve.std    = std::sqrt(std::max(
-                0.0, ranges[i].sumSq / ranges[i].n - curve.mean * curve.mean));
+            curve.std = std::sqrt(std::max(0.0, ranges[i].sumSq / ranges[i].n
+                                                    - curve.mean * curve.mean));
             result.curves.push_back(std::move(curve));
         }
     }
     catch (const PlanckError &e)
     {
-        result = HistogramResult();
+        result       = HistogramResult();
         result.error = e.what();
         if (result.error.isEmpty() || result.error == "FITS error")
             result.error = "could not read the map";
     }
     catch (const std::exception &e)
     {
-        result = HistogramResult();
+        result       = HistogramResult();
         result.error = e.what();
     }
     return result;

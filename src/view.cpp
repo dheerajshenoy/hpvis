@@ -193,8 +193,8 @@ View::setComputedMap(Healpix_Map<float> &&map, const QString &title,
     m_computed = true;
     m_title    = title;
     m_filePath.clear();
-    m_hdu    = 0;
-    m_column = 0;
+    m_hdu      = 0;
+    m_column   = 0;
     m_fitsInfo = FitsInfo();
     m_glWidget->setMapFrame(frame);
     m_glWidget->setMap(std::move(map));

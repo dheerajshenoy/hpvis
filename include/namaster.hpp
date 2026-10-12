@@ -3,8 +3,8 @@
 // namaster.h is C99: it uses `double complex`, which C++ lacks. GCC and Clang
 // accept the `_Complex` keyword in C++ as an extension, so map `complex` to it
 // only while the header is read.
-#include <complex>
 #include <complex.h>
+#include <complex>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"

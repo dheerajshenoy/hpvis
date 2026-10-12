@@ -37,10 +37,10 @@ signals:
 private:
     void fillColumnCombo(int hdu, int column);
 
-    QComboBox *m_hduCombo             = nullptr;
-    QComboBox *m_columnCombo          = nullptr;
-    QComboBox *m_orientationCombo     = nullptr;
-    QComboBox *m_projectionCombo      = nullptr;
-    QComboBox *m_colormapCombo        = nullptr;
+    QComboBox *m_hduCombo         = nullptr;
+    QComboBox *m_columnCombo      = nullptr;
+    QComboBox *m_orientationCombo = nullptr;
+    QComboBox *m_projectionCombo  = nullptr;
+    QComboBox *m_colormapCombo    = nullptr;
     FitsInfo m_fitsInfo;
 };

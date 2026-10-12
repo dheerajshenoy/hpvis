@@ -254,12 +254,10 @@ private:
             Op op;
         };
         static const Fn fns[] = {
-            {"abs", 1, Op::Abs},     {"sqrt", 1, Op::Sqrt},
-            {"log", 1, Op::Log},     {"ln", 1, Op::Log},
-            {"log10", 1, Op::Log10}, {"exp", 1, Op::Exp},
-            {"sin", 1, Op::Sin},     {"cos", 1, Op::Cos},
-            {"tan", 1, Op::Tan},     {"min", 2, Op::Min},
-            {"max", 2, Op::Max},     {"pow", 2, Op::Pow},
+            {"abs", 1, Op::Abs}, {"sqrt", 1, Op::Sqrt},   {"log", 1, Op::Log},
+            {"ln", 1, Op::Log},  {"log10", 1, Op::Log10}, {"exp", 1, Op::Exp},
+            {"sin", 1, Op::Sin}, {"cos", 1, Op::Cos},     {"tan", 1, Op::Tan},
+            {"min", 2, Op::Min}, {"max", 2, Op::Max},     {"pow", 2, Op::Pow},
         };
         const Fn *fn = nullptr;
         for (const Fn &f : fns)

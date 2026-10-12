@@ -33,7 +33,7 @@ enum class ResolutionPolicy
 struct OperationResult
 {
     std::shared_ptr<Healpix_Map<float>> map; // null on failure
-    SkyFrame frame = SkyFrame::Galactic;     // of the first input
+    SkyFrame frame   = SkyFrame::Galactic;   // of the first input
     long validPixels = 0;
     QStringList notes; // things the user should know (resampling, frames)
     QString error;
@@ -43,6 +43,6 @@ struct OperationResult
 // first input's ordering), and evaluates `expression` for every pixel. A pixel
 // is UNSEEN in the result when an input it uses is UNSEEN or the expression
 // has no finite value there. Blocking: run it on a worker thread.
-OperationResult runOperation(const std::vector<OperandSource> &operands,
-                             const QString &expression,
-                             ResolutionPolicy policy);
+OperationResult
+runOperation(const std::vector<OperandSource> &operands,
+             const QString &expression, ResolutionPolicy policy);

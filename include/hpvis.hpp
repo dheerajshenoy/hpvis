@@ -15,9 +15,9 @@
 #include "viewtoolbar.hpp"
 
 #include <QMainWindow>
-#include <memory>
 #include <QSet>
 #include <QTabWidget>
+#include <memory>
 #include <optional>
 
 class MapOperationDialog;
@@ -147,11 +147,11 @@ private:
     QMenu *m_toolsAnalysisMenu     = nullptr;
     QAction *m_toolsSettingsAction = nullptr;
 
-    View *m_view                   = nullptr;
-    TabWidget *m_tabWidget         = nullptr;
-    ViewToolBar *m_toolBar         = nullptr;
+    View *m_view                        = nullptr;
+    TabWidget *m_tabWidget              = nullptr;
+    ViewToolBar *m_toolBar              = nullptr;
     MapOperationDialog *m_operateDialog = nullptr;
-    StatisticsDock *m_statsDock    = nullptr;
-    PowerSpectrumDock *m_powerDock = nullptr;
-    StatusBar *m_statusBar         = nullptr;
+    StatisticsDock *m_statsDock         = nullptr;
+    PowerSpectrumDock *m_powerDock      = nullptr;
+    StatusBar *m_statusBar              = nullptr;
 };

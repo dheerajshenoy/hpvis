@@ -63,16 +63,16 @@ private:
     std::function<QList<OpenMap>()> m_openMaps;
     QList<Row> m_rows;
 
-    QTableWidget *m_table      = nullptr;
-    QComboBox *m_presetCombo   = nullptr;
-    QLineEdit *m_expression    = nullptr;
-    QLineEdit *m_title         = nullptr;
-    QComboBox *m_policyCombo   = nullptr;
-    QLabel *m_message          = nullptr;
-    QProgressBar *m_progress   = nullptr;
-    QPushButton *m_addTabButton = nullptr;
+    QTableWidget *m_table        = nullptr;
+    QComboBox *m_presetCombo     = nullptr;
+    QLineEdit *m_expression      = nullptr;
+    QLineEdit *m_title           = nullptr;
+    QComboBox *m_policyCombo     = nullptr;
+    QLabel *m_message            = nullptr;
+    QProgressBar *m_progress     = nullptr;
+    QPushButton *m_addTabButton  = nullptr;
     QPushButton *m_addFileButton = nullptr;
     QPushButton *m_removeButton  = nullptr;
     QPushButton *m_computeButton = nullptr;
-    bool m_busy = false;
+    bool m_busy                  = false;
 };

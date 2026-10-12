@@ -21,12 +21,11 @@ AppSettings::load()
     a.showStatusBar
         = s.value("general/showStatusBar", d.showStatusBar).toBool();
 
-    const int ori = s.value("view/orientation", int(d.orientation)).toInt();
-    a.orientation = (ori >= 0 && ori <= int(Orientation::Equatorial))
-                        ? Orientation(ori)
-                        : d.orientation;
-    a.viewFromOutside
-        = s.value("view/fromOutside", d.viewFromOutside).toBool();
+    const int ori     = s.value("view/orientation", int(d.orientation)).toInt();
+    a.orientation     = (ori >= 0 && ori <= int(Orientation::Equatorial))
+                            ? Orientation(ori)
+                            : d.orientation;
+    a.viewFromOutside = s.value("view/fromOutside", d.viewFromOutside).toBool();
 
     const int pj = s.value("view/projection", int(d.projection)).toInt();
     a.projection = (pj >= 0 && pj <= int(Projection::GNOMONIC)) ? Projection(pj)
@@ -67,7 +66,7 @@ AppSettings::load()
         s.value("view/graticuleStep", d.graticuleStep).toDouble(), 1.0, 90.0);
     a.globeShadow   = s.value("view/globeShadow", d.globeShadow).toBool();
     a.limbDarkening = s.value("view/limbDarkening", d.limbDarkening).toBool();
-    auto color = [&s](const char *key, const QColor &fallback)
+    auto color      = [&s](const char *key, const QColor &fallback)
     {
         const QColor c(s.value(key, fallback.name()).toString());
         return c.isValid() ? c : fallback;

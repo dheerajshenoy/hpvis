@@ -1,7 +1,6 @@
 #include "openglwidget.hpp"
 
 #include "colormapregistry.hpp"
-
 #include "fitsinfo.hpp"
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
@@ -1066,8 +1065,7 @@ OpenGLWidget::emitCursorData()
     // The pixel is looked up in the frame the map is stored in
     double mapColat, mapPhi;
     anglesFromDirection(
-        skyframe::apply(
-            skyframe::rotation(displayFrame(), m_mapFrame), shown),
+        skyframe::apply(skyframe::rotation(displayFrame(), m_mapFrame), shown),
         mapColat, mapPhi);
 
     const Healpix_Base base(
@@ -1263,7 +1261,7 @@ OpenGLWidget::updateRotation(const QPointF &pos)
         // distance outside it (one globe radius out = one more radian),
         // capped at the far pole
         const float theta = std::min(float(M_PI), float(M_PI_2) + (r - 1.0f));
-        v1 = limb * std::sin(theta) + front * std::cos(theta);
+        v1                = limb * std::sin(theta) + front * std::cos(theta);
     }
 
     const QQuaternion previous = m_rotation;
@@ -1324,9 +1322,9 @@ OpenGLWidget::rotateTo(const QQuaternion &target)
         setRotation(target);
         return;
     }
-    m_glideFrom    = m_rotation;
-    m_glideTo      = target;
-    m_globeAnim    = GlobeAnim::Glide;
+    m_glideFrom = m_rotation;
+    m_glideTo   = target;
+    m_globeAnim = GlobeAnim::Glide;
     m_globeClock.start();
     m_globeTimer.start();
 }
@@ -1358,11 +1356,10 @@ OpenGLWidget::tickGlobeAnimation()
             stopGlobeAnimation();
             return;
         }
-        QQuaternion next
-            = (m_rotation
-               * QQuaternion::fromAxisAndAngle(m_spinVelocity / speed,
-                                               float(speed * dt)))
-                  .normalized();
+        QQuaternion next = (m_rotation
+                            * QQuaternion::fromAxisAndAngle(
+                                m_spinVelocity / speed, float(speed * dt)))
+                               .normalized();
         setRotation(orientationLocked() ? withoutRoll(next) : next);
     }
 }
@@ -1529,8 +1526,7 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
         setCursor(Qt::CrossCursor);
 
         // Throw: keep spinning when released while still moving
-        const bool moving = m_dragClock.isValid()
-                            && m_dragClock.elapsed() < 60
+        const bool moving = m_dragClock.isValid() && m_dragClock.elapsed() < 60
                             && m_spinVelocity.length() > 15.0f;
         if (globeAnimates() && moving)
         {
@@ -1760,7 +1756,7 @@ OpenGLWidget::projectToWindow(double lat, double lon, QPointF &out) const
 
     QVector2D plane;
     if (!projectionmath::forward(m_projection, M_PI / 2.0 - colat, phi, plane,
-                                     m_viewOutside))
+                                 m_viewOutside))
         return false;
 
     // Inverse of the camera and of toNdc()
@@ -1803,7 +1799,8 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
                  false);
     }
     // Latitudes along a visible meridian near the left side of the picture
-    const double meridian = projectionmath::labelMeridian(m_projection, m_viewOutside);
+    const double meridian
+        = projectionmath::labelMeridian(m_projection, m_viewOutside);
     for (double lat = -M_PI / 2 + step; lat < M_PI / 2 - 1e-9; lat += step)
     {
         const double deg = std::round(qRadiansToDegrees(lat) * 100.0) / 100.0;

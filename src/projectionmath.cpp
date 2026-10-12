@@ -110,8 +110,7 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
 }
 
 static bool
-forwardInside(Projection projection, double lat, double lon,
-              QVector2D &plane)
+forwardInside(Projection projection, double lat, double lon, QVector2D &plane)
 {
     switch (projection)
     {
@@ -178,7 +177,8 @@ forward(Projection projection, double lat, double lon, QVector2D &plane,
     return true;
 }
 
-static double labelMeridianInside(Projection projection);
+static double
+labelMeridianInside(Projection projection);
 
 double
 labelMeridian(Projection projection, bool fromOutside)

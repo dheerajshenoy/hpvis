@@ -30,9 +30,9 @@ struct HistogramCurve
 
 struct HistogramResult
 {
-    double lo   = 0.0; // the bins share one range
-    double hi   = 1.0;
-    int bins    = 0;
+    double lo = 0.0; // the bins share one range
+    double hi = 1.0;
+    int bins  = 0;
     std::vector<HistogramCurve> curves;
     QString error;
 };
@@ -40,5 +40,6 @@ struct HistogramResult
 // Histograms of the sources over one range: the union of their value ranges
 // (or, with clipOutliers, of their 0.1 % to 99.9 % ranges, with the pixels
 // outside left out). Blocking, uses all cores: run it on a worker thread.
-HistogramResult computeHistograms(const std::vector<HistogramSource> &sources,
-                                  int bins, bool clipOutliers);
+HistogramResult
+computeHistograms(const std::vector<HistogramSource> &sources, int bins,
+                  bool clipOutliers);

@@ -108,7 +108,7 @@ FitsHeaderDialog::FitsHeaderDialog(const QString &path, int hdu,
         fits_get_num_hdus(f, &count, &status);
         for (int i = 1; i <= count; ++i)
         {
-            int type = 0;
+            int type                 = 0;
             char extname[FLEN_VALUE] = "";
             int st2                  = 0;
             fits_movabs_hdu(f, i, &type, &st2);
@@ -210,14 +210,13 @@ FitsHeaderDialog::applyFilter(const QString &text)
     {
         bool match = text.isEmpty();
         for (int c = 0; c < 3 && !match; ++c)
-            match = m_table->item(r, c)->text().contains(
-                text, Qt::CaseInsensitive);
+            match = m_table->item(r, c)->text().contains(text,
+                                                         Qt::CaseInsensitive);
         m_table->setRowHidden(r, !match);
         shown += match;
     }
-    m_status->setText(text.isEmpty()
-                          ? QString("%1 cards").arg(m_table->rowCount())
-                          : QString("%1 of %2 cards")
-                                .arg(shown)
-                                .arg(m_table->rowCount()));
+    m_status->setText(
+        text.isEmpty()
+            ? QString("%1 cards").arg(m_table->rowCount())
+            : QString("%1 of %2 cards").arg(shown).arg(m_table->rowCount()));
 }

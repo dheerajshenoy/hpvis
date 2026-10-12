@@ -92,8 +92,7 @@ StatisticsDock::initHistogramUI(QWidget *parent)
     m_fieldCombo->setToolTip("The field (column) of the map to show");
     m_binsSpin = new QSpinBox();
     m_binsSpin->setRange(2, 5000);
-    m_binsSpin->setValue(
-        QSettings().value("histogram/bins", 100).toInt());
+    m_binsSpin->setValue(QSettings().value("histogram/bins", 100).toInt());
     m_binsSpin->setToolTip("Number of bins");
 
     auto *row1 = new QHBoxLayout();
@@ -108,7 +107,8 @@ StatisticsDock::initHistogramUI(QWidget *parent)
     m_densityCheck = new QCheckBox("Density");
     m_densityCheck->setToolTip("Divide by the number of pixels and the bin "
                                "width, so maps of different sizes compare");
-    m_densityCheck->setChecked(settings.value("histogram/density", true).toBool());
+    m_densityCheck->setChecked(
+        settings.value("histogram/density", true).toBool());
     m_logCheck = new QCheckBox("Log y");
     m_logCheck->setChecked(settings.value("histogram/log", false).toBool());
     m_maskCheck = new QCheckBox("Use masks");
@@ -140,9 +140,8 @@ StatisticsDock::initHistogramUI(QWidget *parent)
     m_modeCombo->addItem("Overlay", 0);
     m_modeCombo->addItem("Ratio to this map", 1);
     m_modeCombo->addItem("Difference from this map", 2);
-    m_modeCombo->setCurrentIndex(
-        std::max(0, m_modeCombo->findData(
-                        settings.value("histogram/mode", 0).toInt())));
+    m_modeCombo->setCurrentIndex(std::max(
+        0, m_modeCombo->findData(settings.value("histogram/mode", 0).toInt())));
 
     m_exportButton = new QToolButton();
     m_exportButton->setText("Export");
@@ -287,7 +286,10 @@ StatisticsDock::setView(View *view)
         return;
     }
 
-    auto num = [](double v) { return QString::number(v, 'g', 6); };
+    auto num = [](double v)
+    {
+        return QString::number(v, 'g', 6);
+    };
     m_nside->setText(QString::number(gl->healpixMap()->Nside()));
     m_npix->setText(QString::number(gl->healpixMap()->Npix()));
     m_min->setText(num(gl->mapMin()));
@@ -349,13 +351,14 @@ StatisticsDock::updateHistogram()
     // A source for a map: its values come from the file (so a 0 / 1 map keeps
     // its zeros) or, for a computed map, from memory
     const bool masks = m_maskCheck->isChecked();
-    auto makeSource = [masks](View *v, int column, const QString &name)
+    auto makeSource  = [masks](View *v, int column, const QString &name)
     {
         HistogramSource s;
         s.name           = name;
         OpenGLWidget *gl = v->glWidget();
         if (v->isComputed() || v->filePath().isEmpty())
-            s.map = std::make_shared<const Healpix_Map<float>>(*gl->healpixMap());
+            s.map
+                = std::make_shared<const Healpix_Map<float>>(*gl->healpixMap());
         else
         {
             s.path   = v->filePath();
@@ -382,16 +385,15 @@ StatisticsDock::updateHistogram()
     QString name  = titleOf(current);
     if (m_fieldCombo->count() > 1)
         name += " (" + m_fieldCombo->currentText() + ")";
-    sources.push_back(makeSource(current, m_fieldCombo->currentData().toInt(),
-                                 name));
+    sources.push_back(
+        makeSource(current, m_fieldCombo->currentData().toInt(), name));
     colors << m_plotLine;
 
     int next = 0;
     for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
     {
         if (!m.view || m.view.data() == current
-            || !m_compareViews.contains(m.view.data())
-            || !m.view->healpixMap())
+            || !m_compareViews.contains(m.view.data()) || !m.view->healpixMap())
             continue;
         sources.push_back(makeSource(m.view.data(), 0, m.title));
         QColor c(palette[next++ % palette.size()]);
@@ -426,8 +428,8 @@ StatisticsDock::updateHistogram()
             }
             else
             {
-                m_result      = std::move(r);
-                m_curveColors = colors;
+                m_result         = std::move(r);
+                m_curveColors    = colors;
                 m_curveColors[0] = m_plotLine;
                 m_histStatus->setVisible(false);
                 showResult(false);
@@ -436,8 +438,8 @@ StatisticsDock::updateHistogram()
         if (m_rerun)
             scheduleUpdate();
     });
-    watcher->setFuture(QtConcurrent::run(
-        [sources, bins, clip]() { return computeHistograms(sources, bins, clip); }));
+    watcher->setFuture(QtConcurrent::run([sources, bins, clip]()
+    { return computeHistograms(sources, bins, clip); }));
 }
 
 // Draws the last result: counts or density, overlaid or as a ratio /
@@ -499,11 +501,11 @@ StatisticsDock::showResult(bool keepRange)
                 v[i] -= ref[i];
 
         QVariantMap curve;
-        curve["name"]   = m_result.curves[k].name;
-        curve["color"]  = (k < size_t(m_curveColors.size())
-                               ? m_curveColors[int(k)]
-                               : m_plotLine)
-                              .name();
+        curve["name"] = m_result.curves[k].name;
+        curve["color"]
+            = (k < size_t(m_curveColors.size()) ? m_curveColors[int(k)]
+                                                : m_plotLine)
+                  .name();
         curve["values"] = toList(v);
         curves.append(curve);
     }
@@ -519,8 +521,8 @@ StatisticsDock::showResult(bool keepRange)
         yTitle = density ? "Density (1 / pixel value)" : "Pixels per bin";
 
     QMetaObject::invokeMethod(
-        root, "setHistogram", Q_ARG(QVariant, m_result.lo),
-        Q_ARG(QVariant, bw), Q_ARG(QVariant, bins), Q_ARG(QVariant, curves),
+        root, "setHistogram", Q_ARG(QVariant, m_result.lo), Q_ARG(QVariant, bw),
+        Q_ARG(QVariant, bins), Q_ARG(QVariant, curves),
         Q_ARG(QVariant, QString("Pixel value")), Q_ARG(QVariant, yTitle),
         Q_ARG(QVariant, m_logCheck->isChecked()), Q_ARG(QVariant, keepRange));
 }
@@ -591,9 +593,9 @@ StatisticsDock::exportCsv(const QString &givenPath)
     QString path = givenPath;
     if (path.isEmpty())
     {
-        path = QFileDialog::getSaveFileName(
-            this, "Export Histogram", startDirectory() + "/histogram.csv",
-            "CSV Files (*.csv);;All Files (*)");
+        path = QFileDialog::getSaveFileName(this, "Export Histogram",
+                                            startDirectory() + "/histogram.csv",
+                                            "CSV Files (*.csv);;All Files (*)");
         if (path.isEmpty())
             return;
         QSettings().setValue("general/lastDirectory",
@@ -634,8 +636,7 @@ StatisticsDock::exportCsv(const QString &givenPath)
         for (const HistogramCurve &c : m_result.curves)
             out << ',' << c.counts[i];
         for (const HistogramCurve &c : m_result.curves)
-            out << ','
-                << c.counts[i] / (std::max(1L, c.valid) * bw);
+            out << ',' << c.counts[i] / (std::max(1L, c.valid) * bw);
         out << "\n";
     }
 }

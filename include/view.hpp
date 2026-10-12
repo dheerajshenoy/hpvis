@@ -102,11 +102,11 @@ private:
     fitshandle m_fitsHandle;
     OpenGLWidget *m_glWidget = nullptr;
     QString m_filePath;
-    QString m_title;        // of a computed map
+    QString m_title; // of a computed map
     bool m_computed = false;
     FitsInfo m_fitsInfo;
-    int m_hdu     = 0;
-    int m_column  = 0;
+    int m_hdu      = 0;
+    int m_column   = 0;
     bool m_loading = false;
     int m_hduIndex = -1;
 };

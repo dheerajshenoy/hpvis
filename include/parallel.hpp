@@ -29,7 +29,8 @@ template <class Fn>
 void
 forRange(long n, Fn fn)
 {
-    QtConcurrent::blockingMap(chunks(n), [fn](Range &r) { fn(r.first, r.second); });
+    QtConcurrent::blockingMap(chunks(n),
+                              [fn](Range &r) { fn(r.first, r.second); });
 }
 
 // part = fn(begin, end) per chunk; merge(total, part) combines them

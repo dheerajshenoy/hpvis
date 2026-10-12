@@ -33,4 +33,5 @@ struct FitsInfo
 
 // Walks every HDU of the (already open) file. Leaves the handle on the last
 // HDU, so call goto_hdu() afterwards.
-FitsInfo scanFits(fitshandle &file);
+FitsInfo
+scanFits(fitshandle &file);

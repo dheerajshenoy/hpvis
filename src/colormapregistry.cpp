@@ -42,7 +42,8 @@ QVector<QRgb>
 resample(QVector<Stop> stops)
 {
     std::stable_sort(stops.begin(), stops.end(),
-                     [](const Stop &a, const Stop &b) { return a.pos < b.pos; });
+                     [](const Stop &a, const Stop &b)
+    { return a.pos < b.pos; });
 
     QVector<QRgb> lut(ColormapRegistry::kLutSize);
     int seg = 0;
@@ -57,7 +58,9 @@ resample(QVector<Stop> stops)
         const double f
             = span > 0 ? std::clamp((t - a.pos) / span, 0.0, 1.0) : 1.0;
         auto mix = [f](double x, double y)
-        { return std::clamp(x + (y - x) * f, 0.0, 1.0); };
+        {
+            return std::clamp(x + (y - x) * f, 0.0, 1.0);
+        };
         lut[i] = qRgb(qRound(mix(a.r, b.r) * 255), qRound(mix(a.g, b.g) * 255),
                       qRound(mix(a.b, b.b) * 255));
     }

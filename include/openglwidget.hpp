@@ -7,12 +7,12 @@
 #include "projection.hpp"
 #include "skyframe.hpp"
 
+#include <QElapsedTimer>
 #include <QOpenGLBuffer>
 #include <QOpenGLFunctions>
 #include <QOpenGLShaderProgram>
 #include <QOpenGLVertexArrayObject>
 #include <QOpenGLWidget>
-#include <QElapsedTimer>
 #include <QQuaternion>
 #include <QTimer>
 #include <array>
@@ -297,7 +297,7 @@ signals:
                    float min, float max);
     void zoomChanged(float zoom);
     void rotationChanged(); // drag, reset or setRotationAngles
-    void masksChanged(); // list or enabled flags changed
+    void masksChanged();    // list or enabled flags changed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
     void colormapRangeChanged(float min, float max);
     // lonLat in degrees; value is NaN and index -1 when off the map
@@ -399,19 +399,24 @@ private:
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);
     Projection m_projection             = Projection::MOLLWEIDE;
     bool m_isRotating                   = false;
-    QVector3D m_rotateGrab; // view-frame direction grabbed at drag start
+    QVector3D m_rotateGrab;      // view-frame direction grabbed at drag start
     QQuaternion m_rotation;      // current rotation quaternion for 3D view
     QQuaternion m_rotationStart; // rotation at the start of a drag
 
     // Globe animation. Spin: the drag's angular velocity (deg/s, around an
     // axis in the globe's own frame) decays with friction after release.
     // Glide: eases from m_glideFrom to m_glideTo.
-    enum class GlobeAnim { None, Spin, Glide };
-    bool m_animateGlobe = true;
+    enum class GlobeAnim
+    {
+        None,
+        Spin,
+        Glide
+    };
+    bool m_animateGlobe   = true;
     GlobeAnim m_globeAnim = GlobeAnim::None;
     QTimer m_globeTimer;
-    QElapsedTimer m_globeClock;      // frame time while animating
-    QElapsedTimer m_dragClock;       // time between drag moves
-    QVector3D m_spinVelocity;        // axis * deg/s
+    QElapsedTimer m_globeClock; // frame time while animating
+    QElapsedTimer m_dragClock;  // time between drag moves
+    QVector3D m_spinVelocity;   // axis * deg/s
     QQuaternion m_glideFrom, m_glideTo;
 };

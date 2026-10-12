@@ -77,8 +77,8 @@ presetExpression(int preset, const QStringList &n)
 }
 } // namespace
 
-MapOperationDialog::MapOperationDialog(
-    std::function<QList<OpenMap>()> openMaps, QWidget *parent)
+MapOperationDialog::MapOperationDialog(std::function<QList<OpenMap>()> openMaps,
+                                       QWidget *parent)
     : QDialog(parent), m_openMaps(std::move(openMaps))
 {
     initUI();
@@ -119,7 +119,8 @@ MapOperationDialog::initUI()
 
     connect(m_addTabButton, &QPushButton::clicked, this, [this]()
     {
-        const QList<OpenMap> maps = m_openMaps ? m_openMaps() : QList<OpenMap>();
+        const QList<OpenMap> maps
+            = m_openMaps ? m_openMaps() : QList<OpenMap>();
         if (maps.isEmpty())
         {
             showMessage("No map is open.", true);
@@ -128,8 +129,8 @@ MapOperationDialog::initUI()
         QMenu menu(this);
         for (const OpenMap &m : maps)
             menu.addAction(m.title, this, [this, m]() { addTab(m); });
-        menu.exec(m_addTabButton->mapToGlobal(
-            QPoint(0, m_addTabButton->height())));
+        menu.exec(
+            m_addTabButton->mapToGlobal(QPoint(0, m_addTabButton->height())));
     });
     connect(m_addFileButton, &QPushButton::clicked, this, [this]()
     {
@@ -149,9 +150,9 @@ MapOperationDialog::initUI()
     auto *form      = new QFormLayout(operation);
 
     m_presetCombo = new QComboBox();
-    m_presetCombo->addItems({"Custom", "Add", "Subtract (A − B)",
-                             "Multiply", "Divide (A / B)", "Mean",
-                             "Absolute difference", "Maximum", "Minimum"});
+    m_presetCombo->addItems({"Custom", "Add", "Subtract (A − B)", "Multiply",
+                             "Divide (A / B)", "Mean", "Absolute difference",
+                             "Maximum", "Minimum"});
     form->addRow("Operation:", m_presetCombo);
 
     m_expression = new QLineEdit("A - B");
@@ -176,8 +177,8 @@ MapOperationDialog::initUI()
 
     connect(m_presetCombo, &QComboBox::activated, this,
             [this](int i) { applyPreset(i); });
-    connect(m_expression, &QLineEdit::textEdited, this, [this]()
-    { m_presetCombo->setCurrentIndex(0); });
+    connect(m_expression, &QLineEdit::textEdited, this,
+            [this]() { m_presetCombo->setCurrentIndex(0); });
 
     // --- Result ---
     m_message = new QLabel();
@@ -302,10 +303,9 @@ MapOperationDialog::addRow(Row row)
     if (row.view)
     {
         // An open map is used as it is (its current HDU and column)
-        const View *v = row.view;
-        const QString hdu = v->filePath().isEmpty()
-                                ? QString("-")
-                                : QString::number(v->hdu());
+        const View *v     = row.view;
+        const QString hdu = v->filePath().isEmpty() ? QString("-")
+                                                    : QString::number(v->hdu());
         const QString col = v->filePath().isEmpty()
                                 ? QString("-")
                                 : QString::number(v->column());
@@ -330,8 +330,7 @@ MapOperationDialog::addRow(Row row)
     {
         const int index = m_rows.size() - 1;
         fillColumns(index, row.info.hdus.first().index, 0);
-        connect(row.hduCombo, &QComboBox::activated, this, [this, index](int)
-        {
+        connect(row.hduCombo, &QComboBox::activated, this, [this, index](int) {
             fillColumns(index, m_rows[index].hduCombo->currentData().toInt(),
                         0);
         });
@@ -371,9 +370,7 @@ MapOperationDialog::removeSelected()
             QComboBox *combo = m_rows[i].hduCombo;
             combo->disconnect(this);
             connect(combo, &QComboBox::activated, this, [this, i](int)
-            {
-                fillColumns(i, m_rows[i].hduCombo->currentData().toInt(), 0);
-            });
+            { fillColumns(i, m_rows[i].hduCombo->currentData().toInt(), 0); });
         }
 }
 
@@ -463,9 +460,8 @@ MapOperationDialog::compute()
 
     const std::vector<OperandSource> sources = operands();
     const QString expression                 = m_expression->text();
-    const auto policy
-        = ResolutionPolicy(m_policyCombo->currentData().toInt());
-    QString title = m_title->text().trimmed();
+    const auto policy = ResolutionPolicy(m_policyCombo->currentData().toInt());
+    QString title     = m_title->text().trimmed();
     if (title.isEmpty())
         title = "Result";
     title += ": " + expression;

@@ -1,9 +1,9 @@
 #include "powerspectrumdock.hpp"
 
-#include "appsettings.hpp"
 #include "alm.h"
 #include "alm_healpix_tools.h"
 #include "alm_powspec_tools.h"
+#include "appsettings.hpp"
 #include "fitsinfo.hpp"
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
@@ -15,37 +15,37 @@
 #include <QColorDialog>
 #include <QComboBox>
 #include <QDir>
-#include <QInputDialog>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QImage>
-#include <QMenu>
-#include <QMessageBox>
-#include <QTextStream>
-#include <QToolButton>
-#include <QHBoxLayout>
 #include <QFutureWatcher>
+#include <QHBoxLayout>
+#include <QImage>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineSeries>
+#include <QMenu>
+#include <QMessageBox>
+#include <QPointer>
 #include <QProgressBar>
-#include <QRegularExpression>
-#include <QSettings>
 #include <QPushButton>
-#include <QTimer>
-#include <QElapsedTimer>
 #include <QQmlContext>
 #include <QQuickItem>
 #include <QQuickView>
-#include <QPointer>
+#include <QRegularExpression>
+#include <QSettings>
+#include <QTextStream>
+#include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QValueAxis>
 #include <QVariantList>
 #include <QtConcurrent>
 #include <algorithm>
 #include <atomic>
-#include <limits>
 #include <cmath>
+#include <limits>
 #include <memory>
 
 // Highest multipole for the lmax choice: 0 = 3 nside - 1 (the most the map
@@ -373,8 +373,8 @@ PowerSpectrumDock::initUI()
     m_quantityCombo->addItem("D\u2113 = \u2113(\u2113+1) C\u2113 / 2\u03c0", 0);
     m_quantityCombo->addItem("C\u2113", 1);
     m_quantityCombo->addItem("\u2113\u00b2 C\u2113", 2);
-    m_logXCheck = new QCheckBox("Log \u2113");
-    m_logYCheck = new QCheckBox("Log y");
+    m_logXCheck    = new QCheckBox("Log \u2113");
+    m_logYCheck    = new QCheckBox("Log y");
     m_exportButton = new QToolButton();
     m_exportButton->setText("Export");
     m_exportButton->setPopupMode(QToolButton::InstantPopup);
@@ -585,10 +585,9 @@ PowerSpectrumDock::refresh()
         notes << "The map's HDU, column or masks changed since this was "
                  "computed. Press Recompute to update it.";
 
-    m_infoLabel->setText(
-        QString("lmax = %1, %2 refinement round(s)")
-            .arg(it->lmax)
-            .arg(it->iterations));
+    m_infoLabel->setText(QString("lmax = %1, %2 refinement round(s)")
+                             .arg(it->lmax)
+                             .arg(it->iterations));
     m_infoLabel->setVisible(true);
     if (it->iterations != m_accuracyCombo->currentData().toInt()
         || it->lmax != lmaxFor(it->nside, m_lmaxCombo->currentData().toInt()))
@@ -605,9 +604,8 @@ PowerSpectrumDock::refresh()
         const char *name;
         const std::vector<double> *data;
     };
-    const Entry entries[]
-        = {{"TT", &sp.TT}, {"EE", &sp.EE}, {"BB", &sp.BB},
-           {"TE", &sp.TE}, {"TB", &sp.TB}, {"EB", &sp.EB}};
+    const Entry entries[] = {{"TT", &sp.TT}, {"EE", &sp.EE}, {"BB", &sp.BB},
+                             {"TE", &sp.TE}, {"TB", &sp.TB}, {"EB", &sp.EB}};
 
     const QString previous = m_spectrumCombo->currentText();
     {
@@ -659,7 +657,8 @@ PowerSpectrumDock::compute()
     QPointer<View> guard(view);
     auto *watcher = new QFutureWatcher<CalcResult>(this);
     connect(watcher, &QFutureWatcher<CalcResult>::finished, this,
-            [this, watcher, guard, input, column, iterations, r_lmax = lmaxFor(int(input.map->Nside()), lmaxMode)]()
+            [this, watcher, guard, input, column, iterations,
+             r_lmax = lmaxFor(int(input.map->Nside()), lmaxMode)]()
     {
         const CalcResult r = watcher->result();
         watcher->deleteLater();
@@ -764,10 +763,11 @@ PowerSpectrumDock::updateProgress()
     m_progressBar->setRange(0, job.totalSteps());
     m_progressBar->setValue(job.step);
     m_progressLabel->setText(
-        job.cancelled
-            ? QString("Cancelling after the current step\u2026 (%1)")
-                  .arg(elapsed)
-            : QString("%1 \u2014 %2 elapsed").arg(job.stage.load()).arg(elapsed));
+        job.cancelled ? QString("Cancelling after the current step\u2026 (%1)")
+                            .arg(elapsed)
+                      : QString("%1 \u2014 %2 elapsed")
+                            .arg(job.stage.load())
+                            .arg(elapsed));
 }
 
 void
@@ -874,9 +874,9 @@ makeCurve(const QString &name, const QColor &color,
         else
         {
             const double d = (mode == 2) ? c - (*ref)[l] : c;
-            v = quantity == 0   ? ll * (ll + 1.0) * d / (2.0 * M_PI)
-                : quantity == 1 ? d
-                                : ll * ll * d;
+            v              = quantity == 0 ? ll * (ll + 1.0) * d / (2.0 * M_PI)
+                             : quantity == 1 ? d
+                                             : ll * ll * d;
         }
         ell.append(ll);
         y.append(v);
@@ -960,8 +960,8 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
         QColor c(palette[next++ % palette.size()]);
         if (c == m_plotLine)
             c = QColor(palette[next++ % palette.size()]);
-        curves.append(makeCurve(o.name, c, *o.data, &current, mode, quantity,
-                                maxEll));
+        curves.append(
+            makeCurve(o.name, c, *o.data, &current, mode, quantity, maxEll));
     }
 
     const QString symbol = quantity == 0   ? QString("D\u2113")
@@ -1001,8 +1001,8 @@ PowerSpectrumDock::buildCompareMenu()
             continue;
         const View *v   = m.view.data();
         const bool done = m_results.contains(v);
-        QAction *a      = menu->addAction(done ? m.title
-                                               : m.title + "  (not computed)");
+        QAction *a
+            = menu->addAction(done ? m.title : m.title + "  (not computed)");
         a->setCheckable(true);
         a->setEnabled(done);
         a->setChecked(done && m_compareViews.contains(v));
@@ -1081,9 +1081,9 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
 
     struct Col
     {
-        int spectrum = 0;      // index into `names`
-        int kind     = 0;      // 0 = generic, 1 = C_l, 2 = D_l
-        int index    = 0;      // column in the file
+        int spectrum = 0; // index into `names`
+        int kind     = 0; // 0 = generic, 1 = C_l, 2 = D_l
+        int index    = 0; // column in the file
     };
     QList<Col> cols;
     QList<QList<double>> rows;
@@ -1094,7 +1094,8 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
         const QString line = QString::fromUtf8(file.readLine()).trimmed();
         if (line.isEmpty())
             continue;
-        const QString body = line.startsWith('#') ? line.mid(1).trimmed() : line;
+        const QString body
+            = line.startsWith('#') ? line.mid(1).trimmed() : line;
         const QStringList parts = body.split(separator, Qt::SkipEmptyParts);
         if (parts.isEmpty())
             continue;
@@ -1127,11 +1128,10 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
                         Col c;
                         c.spectrum = s;
                         c.index    = i;
-                        c.kind     = t.startsWith("D_L") || t.startsWith("DL")
-                                         ? 2
-                                         : (t.startsWith("C_L") || t.startsWith("CL"))
-                                               ? 1
-                                               : 0;
+                        c.kind = t.startsWith("D_L") || t.startsWith("DL") ? 2
+                                 : (t.startsWith("C_L") || t.startsWith("CL"))
+                                     ? 1
+                                     : 0;
                         cols << c;
                         break;
                     }
@@ -1169,7 +1169,7 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
     bool dl = unit == 1;
     if (needUnit && unit < 0)
     {
-        bool ok = false;
+        bool ok              = false;
         const QString choice = QInputDialog::getItem(
             this, "Load Spectrum", "The values in the file are:",
             {"D\u2113 = \u2113(\u2113+1) C\u2113 / 2\u03c0 (theory spectra "
@@ -1182,7 +1182,7 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
     }
 
     External ext;
-    ext.name = QFileInfo(path).completeBaseName();
+    ext.name  = QFileInfo(path).completeBaseName();
     long lmax = 0;
     for (const auto &r : rows)
         lmax = std::max(lmax, long(std::lround(r[0])));
@@ -1197,12 +1197,18 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
     {
         switch (spectrum)
         {
-            case 0: return ext.spectra.TT;
-            case 1: return ext.spectra.EE;
-            case 2: return ext.spectra.BB;
-            case 3: return ext.spectra.TE;
-            case 4: return ext.spectra.TB;
-            default: return ext.spectra.EB;
+            case 0:
+                return ext.spectra.TT;
+            case 1:
+                return ext.spectra.EE;
+            case 2:
+                return ext.spectra.BB;
+            case 3:
+                return ext.spectra.TE;
+            case 4:
+                return ext.spectra.TB;
+            default:
+                return ext.spectra.EB;
         }
     };
     for (const Col &c : cols)
@@ -1318,9 +1324,8 @@ PowerSpectrumDock::exportCsv(const QString &givenPath)
     {
         const Spectra &sp = *src.spectra;
         for (const Column &c :
-             {Column{"TT", &sp.TT}, Column{"EE", &sp.EE},
-              Column{"BB", &sp.BB}, Column{"TE", &sp.TE},
-              Column{"TB", &sp.TB}, Column{"EB", &sp.EB}})
+             {Column{"TT", &sp.TT}, Column{"EE", &sp.EE}, Column{"BB", &sp.BB},
+              Column{"TE", &sp.TE}, Column{"TB", &sp.TB}, Column{"EB", &sp.EB}})
             if (!c.data->empty())
             {
                 columns << Column{c.name + src.suffix, c.data};

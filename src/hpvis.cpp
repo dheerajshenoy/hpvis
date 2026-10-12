@@ -5,8 +5,8 @@
 #include "mapoperationdialog.hpp"
 #include "pixelordering.hpp"
 #include "powerspectrumdock.hpp"
-#include "statisticsdock.hpp"
 #include "settingsdialog.hpp"
+#include "statisticsdock.hpp"
 #include "view.hpp"
 #include "viewtoolbar.hpp"
 
@@ -291,8 +291,8 @@ HpVis::initMenubar()
         dialog.exec();
     });
 
-    m_fileSaveMapAction = m_fileMenu->addAction(
-        "&Save Map As...", this, &HpVis::onSaveMapTriggered);
+    m_fileSaveMapAction = m_fileMenu->addAction("&Save Map As...", this,
+                                                &HpVis::onSaveMapTriggered);
 
     m_fileCloseTabAction = m_fileMenu->addAction("&Close Tab", this, [this]()
     {
@@ -322,7 +322,7 @@ HpVis::initMenubar()
     m_viewMenu->addSeparator();
 
     // Orientation (radio items: Free / Galactic / Ecliptic / Equatorial)
-    m_orientationMenu = m_viewMenu->addMenu("&Orientation");
+    m_orientationMenu      = m_viewMenu->addMenu("&Orientation");
     auto *orientationGroup = new QActionGroup(this);
     const QStringList orientationNames
         = {"&Free", "&Galactic", "&Ecliptic", "E&quatorial"};
@@ -344,10 +344,10 @@ HpVis::initMenubar()
     m_orientationActions[0]->setChecked(true);
 
     // Perspective (radio items: Inside / Outside)
-    m_perspectiveMenu = m_viewMenu->addMenu("&Perspective");
+    m_perspectiveMenu      = m_viewMenu->addMenu("&Perspective");
     auto *perspectiveGroup = new QActionGroup(this);
-    m_insideAction  = m_perspectiveMenu->addAction("&Inside (sky)");
-    m_outsideAction = m_perspectiveMenu->addAction("&Outside (globe)");
+    m_insideAction         = m_perspectiveMenu->addAction("&Inside (sky)");
+    m_outsideAction        = m_perspectiveMenu->addAction("&Outside (globe)");
     m_insideAction->setStatusTip(
         "The sky seen from the center: longitude increases to the left");
     m_outsideAction->setStatusTip(
@@ -1384,10 +1384,10 @@ HpVis::onSaveMapTriggered()
         return;
     }
 
-    QString suggestion = m_view->isComputed()
-                             ? QString("result.fits")
-                             : QFileInfo(m_view->filePath()).completeBaseName()
-                                   + "_copy.fits";
+    QString suggestion
+        = m_view->isComputed()
+              ? QString("result.fits")
+              : QFileInfo(m_view->filePath()).completeBaseName() + "_copy.fits";
     const QString path = QFileDialog::getSaveFileName(
         this, "Save Map As", startDirectory() + "/" + suggestion,
         "FITS Files (*.fits);;All Files (*)");
@@ -1399,6 +1399,7 @@ HpVis::onSaveMapTriggered()
     if (m_view->saveMap(path, &error))
         m_statusBar->showMessage(QString("Saved %1").arg(path), 4000);
     else
-        QMessageBox::critical(this, "Save Map",
-                              QString("Failed to save %1: %2").arg(path, error));
+        QMessageBox::critical(
+            this, "Save Map",
+            QString("Failed to save %1: %2").arg(path, error));
 }

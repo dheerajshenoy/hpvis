@@ -35,9 +35,10 @@ load(const OperandSource &op)
 
     const QString file = QFileInfo(op.path).fileName();
     if (!QFileInfo::exists(op.path))
-        throw PlanckError(
-            QString("%1: the file %2 does not exist").arg(op.name, file)
-                .toStdString().c_str());
+        throw PlanckError(QString("%1: the file %2 does not exist")
+                              .arg(op.name, file)
+                              .toStdString()
+                              .c_str());
     fitshandle fits;
     try
     {
@@ -121,7 +122,7 @@ runOperation(const std::vector<OperandSource> &operands,
             throw PlanckError("the expression uses no map");
 
         // Output: the first used map's ordering; the resolution by the policy
-        const Loaded &first = loaded[used.front()];
+        const Loaded &first                  = loaded[used.front()];
         const Healpix_Ordering_Scheme scheme = first.map->Scheme();
         int nside                            = int(first.map->Nside());
         for (int index : used)
@@ -152,9 +153,8 @@ runOperation(const std::vector<OperandSource> &operands,
                 result.notes << QString("%1: nside %2 %3 to %4")
                                     .arg(operands[index].name)
                                     .arg(src->Nside())
-                                    .arg(int(src->Nside()) < nside
-                                             ? "upgraded"
-                                             : "degraded")
+                                    .arg(int(src->Nside()) < nside ? "upgraded"
+                                                                   : "degraded")
                                     .arg(nside);
         }
 
@@ -169,8 +169,9 @@ runOperation(const std::vector<OperandSource> &operands,
                                          skyframe::name(first.frame));
 
         // Evaluate
-        auto out = std::make_shared<Healpix_Map<float>>(nside, scheme, SET_NSIDE);
-        const long npix = out->Npix();
+        auto out
+            = std::make_shared<Healpix_Map<float>>(nside, scheme, SET_NSIDE);
+        const long npix   = out->Npix();
         const float undef = float(Healpix_undef);
         long valid        = 0;
 

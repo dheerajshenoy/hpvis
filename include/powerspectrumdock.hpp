@@ -1,7 +1,6 @@
 #pragma once
 
 #include "healpix_map.h"
-
 #include "openmap.hpp"
 
 #include <QColor>
@@ -33,10 +32,10 @@ struct Spectra
 // What the computation needs to know about a map
 struct PowerSpectrumInput
 {
-    QString path;   // FITS file the map came from (looked at for Q / U columns)
-    int hdu = 0;    // 1-based HDU of the map; 0 = unknown
+    QString path; // FITS file the map came from (looked at for Q / U columns)
+    int hdu = 0;  // 1-based HDU of the map; 0 = unknown
     std::shared_ptr<Healpix_Map<float>> map; // fallback / intensity-only map
-    bool maskActive = false; // a mask is applied in the view
+    bool maskActive = false;                 // a mask is applied in the view
 };
 
 // Dockable power spectrum plot. It follows the current tab: each map keeps its
@@ -93,7 +92,8 @@ private:
     // -1 = ask) answers the question of what the values are
     void loadExternalCurve(const QString &path = QString(), int unit = -1);
     QString titleOf(const View *view) const;
-    void pickPlotColor(QPushButton *button, QColor &color, const QString &title);
+    void pickPlotColor(QPushButton *button, QColor &color,
+                       const QString &title);
     void showColorOnButton(QPushButton *button, const QColor &color);
     void exportCsv(const QString &path = QString());
     void exportImage();
@@ -112,25 +112,25 @@ private:
     std::function<QList<OpenMap>()> m_openMaps;
     QSet<const View *> m_compareViews;
     QList<External> m_external;
-    QComboBox *m_modeCombo       = nullptr;
-    QCheckBox *m_commonCheck     = nullptr; // limit all curves to a shared l range
+    QComboBox *m_modeCombo   = nullptr;
+    QCheckBox *m_commonCheck = nullptr; // limit all curves to a shared l range
     QToolButton *m_compareButton = nullptr;
     QSet<const View *> m_busy;
     // The running computation of each busy view (progress, cancel flag)
     QHash<const View *, std::shared_ptr<PowerSpectrumJob>> m_jobs;
     QTimer *m_progressTimer = nullptr;
 
-    QQuickView *m_chartView    = nullptr;
-    QWidget *m_chartContainer  = nullptr;
-    QLabel *m_statusLabel      = nullptr;
-    QLabel *m_warningLabel     = nullptr;
-    QComboBox *m_spectrumCombo = nullptr;
-    QComboBox *m_accuracyCombo = nullptr;
-    QComboBox *m_lmaxCombo     = nullptr;
-    QLabel *m_infoLabel        = nullptr;
-    QComboBox *m_quantityCombo = nullptr; // what the y axis shows
-    QCheckBox *m_logXCheck     = nullptr;
-    QCheckBox *m_logYCheck     = nullptr;
+    QQuickView *m_chartView     = nullptr;
+    QWidget *m_chartContainer   = nullptr;
+    QLabel *m_statusLabel       = nullptr;
+    QLabel *m_warningLabel      = nullptr;
+    QComboBox *m_spectrumCombo  = nullptr;
+    QComboBox *m_accuracyCombo  = nullptr;
+    QComboBox *m_lmaxCombo      = nullptr;
+    QLabel *m_infoLabel         = nullptr;
+    QComboBox *m_quantityCombo  = nullptr; // what the y axis shows
+    QCheckBox *m_logXCheck      = nullptr;
+    QCheckBox *m_logYCheck      = nullptr;
     QToolButton *m_exportButton = nullptr;
     QPushButton *m_bgButton     = nullptr;
     QPushButton *m_fgButton     = nullptr;
@@ -141,5 +141,5 @@ private:
     QPushButton *m_computeButton = nullptr;
     QProgressBar *m_progressBar  = nullptr;
     QLabel *m_progressLabel      = nullptr;
-    bool m_plotLoaded          = false;
+    bool m_plotLoaded            = false;
 };

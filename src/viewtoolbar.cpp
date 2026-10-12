@@ -53,14 +53,15 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
 
     // --- Orientation ---
     m_orientationCombo = new QComboBox();
-    m_orientationCombo->addItems({"Free", "Galactic", "Ecliptic", "Equatorial"});
+    m_orientationCombo->addItems(
+        {"Free", "Galactic", "Ecliptic", "Equatorial"});
     m_orientationCombo->setToolTip(
         "Free: the map's own frame, dragging also rolls the view.\n"
-        "Galactic, Ecliptic, Equatorial: show the sky in that frame, north up.");
+        "Galactic, Ecliptic, Equatorial: show the sky in that frame, north "
+        "up.");
     addLabeled("Orientation", m_orientationCombo);
     connect(m_orientationCombo, &QComboBox::currentIndexChanged, this,
-            [this](int index)
-    { emit orientationChanged(Orientation(index)); });
+            [this](int index) { emit orientationChanged(Orientation(index)); });
     connect(m_projectionCombo, &QComboBox::currentIndexChanged, this,
             [this](int index)
     {
