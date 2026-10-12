@@ -25,6 +25,8 @@
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QInputDialog>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QLabel>
 #include <QSlider>
 #include <QWidgetAction>
@@ -330,6 +332,15 @@ HpVis::initMenubar()
     m_fileMenu->addAction("&Exit", this, &HpVis::close);
 
     m_editMenu = menuBar->addMenu("&Edit");
+    m_editMenu->addAction("&Copy Image", QKeySequence("Ctrl+Shift+C"), this,
+                          [this]()
+    {
+        if (!m_view)
+            return;
+        QGuiApplication::clipboard()->setImage(
+            m_view->glWidget()->grabFramebuffer());
+        statusBar()->showMessage("Image copied to clipboard", 3000);
+    });
     m_viewMenu = menuBar->addMenu("&View");
 
     m_viewMinimapAction
