@@ -20,9 +20,6 @@
 - [ ] Polarization display (Q/U → amplitude, vectors)
 - [ ] Map operations: smoothing, ud_grade
 
-## Export
-- [ ] Copy view to clipboard
-
 ## UI / App
 - [ ] Side-by-side / linked views (synced zoom, rotation, color range)
 - [ ] Packaging (AppImage / Arch PKGBUILD) and README with screenshots

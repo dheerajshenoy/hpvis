@@ -137,6 +137,8 @@ add_executable(${PROJECT_NAME}
     src/histogram.cpp
     src/mapoperationdialog.cpp
     src/resolution.cpp
+    src/smoothing.cpp
+    src/smoothdialog.cpp
     src/masksource.cpp
     src/masksourcedialog.cpp
     src/downgradedialog.cpp
@@ -169,6 +171,8 @@ add_executable(${PROJECT_NAME}
     include/histogram.hpp
     include/mapoperationdialog.hpp
     include/resolution.hpp
+    include/smoothing.hpp
+    include/smoothdialog.hpp
     include/masksource.hpp
     include/masksourcedialog.hpp
     include/downgradedialog.hpp

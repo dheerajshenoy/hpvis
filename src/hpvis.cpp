@@ -2,6 +2,7 @@
 
 #include "colormapregistry.hpp"
 #include "downgradedialog.hpp"
+#include "smoothdialog.hpp"
 #include "fitsheaderdialog.hpp"
 #include "masksourcedialog.hpp"
 #include "mapoperationdialog.hpp"
@@ -595,6 +596,8 @@ HpVis::initMenubar()
                            &HpVis::onOperateTriggered);
     m_toolsMenu->addAction("Change &Resolution...", this,
                            &HpVis::onDowngradeTriggered);
+    m_toolsMenu->addAction("&Beam Smoothing...", this,
+                           &HpVis::onSmoothTriggered);
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
@@ -1482,6 +1485,22 @@ HpVis::onDowngradeTriggered()
     m_downgradeDialog->show();
     m_downgradeDialog->raise();
     m_downgradeDialog->activateWindow();
+}
+
+// The Beam Smoothing dialog: works on the current tab
+void
+HpVis::onSmoothTriggered()
+{
+    if (!m_smoothDialog)
+    {
+        m_smoothDialog = new SmoothDialog([this]() { return m_view; }, this);
+        connect(m_smoothDialog, &SmoothDialog::mapReady, this,
+                &HpVis::openComputedMap);
+    }
+    m_smoothDialog->refresh();
+    m_smoothDialog->show();
+    m_smoothDialog->raise();
+    m_smoothDialog->activateWindow();
 }
 
 // Opens a map that was computed from other maps as a new tab

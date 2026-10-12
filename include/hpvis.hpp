@@ -21,6 +21,7 @@
 #include <optional>
 
 class DowngradeDialog;
+class SmoothDialog;
 class MapOperationDialog;
 
 class HpVis : public QMainWindow
@@ -99,6 +100,7 @@ private slots:
     void onRotationActionTriggered();
     void onOperateTriggered();
     void onDowngradeTriggered();
+    void onSmoothTriggered();
     QList<OpenMap> openMaps() const;
     void onSaveMapTriggered();
     void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
@@ -156,6 +158,7 @@ private:
     ViewToolBar *m_toolBar              = nullptr;
     MapOperationDialog *m_operateDialog = nullptr;
     DowngradeDialog *m_downgradeDialog  = nullptr;
+    SmoothDialog *m_smoothDialog        = nullptr;
     StatisticsDock *m_statsDock         = nullptr;
     PowerSpectrumDock *m_powerDock      = nullptr;
     StatusBar *m_statusBar              = nullptr;
