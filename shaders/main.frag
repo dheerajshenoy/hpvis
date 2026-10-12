@@ -11,6 +11,39 @@ out vec4 FragColor;
 #include "colorbar.glsl"
 #include "graticule.glsl"
 
+// Sky angles in the displayed frame at a point of the projection plane (the
+// same steps as in main()); false outside the projection
+bool skyAngles(vec2 uv, out float colat, out float phi) {
+    if (!inverseProjection(uv, colat, phi))
+        return false;
+    vec3 dir = vec3(sin(colat) * cos(phi), sin(colat) * sin(phi), cos(colat));
+    dir   = globe_rotation * dir;
+    colat = atan(length(dir.xy), dir.z);
+    phi   = mod(atan(dir.y, dir.x), 2.0 * PI);
+    return true;
+}
+
+// Change of latitude and longitude over one screen pixel along x and along y
+// (summed, like fwidth). A neighbour outside the projection is replaced by
+// the one on the other side.
+void graticuleDerivatives(vec2 uv, float colat, float phi,
+                          out float dLat, out float dPhi) {
+    vec2 step = view_scale / (zoom * viewport_size); // plane-uv per pixel
+    dLat = 0.0;
+    dPhi = 0.0;
+    for (int k = 0; k < 2; ++k) {
+        vec2 off = (k == 0) ? vec2(step.x, 0.0) : vec2(0.0, step.y);
+        float c, p;
+        if (!skyAngles(uv + off, c, p) && !skyAngles(uv - off, c, p)) {
+            dLat = 10.0; // isolated pixel: no line
+            dPhi = 10.0;
+            return;
+        }
+        dLat += abs(c - colat);
+        dPhi += abs(mod(p - phi + PI, 2.0 * PI) - PI) ;
+    }
+}
+
 void main() {
     float colat, phi;
 
@@ -109,9 +142,12 @@ void main() {
     }
 
     // Drawn last so the lines also cross unseen / masked pixels
-    if (graticule_enabled)
+    if (graticule_enabled) {
+        float dLat, dPhi;
+        graticuleDerivatives(viewUV, colat, phi, dLat, dPhi);
         color = mix(color, graticule_color.rgb,
-                    graticule_color.a * graticule(colat, phi));
+                    graticule_color.a * graticule(colat, phi, dLat, dPhi));
+    }
 
     FragColor = vec4(color, out_alpha);
 }
