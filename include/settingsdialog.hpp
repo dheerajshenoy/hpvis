@@ -44,6 +44,7 @@ private:
     QWidget *createGeneralSettingsPage();
     QWidget *createAppearanceSettingsPage();
     QWidget *createOverlaysSettingsPage();
+    QWidget *createTheorySettingsPage();
     QWidget *createAboutPage();
 
     void setColorButton(QPushButton *button, const QColor &color);
@@ -92,6 +93,10 @@ private:
     QComboBox *m_graticuleStepCombo = nullptr;
     QCheckBox *m_globeShadowCheck   = nullptr;
     QCheckBox *m_limbDarkeningCheck = nullptr;
+    QComboBox *m_theoryPresetCombo  = nullptr;
+    QLineEdit *m_theoryFile         = nullptr;
+    QPushButton *m_theoryBrowse     = nullptr;
+    QComboBox *m_theoryUnitCombo    = nullptr;
     QCheckBox *m_hdrCheck           = nullptr;
     QCheckBox *m_animateCheck       = nullptr;
     QCheckBox *m_animateProjectionCheck = nullptr;

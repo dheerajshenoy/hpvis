@@ -5,6 +5,7 @@
 #include "skyframe.hpp"
 
 #include <QColor>
+#include <QString>
 
 // User preferences, stored with QSettings (~/.config/hpvis/hpvis.conf
 // on Linux). The view options are the defaults for newly opened maps.
@@ -45,6 +46,10 @@ struct AppSettings
     QColor plotLine         = QColor(0x7f, 0xd1, 0xff);
     bool animateOrthoGlobe  = true; // orthographic globe rotation animation
     bool animateProjection  = true; // fade between projections
+    // Theoretical CMB spectrum overplotted on the power spectrum
+    int theoryPreset        = 0; // TheoryPreset
+    QString theoryFile;          // for the custom preset
+    int theoryUnit          = 0; // TheoryUnit: the maps' unit (uK, mK, K)
 
     bool operator==(const AppSettings &) const = default;
 

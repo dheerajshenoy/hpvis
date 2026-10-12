@@ -86,6 +86,11 @@ AppSettings::load()
         = s.value("view/animateOrthoGlobe", d.animateOrthoGlobe).toBool();
     a.animateProjection
         = s.value("view/animateProjection", d.animateProjection).toBool();
+    a.theoryPreset = std::clamp(
+        s.value("theory/preset", d.theoryPreset).toInt(), 0, 1);
+    a.theoryFile = s.value("theory/file", d.theoryFile).toString();
+    a.theoryUnit
+        = std::clamp(s.value("theory/unit", d.theoryUnit).toInt(), 0, 2);
     return a;
 }
 
@@ -125,5 +130,8 @@ AppSettings::save() const
     s.setValue("plot/background", plotBackground.name());
     s.setValue("plot/foreground", plotForeground.name());
     s.setValue("plot/line", plotLine.name());
+    s.setValue("theory/preset", theoryPreset);
+    s.setValue("theory/file", theoryFile);
+    s.setValue("theory/unit", theoryUnit);
     s.sync();
 }

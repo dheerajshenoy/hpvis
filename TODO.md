@@ -18,14 +18,7 @@
 
 ## Data & files
 - [ ] Polarization display (Q/U → amplitude, vectors)
-- [ ] Map operations: smoothing, ud_grade
 
 ## UI / App
 - [ ] Side-by-side / linked views (synced zoom, rotation, color range)
 - [ ] Packaging (AppImage / Arch PKGBUILD) and README with screenshots
-
-### Data
-- [ ] Smoothing FWHM spinbox
-
-### Analysis
-- [ ] Theoretical Model Overlay: Allow users to load or compute theoretical $C_\ell$ curves (e.g., from CAMB or Planck best-fit parameters) to compare directly against their map data.

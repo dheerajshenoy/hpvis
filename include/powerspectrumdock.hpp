@@ -58,6 +58,10 @@ public:
     void setPlotColors(const QColor &background, const QColor &foreground,
                        const QColor &line);
 
+    // Re-reads the theory spectrum setting and redraws (after the settings
+    // dialog saved)
+    void refreshTheory();
+
     // Drops what was stored for a view that is going away
     void forget(const View *view);
 
@@ -113,6 +117,13 @@ private:
     std::function<QList<OpenMap>()> m_openMaps;
     QSet<const View *> m_compareViews;
     QList<External> m_external;
+    // The theoretical spectrum shown with Compare > Theory (cached per source)
+    const Spectra *theorySpectra();
+    bool m_theoryOn = false;
+    bool m_theoryLoaded = false;
+    QString m_theoryKey;   // what m_theory was loaded from
+    QString m_theoryName;
+    Spectra m_theory;
     QComboBox *m_modeCombo   = nullptr;
     QCheckBox *m_commonCheck = nullptr; // limit all curves to a shared l range
     QToolButton *m_compareButton = nullptr;

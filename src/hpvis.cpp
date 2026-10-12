@@ -1130,6 +1130,7 @@ HpVis::applySavedSettings()
                                m_settings.plotForeground, m_settings.plotLine);
     m_statsDock->setPlotColors(m_settings.plotBackground,
                                m_settings.plotForeground, m_settings.plotLine);
+    m_powerDock->refreshTheory();
 
     // Apply what changed to the maps that are already open too. Only the
     // changed options are touched, so per-map tweaks to the others survive.

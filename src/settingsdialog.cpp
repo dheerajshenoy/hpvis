@@ -5,6 +5,7 @@
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QColorDialog>
+#include <QFileDialog>
 #include <QComboBox>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -40,6 +41,7 @@ SettingsDialog::initUI()
         "General",
         "Appearance",
         "Overlays",
+        "Theory",
         "About",
     });
     m_pageKeywords = {
@@ -56,6 +58,8 @@ SettingsDialog::initUI()
         "overlays color bar minimap graticule grid spacing color masks mask "
         "mode "
         "hide dim strength opacity",
+        "theory theoretical cmb power spectrum planck 2018 best fit cosmology "
+        "camb class custom file beam overplot units microkelvin kelvin",
         "about version author license",
     };
 
@@ -73,6 +77,7 @@ SettingsDialog::initUI()
     m_stackedWidget->addWidget(createGeneralSettingsPage());
     m_stackedWidget->addWidget(createAppearanceSettingsPage());
     m_stackedWidget->addWidget(createOverlaysSettingsPage());
+    m_stackedWidget->addWidget(createTheorySettingsPage());
     m_stackedWidget->addWidget(createAboutPage());
 
     hlayout->addWidget(m_listView);
@@ -123,6 +128,24 @@ SettingsDialog::initConnections()
     };
     connect(m_recentMaxSpin, &QSpinBox::valueChanged, this, changed);
     connect(m_streamCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_theoryPresetCombo, &QComboBox::currentIndexChanged, this,
+            [this, changed]()
+    {
+        const bool custom = m_theoryPresetCombo->currentIndex() == 1;
+        m_theoryFile->setEnabled(custom);
+        m_theoryBrowse->setEnabled(custom);
+        changed();
+    });
+    connect(m_theoryUnitCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_theoryFile, &QLineEdit::textChanged, this, changed);
+    connect(m_theoryBrowse, &QPushButton::clicked, this, [this]()
+    {
+        const QString f = QFileDialog::getOpenFileName(
+            this, "Theory spectrum", QString(),
+            "Text files (*.txt *.dat *.csv);;All Files (*)");
+        if (!f.isEmpty())
+            m_theoryFile->setText(f);
+    });
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_projectionCombo, &QComboBox::currentIndexChanged, this, changed);
@@ -236,6 +259,9 @@ SettingsDialog::currentSettings() const
     a.animateOrthoGlobe  = m_animateCheck->isChecked();
     a.animateProjection  = m_animateProjectionCheck->isChecked();
     a.hdrRendering       = m_hdrCheck->isChecked();
+    a.theoryPreset       = m_theoryPresetCombo->currentIndex();
+    a.theoryFile         = m_theoryFile->text().trimmed();
+    a.theoryUnit         = m_theoryUnitCombo->currentIndex();
     a.plotBackground     = m_plotBackground;
     a.plotForeground     = m_plotForeground;
     a.plotLine           = m_plotLine;
@@ -291,6 +317,11 @@ SettingsDialog::loadSettings()
     m_animateCheck->setChecked(a.animateOrthoGlobe);
     m_animateProjectionCheck->setChecked(a.animateProjection);
     m_hdrCheck->setChecked(a.hdrRendering);
+    m_theoryPresetCombo->setCurrentIndex(a.theoryPreset);
+    m_theoryFile->setText(a.theoryFile);
+    m_theoryUnitCombo->setCurrentIndex(a.theoryUnit);
+    m_theoryFile->setEnabled(a.theoryPreset == 1);
+    m_theoryBrowse->setEnabled(a.theoryPreset == 1);
     m_plotBackground = a.plotBackground;
     m_plotForeground = a.plotForeground;
     m_plotLine       = a.plotLine;
@@ -505,6 +536,53 @@ SettingsDialog::createAppearanceSettingsPage()
     outer->addWidget(animationBox);
     outer->addWidget(plotBox);
 
+    outer->addStretch();
+    return page;
+}
+
+QWidget *
+SettingsDialog::createTheorySettingsPage()
+{
+    QWidget *page      = new QWidget();
+    QVBoxLayout *outer = new QVBoxLayout(page);
+
+    auto *box  = new QGroupBox("Theoretical CMB spectrum");
+    auto *form = new QFormLayout(box);
+
+    m_theoryPresetCombo = new QComboBox();
+    m_theoryPresetCombo->addItems(
+        {"Planck 2018 best fit (bundled)", "Custom file"});
+    m_theoryPresetCombo->setToolTip(
+        "The base-LCDM best fit of Planck 2018 (TT,TE,EE+lowE+lensing) ships "
+        "with hpvis: TT, TE, EE and lensing-only BB, l up to 2508.");
+    form->addRow("Spectrum:", m_theoryPresetCombo);
+
+    auto *fileRow = new QHBoxLayout();
+    m_theoryFile  = new QLineEdit();
+    m_theoryFile->setPlaceholderText(
+        "text file: l TT TE EE BB, in D_l = l(l+1) C_l / 2pi (uK^2)");
+    m_theoryFile->setToolTip(
+        "Columns are taken from a # header naming them (L TT TE EE BB ...); "
+        "without one the order is L TT TE EE BB. Values are D_l in uK^2, as "
+        "CAMB and CLASS write them.");
+    m_theoryBrowse = new QPushButton("Browse...");
+    fileRow->addWidget(m_theoryFile, 1);
+    fileRow->addWidget(m_theoryBrowse);
+    form->addRow("File:", fileRow);
+
+    m_theoryUnitCombo = new QComboBox();
+    m_theoryUnitCombo->addItems({"uK", "mK", "K"});
+    m_theoryUnitCombo->setToolTip(
+        "The unit of the maps you analyse. The theory is in uK^2 and is "
+        "scaled to match.");
+    form->addRow("Map unit:", m_theoryUnitCombo);
+
+    auto *note = new QLabel(
+        "Overplot it from the power spectrum dock: Compare > Theory.");
+    note->setWordWrap(true);
+    form->addRow(note);
+
+    outer->addWidget(box);
     outer->addStretch();
     return page;
 }

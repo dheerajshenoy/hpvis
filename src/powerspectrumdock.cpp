@@ -9,6 +9,7 @@
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "powspec.h"
+#include "theoryspectrum.hpp"
 #include "view.hpp"
 
 #include <QCheckBox>
@@ -454,6 +455,7 @@ PowerSpectrumDock::initUI()
     m_compareButton->setMenu(compareMenu);
     connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
             [this]() { replot(); });
+    m_theoryOn = QSettings().value("powerspectrum/theory", false).toBool();
     m_commonCheck = new QCheckBox("Common \u2113 range");
     m_commonCheck->setToolTip(
         "Show every curve only up to the highest multipole they all have.\n"
@@ -856,6 +858,50 @@ PowerSpectrumDock::pickPlotColor(QPushButton *button, QColor &color,
     emit plotColorsChanged(m_plotBackground, m_plotForeground, m_plotLine);
 }
 
+// The theoretical spectrum chosen in the settings, loaded when it changes.
+// Null (with a message box) when it cannot be read.
+const Spectra *
+PowerSpectrumDock::theorySpectra()
+{
+    const AppSettings s = AppSettings::load();
+    TheorySource src;
+    src.preset = TheoryPreset(s.theoryPreset);
+    src.file   = s.theoryFile;
+    src.unit   = TheoryUnit(s.theoryUnit);
+    const QString key
+        = QString("%1|%2|%3").arg(s.theoryPreset).arg(s.theoryFile).arg(
+            s.theoryUnit);
+    if (!m_theoryLoaded || key != m_theoryKey)
+    {
+        m_theoryKey    = key;
+        m_theoryLoaded = true;
+        m_theory       = Spectra();
+        try
+        {
+            m_theory     = loadTheorySpectra(src);
+            m_theoryName = src.label();
+        }
+        catch (const std::exception &e)
+        {
+            m_theoryOn = false;
+            QMessageBox::warning(this, "Theory spectrum",
+                                 QString("%1\n\nChoose another one in "
+                                         "Settings > Theory.")
+                                     .arg(e.what()));
+            return nullptr;
+        }
+    }
+    return m_theory.TT.empty() && m_theory.EE.empty() ? nullptr : &m_theory;
+}
+
+void
+PowerSpectrumDock::refreshTheory()
+{
+    m_theoryLoaded = false;
+    if (m_theoryOn)
+        replot(true);
+}
+
 // The spectrum the combo selects, from a result
 static const std::vector<double> *
 spectrumByName(const Spectra &spectra, const QString &name)
@@ -960,6 +1006,14 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
             const std::vector<double> *d = spectrumByName(e.spectra, name);
             if (!d->empty())
                 others.append({e.name, d});
+        }
+
+    if (m_theoryOn)
+        if (const Spectra *t = theorySpectra())
+        {
+            const std::vector<double> *d = spectrumByName(*t, name);
+            if (!d->empty())
+                others.append({m_theoryName, d});
         }
 
     // Ratio and difference need something to compare with
@@ -1070,6 +1124,15 @@ PowerSpectrumDock::buildCompareMenu()
     }
 
     menu->addSeparator();
+    QAction *theory = menu->addAction("&Theory (Settings > Theory)");
+    theory->setCheckable(true);
+    theory->setChecked(m_theoryOn);
+    connect(theory, &QAction::toggled, this, [this](bool on)
+    {
+        m_theoryOn = on;
+        QSettings().setValue("powerspectrum/theory", on);
+        replot();
+    });
     menu->addAction("Load a &curve from a file...", this,
                     [this]() { loadExternalCurve(); });
     QAction *clear = menu->addAction("&Remove loaded curves", this, [this]()
