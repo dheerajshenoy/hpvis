@@ -45,6 +45,12 @@ public:
         return m_pixelOrdering;
     }
 
+    // True when the pixel ordering was changed from the one the map was
+    // loaded with (then the file no longer describes what is shown)
+    bool orderingOverridden() const
+    {
+        return m_pixelOrdering != m_loadedOrdering;
+    }
     void setPixelOrdering(PixelOrdering ordering);
     // Maps with a larger nside are streamed: a coarse copy stays on the GPU
     // and only the full-resolution tiles on screen are loaded. Applies to the
@@ -419,6 +425,7 @@ private:
 
 private:
     PixelOrdering m_pixelOrdering = PixelOrdering::RING;
+    PixelOrdering m_loadedOrdering = PixelOrdering::RING; // of the file
     Colormap m_colormap           = Colormap::VIRIDIS;
     unsigned int m_lutTexture     = 0; // custom colormaps, one row each
     int m_lutRows                 = 1;

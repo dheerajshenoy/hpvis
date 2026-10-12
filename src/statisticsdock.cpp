@@ -503,7 +503,10 @@ StatisticsDock::updateHistogram()
         HistogramSource s;
         s.name           = name;
         OpenGLWidget *gl = v->glWidget();
-        if (v->isComputed() || v->filePath().isEmpty())
+        // (an overridden pixel ordering is not in the file: use the map in
+        // memory, which the masks are indexed like)
+        if (v->isComputed() || v->filePath().isEmpty()
+            || gl->orderingOverridden())
             s.map
                 = std::make_shared<const Healpix_Map<float>>(*gl->healpixMap());
         else

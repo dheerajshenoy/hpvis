@@ -109,11 +109,52 @@ OpenGLWidget::~OpenGLWidget()
     }
 }
 
-// TODO: Make this async so that the UI doesn't freeze when loading large maps
+// Reads the map's pixel values as the other ordering, for files whose ORDERING
+// keyword is wrong: the values stay where they are, only the sky position
+// they stand for changes. Re-uploads the map; loaded masks are converted so
+// they keep covering the same part of the sky.
+// TODO: Make this async so that the UI doesn't freeze with large maps
 void
 OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
 {
+    if (ordering == m_pixelOrdering)
+        return;
+    const Healpix_Ordering_Scheme oldScheme
+        = m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING;
+    const Healpix_Ordering_Scheme newScheme
+        = ordering == PixelOrdering::NESTED ? NEST : RING;
     m_pixelOrdering = ordering;
+    if (m_pendingMap.Npix() == 0)
+        return;
+
+    // Only the scheme flag changes (swap_scheme() would move the values)
+    m_pendingMap.Healpix_Base::SetNside(m_pendingMap.Nside(), newScheme);
+
+    // The masks are indexed like the map: re-index them (old index -> new)
+    const long npix = m_pendingMap.Npix();
+    const Healpix_Base base(int(m_pendingMap.Nside()), oldScheme, SET_NSIDE);
+    for (MaskEntry &m : m_masks)
+    {
+        if (m.data.size() != size_t(npix))
+            continue;
+        std::vector<uint8_t> moved(static_cast<size_t>(npix));
+        const uint8_t *in = m.data.data();
+        uint8_t *out      = moved.data();
+        parallel::forRange(npix, [&](long begin, long end)
+        {
+            for (long i = begin; i < end; ++i)
+                out[oldScheme == RING ? base.ring2nest(i) : base.nest2ring(i)]
+                    = in[i];
+        });
+        m.data = std::move(moved);
+    }
+    m_maskDirty = !m_masks.empty();
+
+    if (isValid())
+        uploadMapToGPU(m_pendingMap);
+    else
+        m_hasPendingMap = true; // uploaded with the first paint
+
     if (m_statsRegion.active) // the pixels inside the region changed
     {
         ++m_regionRevision;
@@ -367,6 +408,7 @@ OpenGLWidget::setMap(Healpix_Map<float> &&map)
     m_hasPendingMap = true;
 
     m_pixelOrdering = static_cast<PixelOrdering>(m_pendingMap.Scheme());
+    m_loadedOrdering = m_pixelOrdering;
     if (sizeChanged && !m_masks.empty())
     {
         m_masks.clear();

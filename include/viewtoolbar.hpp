@@ -35,6 +35,7 @@ signals:
     void colormapChanged(Colormap colormap);
 
 private:
+    void widenPopup(QComboBox *combo);
     void fillColumnCombo(int hdu, int column);
 
     QComboBox *m_hduCombo         = nullptr;

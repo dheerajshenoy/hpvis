@@ -2,7 +2,10 @@
 
 #include "colormapregistry.hpp"
 
+#include <QAbstractItemView>
 #include <QLabel>
+#include <algorithm>
+#include <utility>
 
 ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
 {
@@ -19,6 +22,14 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
     // --- Data selection ---
     m_hduCombo    = new QComboBox();
     m_columnCombo = new QComboBox();
+    // Wide enough to read a name even when the list is empty or short
+    for (auto [combo, chars] : {std::pair<QComboBox *, int>{m_hduCombo, 12},
+                                std::pair<QComboBox *, int>{m_columnCombo, 20}})
+    {
+        combo->setSizeAdjustPolicy(
+            QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        combo->setMinimumContentsLength(chars);
+    }
     addLabeled("HDU", m_hduCombo);
     addLabeled("Column", m_columnCombo);
     addSeparator();
@@ -143,11 +154,27 @@ ViewToolBar::setFitsInfo(const FitsInfo &info, int hdu, int column)
         m_hduCombo->addItem(label, h.index);
     }
     m_hduCombo->setEnabled(info.hdus.size() > 1);
+    widenPopup(m_hduCombo);
 
     const int row = m_hduCombo->findData(hdu);
     if (row >= 0)
         m_hduCombo->setCurrentIndex(row);
     fillColumnCombo(hdu, column);
+}
+
+// The drop-down list is at least as wide as its longest entry (and each entry
+// shows its full text as a tooltip)
+void
+ViewToolBar::widenPopup(QComboBox *combo)
+{
+    int widest = 0;
+    for (int i = 0; i < combo->count(); ++i)
+    {
+        widest = std::max(
+            widest, combo->fontMetrics().horizontalAdvance(combo->itemText(i)));
+        combo->setItemData(i, combo->itemText(i), Qt::ToolTipRole);
+    }
+    combo->view()->setMinimumWidth(widest + 40); // scroll bar and margins
 }
 
 void
@@ -160,6 +187,7 @@ ViewToolBar::fillColumnCombo(int hdu, int column)
             m_columnCombo->addItem(
                 c.name.isEmpty() ? QString::number(c.index) : c.name, c.index);
     m_columnCombo->setEnabled(m_columnCombo->count() > 1);
+    widenPopup(m_columnCombo);
 
     const int row = m_columnCombo->findData(column);
     if (row >= 0)
