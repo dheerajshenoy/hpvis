@@ -137,6 +137,7 @@ add_executable(${PROJECT_NAME}
     src/mapoperationdialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
+    src/tilecache.cpp
     src/tabbar.cpp
     src/tabwidget.cpp
     src/viewtoolbar.cpp
@@ -162,6 +163,7 @@ add_executable(${PROJECT_NAME}
     include/histogram.hpp
     include/mapoperationdialog.hpp
     include/openglwidget.hpp
+    include/tilecache.hpp
     include/argparse.hpp
     include/tabwidget.hpp
     include/tabbar.hpp

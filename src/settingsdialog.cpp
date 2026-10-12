@@ -121,6 +121,7 @@ SettingsDialog::initConnections()
         updateSaveEnabled();
     };
     connect(m_recentMaxSpin, &QSpinBox::valueChanged, this, changed);
+    connect(m_streamCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_colormapCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_scaleCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_projectionCombo, &QComboBox::currentIndexChanged, this, changed);
@@ -133,7 +134,8 @@ SettingsDialog::initConnections()
     for (QCheckBox *box :
          {m_rememberDirCheck, m_showToolbarCheck, m_showStatusBarCheck,
           m_reverseCheck, m_colorBarCheck, m_minimapCheck, m_graticuleCheck,
-          m_globeShadowCheck, m_limbDarkeningCheck, m_animateCheck})
+          m_globeShadowCheck, m_limbDarkeningCheck, m_animateCheck,
+          m_animateProjectionCheck})
         connect(box, &QCheckBox::toggled, this, changed);
 }
 
@@ -212,6 +214,7 @@ SettingsDialog::currentSettings() const
     a.rememberLastDir    = m_rememberDirCheck->isChecked();
     a.showToolbar        = m_showToolbarCheck->isChecked();
     a.showStatusBar      = m_showStatusBarCheck->isChecked();
+    a.streamingNside     = m_streamCombo->currentData().toInt();
     a.projection         = Projection(m_projectionCombo->currentIndex());
     a.viewFromOutside    = m_perspectiveCombo->currentIndex() == 1;
     a.orientation        = Orientation(m_orientationCombo->currentIndex());
@@ -230,6 +233,7 @@ SettingsDialog::currentSettings() const
     a.globeShadow        = m_globeShadowCheck->isChecked();
     a.limbDarkening      = m_limbDarkeningCheck->isChecked();
     a.animateOrthoGlobe  = m_animateCheck->isChecked();
+    a.animateProjection  = m_animateProjectionCheck->isChecked();
     a.plotBackground     = m_plotBackground;
     a.plotForeground     = m_plotForeground;
     a.plotLine           = m_plotLine;
@@ -258,6 +262,8 @@ SettingsDialog::loadSettings()
     m_rememberDirCheck->setChecked(a.rememberLastDir);
     m_showToolbarCheck->setChecked(a.showToolbar);
     m_showStatusBarCheck->setChecked(a.showStatusBar);
+    const int stream = m_streamCombo->findData(a.streamingNside);
+    m_streamCombo->setCurrentIndex(stream >= 0 ? stream : 3);
     m_projectionCombo->setCurrentIndex(int(a.projection));
     m_perspectiveCombo->setCurrentIndex(a.viewFromOutside ? 1 : 0);
     m_orientationCombo->setCurrentIndex(int(a.orientation));
@@ -281,6 +287,7 @@ SettingsDialog::loadSettings()
     m_globeShadowCheck->setChecked(a.globeShadow);
     m_limbDarkeningCheck->setChecked(a.limbDarkening);
     m_animateCheck->setChecked(a.animateOrthoGlobe);
+    m_animateProjectionCheck->setChecked(a.animateProjection);
     m_plotBackground = a.plotBackground;
     m_plotForeground = a.plotForeground;
     m_plotLine       = a.plotLine;
@@ -340,6 +347,24 @@ SettingsDialog::createGeneralSettingsPage()
                                        "last used folder");
     form->addRow(m_rememberDirCheck);
     outer->addWidget(box);
+
+    // --- Large maps ---
+    auto *bigBox  = new QGroupBox("Large maps");
+    auto *bigForm = new QFormLayout(bigBox);
+
+    m_streamCombo = new QComboBox();
+    for (int n : {512, 1024, 2048, 4096, 8192})
+        m_streamCombo->addItem(n == 8192 ? "8192 (never stream)"
+                                         : QString::number(n),
+                               n);
+    m_streamCombo->setToolTip(
+        "Maps with a larger nside are not kept on the GPU in full: a coarse "
+        "copy (at most nside 2048) stays resident and only the full-resolution "
+        "tiles on screen are loaded as you zoom and pan. Lowers video memory "
+        "use to a few hundred MB whatever the nside. Masks are shown at the "
+        "coarse resolution while streaming. Applies to open maps too.");
+    bigForm->addRow("Stream maps above nside:", m_streamCombo);
+    outer->addWidget(bigBox);
 
     // --- Interface ---
     auto *uiBox  = new QGroupBox("Interface");
@@ -438,6 +463,9 @@ SettingsDialog::createAppearanceSettingsPage()
     m_animateCheck      = new QCheckBox(
         "Orthographic globe: spin after dragging, glide on reset");
     animationForm->addRow(m_animateCheck);
+    m_animateProjectionCheck
+        = new QCheckBox("Fade between projections when switching");
+    animationForm->addRow(m_animateProjectionCheck);
 
     // --- Power spectrum plot ---
     auto *plotBox     = new QGroupBox("Power spectrum plot");

@@ -154,15 +154,19 @@ the recent files list under `~/.local/share/hpvis/`.
 
 ## Caveats
 
-- Maximum nside is 8192, and it is limited by memory, not by the viewer. The
-  map is kept on the GPU as 32-bit floats, 4 bytes per pixel: nside 2048 needs
-  0.2 GB, nside 4096 needs 0.8 GB and nside 8192 needs 3.2 GB of video memory.
-  Each loaded mask adds another 1 byte per pixel (rounded up to groups of four
-  masks), and the map is also held in RAM. If the GPU cannot allocate the
-  texture, a message is shown and the map is not displayed. Integrated GPUs
-  share system memory, so nside 8192 may fail there.
-- The GPU's maximum texture size (usually 16384) also caps nside.
-- There is no level-of-detail rendering yet: the whole map is always resident
-  in full resolution (tiled rendering is on the to-do list).
+- Maximum nside is 8192. The map is kept on the GPU as 32-bit floats, 4 bytes
+  per pixel: nside 2048 needs 0.2 GB, nside 4096 needs 0.8 GB and nside 8192
+  needs 3.2 GB of video memory (integrated GPUs share system memory). Maps
+  with a larger nside than the "Stream maps above nside" setting (Settings >
+  General, default 4096) are streamed instead: a coarse copy (at most nside
+  2048) stays on the GPU and the full-resolution tiles on screen are loaded as
+  you zoom and pan, which needs only a few hundred MB whatever the nside. The
+  map is also held in RAM in full (3.2 GB at nside 8192).
+- While streaming, zooming in shows the coarse map for a moment until the
+  tiles arrive, and masks are applied at the coarse resolution.
+- The GPU's maximum texture size (usually 16384) also caps nside when not
+  streaming.
+- If the GPU cannot allocate the textures, a message is shown and the map is
+  not displayed; lower the streaming limit in the settings.
 
 See [CHANGELOG.md](CHANGELOG.md) for the list of changes.

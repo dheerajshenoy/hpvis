@@ -479,7 +479,8 @@ HpVis::initMenubar()
     m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
 
     auto zoomLevels
-        = {0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f, 32.0f, 64.0f};
+        = {0.1f, 0.25f, 0.5f, 1.0f,  2.0f,  4.0f,   8.0f,
+       16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f};
 
     for (float zoom : zoomLevels)
     {
@@ -1047,6 +1048,9 @@ HpVis::applySavedSettings()
         if (s.unseen != previous.unseen)
             gl->setUnseenColor(s.unseen);
 
+        if (s.streamingNside != previous.streamingNside)
+            gl->setStreamingNside(s.streamingNside);
+
         if (s.colorBar != previous.colorBar)
             gl->setColorBarVisible(s.colorBar);
 
@@ -1067,6 +1071,9 @@ HpVis::applySavedSettings()
 
         if (s.animateOrthoGlobe != previous.animateOrthoGlobe)
             gl->setAnimateGlobe(s.animateOrthoGlobe);
+
+        if (s.animateProjection != previous.animateProjection)
+            gl->setAnimateProjection(s.animateProjection);
 
         if (s.orientation != previous.orientation)
             gl->setOrientation(s.orientation);
@@ -1131,6 +1138,7 @@ HpVis::applyDefaults(View *view)
     gl->setColormapScale(m_settings.scale);
     gl->setBackgroundColor(m_settings.background);
     gl->setUnseenColor(m_settings.unseen);
+    gl->setStreamingNside(m_settings.streamingNside);
     gl->setColorBarVisible(m_settings.colorBar);
     gl->setMinimapEnabled(m_settings.minimap);
     gl->setGraticuleEnabled(m_settings.graticule);
@@ -1141,6 +1149,7 @@ HpVis::applyDefaults(View *view)
     gl->setViewFromOutside(m_settings.viewFromOutside);
     gl->setOrientation(m_settings.orientation);
     gl->setAnimateGlobe(m_settings.animateOrthoGlobe);
+    gl->setAnimateProjection(m_settings.animateProjection);
     gl->setGraticuleColor(m_settings.graticuleColor);
     gl->setMaskMode(m_settings.maskMode);
     gl->setMaskOpacity(m_settings.maskOpacityPercent / 100.0f);

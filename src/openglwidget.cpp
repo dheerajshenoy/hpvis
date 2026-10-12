@@ -28,6 +28,7 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
+#include <unordered_map>
 #include <pointing.h>
 #include <qcoreapplication.h>
 #include <qsurfaceformat.h>
@@ -91,26 +92,17 @@ OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 
 OpenGLWidget::~OpenGLWidget()
 {
-    if (m_mapTexture)
-    {
-        makeCurrent();
-        glDeleteTextures(1, &m_mapTexture);
-        m_mapTexture = 0;
-        doneCurrent();
-    }
+    makeCurrent();
+    deleteMapTextures();
+    deleteMaskTextures();
+    if (m_tiles)
+        m_tiles->destroy();
+    doneCurrent();
     if (m_lutTexture)
     {
         makeCurrent();
         glDeleteTextures(1, &m_lutTexture);
         m_lutTexture = 0;
-        doneCurrent();
-    }
-    if (m_maskTextures[0] || m_maskTextures[1] || m_maskTextures[2]
-        || m_maskTextures[3])
-    {
-        makeCurrent();
-        glDeleteTextures(int(m_maskTextures.size()), m_maskTextures.data());
-        m_maskTextures.fill(0);
         doneCurrent();
     }
 }
@@ -128,6 +120,22 @@ void
 OpenGLWidget::setColormap(Colormap colormap)
 {
     m_colormap = colormap;
+    update();
+}
+
+void
+OpenGLWidget::setStreamingNside(int nside)
+{
+    if (nside == m_streamNside)
+        return;
+    m_streamNside = nside;
+    // Only a map already on the GPU whose mode would change is re-uploaded
+    if (m_nside > 0)
+    {
+        const bool streams = m_nside > nside && TileCache::supports(m_nside);
+        if (streams != (m_levelShift > 0))
+            m_needsReupload = true;
+    }
     update();
 }
 
@@ -427,6 +435,14 @@ OpenGLWidget::paintGL()
                        m_mapRms, m_mapStd, m_mapMin, m_mapMax);
     }
 
+    if (m_needsReupload)
+    {
+        m_needsReupload = false;
+        uploadMapToGPU(m_pendingMap);
+        m_maskDirty = !m_masks.empty();
+    }
+    if (m_streaming)
+        updateTiles();
     if (m_maskDirty)
         uploadMaskToGPU();
     if (m_lutDirty)
@@ -436,25 +452,16 @@ OpenGLWidget::paintGL()
 
     m_camera->uploadUniforms(m_shaderProgram);
 
-    // 1. Bind the HEALPix map (array of face textures) to texture unit 0
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTexture);
-    m_shaderProgram.setUniformValue("mapTexture", 0);
-
-    // Mask textures on units 1..4; their samplers are only read for masks
-    // whose bit is set in mask_bits
-    for (int g = 0; g < 4; ++g)
-    {
-        glActiveTexture(GL_TEXTURE1 + g);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, m_maskTextures[g]);
-        m_shaderProgram.setUniformValue(
-            QByteArray("maskTex" + QByteArray::number(g)).constData(), 1 + g);
-    }
-    // Custom colormaps on unit 5
-    glActiveTexture(GL_TEXTURE5);
+    // 1. Bind the HEALPix map and the masks (arrays of face textures)
+    bindDataTextures(true);
+    // Custom colormaps
+    glActiveTexture(GL_TEXTURE0 + kLutUnit);
     glBindTexture(GL_TEXTURE_2D, m_lutTexture);
-    m_shaderProgram.setUniformValue("colormapLut", 5);
+    m_shaderProgram.setUniformValue("colormapLut", kLutUnit);
     m_shaderProgram.setUniformValue("lut_rows", m_lutRows);
+    m_shaderProgram.setUniformValue("seg_layers", m_segLayers);
+    m_shaderProgram.setUniformValue("level_shift", m_levelShift);
+    m_shaderProgram.setUniformValue("streaming", m_streaming);
     glActiveTexture(GL_TEXTURE0);
     m_shaderProgram.setUniformValue("viewport_size",
                                     QVector2D(width() * devicePixelRatioF(),
@@ -502,8 +509,33 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue(
         "frame_to_native", skyframe::rotation(displayFrame(), m_mapFrame));
 
+    m_shaderProgram.setUniformValue("out_alpha", 1.0f);
+    const float fade = projectionFade();
     m_vao.bind();
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    if (fade < 1.0f)
+    {
+        // The old projection, opaque, then the new one fading in over it
+        m_shaderProgram.setUniformValue("projection_type",
+                                        static_cast<int>(m_prevProjection));
+        m_shaderProgram.setUniformValue("view_scale",
+                                        viewScale(m_prevProjection));
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        m_shaderProgram.setUniformValue("projection_type",
+                                        static_cast<int>(m_projection));
+        m_shaderProgram.setUniformValue("view_scale", viewScale());
+        m_shaderProgram.setUniformValue("out_alpha", fade);
+        glEnable(GL_BLEND);
+        // Keep the framebuffer's alpha at 1: the widget composites it
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO,
+                            GL_ONE);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glDisable(GL_BLEND);
+        m_shaderProgram.setUniformValue("out_alpha", 1.0f);
+        QTimer::singleShot(0, this, [this]() { update(); });
+    }
+    else
+        glDrawArrays(GL_TRIANGLES, 0, 6);
     m_vao.release();
 
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
@@ -530,14 +562,7 @@ OpenGLWidget::paintGL()
         m_shaderProgram.setUniformValue("graticule_enabled", false);
         m_shaderProgram.setUniformValue("view_scale", QVector2D(1.0f, 1.0f));
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTexture);
-        for (int g = 0; g < 4; ++g)
-        {
-            glActiveTexture(GL_TEXTURE1 + g);
-            glBindTexture(GL_TEXTURE_2D_ARRAY, m_maskTextures[g]);
-        }
-        glActiveTexture(GL_TEXTURE0);
+        bindDataTextures(false);
 
         m_vao.bind();
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -581,7 +606,7 @@ OpenGLWidget::paintGL()
         p.drawRect(minimapRect.adjusted(0, 0, -1, -1));
     }
 
-    if (m_graticuleEnabled)
+    if (m_graticuleEnabled && !m_projectionFading)
         paintGraticuleLabels(p);
 
     if (m_isRegionSelecting)
@@ -897,67 +922,182 @@ OpenGLWidget::uploadColormapLut()
 
 // The texel of face f at (x, y) holds map pixel xyf2pix(x, y, f), so the GPU
 // never deals with pixel numbers: it finds (x, y, f) from the direction and
-// reads that texel, whatever the map's ordering. Calls put(texel, pixel) for
-// every texel of `face` (row-major, nside wide), in parallel.
+// reads that texel, whatever the map's ordering. The texture may be a coarser
+// level (texNside < nside): each texel then stands for a block of
+// (nside / texNside)^2 pixels. Calls put(texel, pixels, count) for every
+// texel of `face` (row-major, texNside wide), in parallel.
 template <class Put>
 static void
-gatherFace(const Healpix_Base &base, int face, Put put)
+gatherFace(const Healpix_Base &base, int face, int texNside, Put put)
 {
-    const int ns = base.Nside();
-    parallel::forRange(ns, [&](long y0, long y1) {
+    const int r = base.Nside() / texNside;
+    parallel::forRange(texNside, [&](long y0, long y1) {
+        std::vector<int> pix(size_t(r) * r);
         for (long y = y0; y < y1; ++y)
-            for (int x = 0; x < ns; ++x)
-                put(size_t(y) * ns + x, base.xyf2pix(x, int(y), face));
+            for (int x = 0; x < texNside; ++x)
+            {
+                int n = 0;
+                for (int dy = 0; dy < r; ++dy)
+                    for (int dx = 0; dx < r; ++dx)
+                        pix[size_t(n++)]
+                            = base.xyf2pix(x * r + dx, int(y) * r + dy, face);
+                put(size_t(y) * texNside + x, pix.data(), n);
+            }
     });
+}
+
+void
+OpenGLWidget::deleteMapTextures()
+{
+    glDeleteTextures(int(m_mapTextures.size()), m_mapTextures.data());
+    m_mapTextures.fill(0);
+}
+
+void
+OpenGLWidget::deleteMaskTextures()
+{
+    glDeleteTextures(int(m_maskTextures.size()), m_maskTextures.data());
+    m_maskTextures.fill(0);
+}
+
+void
+OpenGLWidget::bindDataTextures(bool setSamplers)
+{
+    const int segs = 12 / m_segLayers;
+    auto setUnit   = [&](const QByteArray &name, int unit) {
+        if (setSamplers)
+            m_shaderProgram.setUniformValue(name.constData(), unit);
+    };
+    // Samplers of unused segments point at the first segment's unit (same
+    // sampler type, never read), which frees units for the tile textures
+    for (int k = 0; k < kMaxSegments; ++k)
+    {
+        glActiveTexture(GL_TEXTURE0 + k);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTextures[k]);
+        setUnit("mapTexture" + QByteArray::number(k), k < segs ? k : 0);
+    }
+    for (int g = 0; g < 4; ++g)
+        for (int k = 0; k < kMaxSegments; ++k)
+        {
+            const int unit = kMaxSegments + g * kMaxSegments + k;
+            glActiveTexture(GL_TEXTURE0 + unit);
+            glBindTexture(GL_TEXTURE_2D_ARRAY,
+                          m_maskTextures[g * kMaxSegments + k]);
+            setUnit("maskTex" + QByteArray::number(g) + "_"
+                        + QByteArray::number(k),
+                    k < segs ? unit : kMaxSegments + g * kMaxSegments);
+        }
+    // The tile textures take the units of the map segments 1 and 2, which a
+    // streamed (coarse, single segment) map does not use. Without streaming
+    // the tile samplers just alias unit 0 and are never read.
+    const bool tiles = m_streaming && m_tiles && m_tiles->atlas();
+    if (tiles)
+    {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_tiles->atlas());
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, m_tiles->pages());
+    }
+    setUnit("tileAtlas", tiles ? 1 : 0);
+    setUnit("tilePages", tiles ? 2 : 0);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+bool
+OpenGLWidget::allocSegment(GLuint &tex, GLenum internalFormat, GLenum format,
+                           GLenum type)
+{
+    const int ns = int(m_texNside);
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+    glGetError(); // clear
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, ns, ns, m_segLayers,
+                 0, format, type, nullptr);
+    if (const GLenum e = glGetError(); e != GL_NO_ERROR)
+    {
+        std::cerr << "[GL] allocating a " << ns << "x" << ns << "x"
+                  << m_segLayers << " texture failed, error 0x" << std::hex << e
+                  << std::dec << std::endl;
+        glDeleteTextures(1, &tex);
+        tex = 0;
+        return false;
+    }
+    // NEAREST keeps crisp pixel edges
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    return true;
+}
+
+// The face layers are spread over textures of at most 1 GiB: some drivers
+// (Mesa on Intel) refuse larger single textures even with plenty of memory.
+static int
+segmentLayers(int nside)
+{
+    constexpr size_t kMaxBytes = size_t(1) << 30;
+    for (int layers : {12, 6, 4, 3, 2, 1})
+        if (size_t(layers) * nside * nside * 4 <= kMaxBytes)
+            return layers;
+    return 1;
 }
 
 void
 OpenGLWidget::uploadMaskToGPU()
 {
     makeCurrent();
-    glDeleteTextures(int(m_maskTextures.size()), m_maskTextures.data());
-    m_maskTextures.fill(0);
+    deleteMaskTextures();
     m_maskDirty = false;
 
     if (m_masks.empty())
         return;
 
-    const int ns = int(m_nside);
-    const Healpix_Base base(ns, m_pixelOrdering == PixelOrdering::NESTED ? NEST
-                                                                         : RING,
+    // With streaming the masks are only kept at the coarse level
+    const int ns = int(m_texNside);
+    const Healpix_Base base(int(m_nside),
+                            m_pixelOrdering == PixelOrdering::NESTED ? NEST
+                                                                     : RING,
                             SET_NSIDE);
     std::vector<uint8_t> buf(size_t(ns) * ns * 4);
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     for (size_t g = 0; g * 4 < m_masks.size(); ++g)
-    {
-        glGenTextures(1, &m_maskTextures[g]);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, m_maskTextures[g]);
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, ns, ns, 12, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, nullptr);
-
-        for (int face = 0; face < 12; ++face)
+        for (int seg = 0; seg < 12 / m_segLayers; ++seg)
         {
-            // Unused channels stay 255 (keep)
-            gatherFace(base, face, [&](size_t texel, int pix) {
-                for (size_t c = 0; c < 4; ++c)
-                {
-                    const size_t m = g * 4 + c;
-                    buf[texel * 4 + c]
-                        = m < m_masks.size() ? m_masks[m].data[size_t(pix)]
-                                             : uint8_t(255);
-                }
-            });
-            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, face, ns, ns, 1,
-                            GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+            GLuint &tex = m_maskTextures[g * kMaxSegments + seg];
+            if (!allocSegment(tex, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE))
+            {
+                deleteMaskTextures();
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+                QMessageBox::warning(this, "Out of GPU memory",
+                                     "The masks do not fit in video memory.");
+                return;
+            }
+            for (int l = 0; l < m_segLayers; ++l)
+            {
+                gatherFace(
+                    base, seg * m_segLayers + l, ns,
+                    [&](size_t texel, const int *pix, int n) {
+                        for (size_t c = 0; c < 4; ++c)
+                        {
+                            // Unused channels stay 255 (keep)
+                            const size_t m = g * 4 + c;
+                            if (m >= m_masks.size())
+                            {
+                                buf[texel * 4 + c] = 255;
+                                continue;
+                            }
+                            const std::vector<uint8_t> &d = m_masks[m].data;
+                            int sum                       = 0;
+                            for (int i = 0; i < n; ++i)
+                                sum += d[size_t(pix[i])];
+                            buf[texel * 4 + c] = uint8_t((sum + n / 2) / n);
+                        }
+                    });
+                glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, l, ns, ns, 1,
+                                GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+            }
         }
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,
-                        GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,
-                        GL_CLAMP_TO_EDGE);
-    }
     // Restore the default: Qt's text renderer relies on it
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
@@ -977,68 +1117,208 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
     }
 
     makeCurrent();
+    deleteMapTextures();
+    if (m_tiles)
+        m_tiles->destroy();
+    m_tiles.reset();
 
-    if (m_mapTexture)
+    // Streaming: keep a coarse level (at most nside 2048, and not above the
+    // user's limit) resident, and the rest as tiles on demand
+    const int ns   = int(m_nside);
+    m_streaming    = false;
+    m_levelShift   = 0;
+    if (ns > m_streamNside && TileCache::supports(ns))
     {
-        glDeleteTextures(1, &m_mapTexture);
-        m_mapTexture = 0;
+        const int limit = std::min(m_streamNside, 2048);
+        while ((ns >> m_levelShift) > limit)
+            ++m_levelShift;
+        m_levelShift = std::max(m_levelShift, 1);
     }
+    m_texNside = ns >> m_levelShift;
 
-    const int ns = int(m_nside);
     GLint maxSize = 0;
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
-    if (ns > maxSize)
+    if (m_texNside > maxSize)
     {
+        std::cerr << "[GL] nside " << m_texNside
+                  << " exceeds GL_MAX_TEXTURE_SIZE " << maxSize << std::endl;
         QMessageBox::warning(
             this, "Map too large",
             QString("nside %1 needs %1x%1 textures, but this GPU supports "
-                    "at most %2.")
-                .arg(ns)
+                    "at most %2. Lower the streaming limit in the settings.")
+                .arg(m_texNside)
                 .arg(maxSize));
         return;
     }
 
-    glGenTextures(1, &m_mapTexture);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, m_mapTexture);
-
-    // One nside x nside layer per base face
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glGetError(); // clear
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R32F, ns, ns, 12, 0, GL_RED,
-                 GL_FLOAT, nullptr);
-    if (glGetError() == GL_OUT_OF_MEMORY)
-    {
-        glDeleteTextures(1, &m_mapTexture);
-        m_mapTexture = 0;
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        QMessageBox::warning(this, "Out of GPU memory",
-                             QString("nside %1 needs %2 MB of video memory.")
-                                 .arg(ns)
-                                 .arg(12.0 * ns * ns * 4 / 1048576.0, 0, 'f',
-                                      0));
-        return;
-    }
-
+    const int tex = int(m_texNside);
+    m_segLayers   = segmentLayers(tex);
     const Healpix_Base base(ns, map.Scheme(), SET_NSIDE);
-    std::vector<float> buf(size_t(ns) * ns); // one face at a time
-    for (int face = 0; face < 12; ++face)
+    std::vector<float> buf(size_t(tex) * tex); // one face at a time
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for (int seg = 0; seg < 12 / m_segLayers; ++seg)
     {
-        gatherFace(base, face, [&](size_t texel, int pix) {
-            buf[texel] = mapDataPtr[pix];
-        });
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, face, ns, ns, 1, GL_RED,
-                        GL_FLOAT, buf.data());
+        if (!allocSegment(m_mapTextures[seg], GL_R32F, GL_RED, GL_FLOAT))
+        {
+            deleteMapTextures();
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            QMessageBox::warning(
+                this, "Out of GPU memory",
+                QString("nside %1 needs %2 MB of video memory. Lower the "
+                        "streaming limit in the settings.")
+                    .arg(tex)
+                    .arg(12.0 * tex * tex * 4 / 1048576.0, 0, 'f', 0));
+            return;
+        }
+        for (int l = 0; l < m_segLayers; ++l)
+        {
+            gatherFace(base, seg * m_segLayers + l, tex,
+                       [&](size_t texel, const int *pix, int n) {
+                           if (n == 1)
+                           {
+                               buf[texel] = mapDataPtr[pix[0]];
+                               return;
+                           }
+                           // Average of the valid pixels of the block
+                           double sum = 0.0;
+                           int valid  = 0;
+                           for (int i = 0; i < n; ++i)
+                           {
+                               const float v = mapDataPtr[pix[i]];
+                               if (v > -1.0e30f && std::isfinite(v))
+                               {
+                                   sum += v;
+                                   ++valid;
+                               }
+                           }
+                           buf[texel] = valid ? float(sum / valid)
+                                              : -1.6375e30f; // UNSEEN
+                       });
+            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, l, tex, tex, 1,
+                            GL_RED, GL_FLOAT, buf.data());
+        }
     }
     // Restore the default: Qt's text renderer relies on it
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-
-    // NEAREST keeps crisp pixel edges
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
+    if (const GLenum e = glGetError(); e != GL_NO_ERROR)
+        std::cerr << "[GL] uploading the map failed, error 0x" << std::hex << e
+                  << std::dec << std::endl;
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+
+    if (m_levelShift > 0)
+    {
+        m_tiles = std::make_unique<TileCache>();
+        // 256 tiles = 256 MB; fewer if the GPU cannot spare that
+        if (m_tiles->create(ns, 256))
+            m_streaming = true;
+        else
+        {
+            m_tiles.reset();
+            std::cerr << "[GL] tile streaming unavailable; showing the "
+                         "nside "
+                      << m_texNside << " version" << std::endl;
+        }
+    }
+}
+
+static QVector3D
+directionFromAngles(double colat, double phi);
+static void
+anglesFromDirection(const QVector3D &v, double &colat, double &phi);
+
+// The sky direction (in the map's frame) shown at a widget position; the
+// same mapping as the fragment shader. False outside the projection.
+static bool
+mapDirectionAt(const QVector2D &plane, Projection projection, bool outside,
+               const QQuaternion &rotation, const QGenericMatrix<3, 3, float> &toMap,
+               QVector3D &dir)
+{
+    double colat, phi;
+    if (!projectionmath::inverse(projection, plane, colat, phi, outside))
+        return false;
+    const QVector3D shown = rotation.rotatedVector(directionFromAngles(colat, phi));
+    dir = skyframe::apply(toMap, shown);
+    return true;
+}
+
+std::vector<int>
+OpenGLWidget::visibleTiles() const
+{
+    // Sample the view on a grid. Where a screen pixel covers less sky than a
+    // texel of the coarse map, the coarse map is blocky and the full-resolution
+    // tile under the sample is wanted.
+    constexpr int kGrid = 96;
+    const int t         = m_tiles->tilesPerSide();
+    const double coarse = std::sqrt(4.0 * M_PI / 12.0) / double(m_texNside);
+    const auto toMap
+        = skyframe::rotation(displayFrame(), m_mapFrame);
+    const Healpix_Base base(int(m_nside), m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING,
+                            SET_NSIDE);
+
+    const double stepX = double(width()) / (kGrid - 1);
+    const double stepY = double(height()) / (kGrid - 1);
+    const QPointF centre(width() / 2.0, height() / 2.0);
+
+    std::vector<QVector3D> dirs(size_t(kGrid) * kGrid);
+    std::vector<char> ok(size_t(kGrid) * kGrid, 0);
+    for (int j = 0; j < kGrid; ++j)
+        for (int i = 0; i < kGrid; ++i)
+        {
+            const QVector2D p
+                = toNdc(QPointF(i * stepX, j * stepY)) / m_camera->zoom
+                  + m_camera->panOffset;
+            const size_t k = size_t(j) * kGrid + i;
+            ok[k] = mapDirectionAt(p, m_projection, m_viewOutside, m_rotation,
+                                   toMap, dirs[k]);
+        }
+
+    std::unordered_map<int, double> nearest; // tile -> distance from centre
+    for (int j = 0; j < kGrid; ++j)
+        for (int i = 0; i + 1 < kGrid; ++i)
+        {
+            const size_t k = size_t(j) * kGrid + i;
+            if (!ok[k] || !ok[k + 1])
+                continue;
+            const double dot = std::clamp(
+                double(QVector3D::dotProduct(dirs[k], dirs[k + 1])), -1.0, 1.0);
+            const double perPixel = std::acos(dot) / stepX;
+            if (perPixel >= coarse)
+                continue; // the coarse map is as fine as the screen
+            double colat, phi;
+            anglesFromDirection(dirs[k], colat, phi);
+            int ix, iy, face;
+            base.pix2xyf(base.ang2pix(pointing(colat, phi)), ix, iy, face);
+            const int key = TileCache::key(face, ix / TileCache::kTileSize,
+                                           iy / TileCache::kTileSize, t);
+            const double d = std::hypot(i * stepX - centre.x(),
+                                        j * stepY - centre.y());
+            auto [it, inserted] = nearest.try_emplace(key, d);
+            if (!inserted)
+                it->second = std::min(it->second, d);
+        }
+
+    std::vector<std::pair<double, int>> order;
+    order.reserve(nearest.size());
+    for (const auto &[key, d] : nearest)
+        order.emplace_back(d, key);
+    std::sort(order.begin(), order.end());
+    std::vector<int> wanted;
+    for (size_t i = 0; i < order.size() && int(i) < m_tiles->capacity(); ++i)
+        wanted.push_back(order[i].second);
+    return wanted;
+}
+
+void
+OpenGLWidget::updateTiles()
+{
+    if (!m_tiles || m_pendingMap.Npix() == 0)
+        return;
+    // A few tiles per frame keep the view responsive; more follow
+    const bool more
+        = m_tiles->update(m_pendingMap, visibleTiles(), 6);
+    if (more)
+        QTimer::singleShot(0, this, [this]() { update(); });
 }
 
 // Call this inside initializeGL() after initializeOpenGLFunctions():
@@ -1154,13 +1434,13 @@ OpenGLWidget::toNdc(const QPointF &pos) const
 }
 
 QVector2D
-OpenGLWidget::viewScale() const
+OpenGLWidget::viewScale(Projection projection) const
 {
     // Largest box with the projection's aspect (2:1, or 1:1 for the disks)
     // that fits inside the window minus the padding, centered. Window NDC
     // divided by the box's share of the window gives map NDC in [-1, 1]
     // inside the box.
-    const float aspect = float(projectionmath::aspect(m_projection));
+    const float aspect = float(projectionmath::aspect(projection));
     const float w      = float(std::max(width(), 1));
     const float h      = float(std::max(height(), 1));
     const float pad    = float(kMapPadding);
@@ -1868,9 +2148,34 @@ OpenGLWidget::setGraticuleColor(const QColor &color)
     update();
 }
 
+float
+OpenGLWidget::projectionFade()
+{
+    if (!m_projectionFading)
+        return 1.0f;
+    constexpr double kDurationMs = 300.0;
+    const double t = m_projectionClock.elapsed() / kDurationMs;
+    if (t >= 1.0)
+    {
+        m_projectionFading = false;
+        return 1.0f;
+    }
+    return float(t * t * (3.0 - 2.0 * t)); // smoothstep
+}
+
 void
 OpenGLWidget::setProjection(Projection projection)
 {
+    // Fade from the old picture to the new one, if there is one to show. The
+    // rest of the widget (labels, cursor, minimap) switches at once.
+    if (m_animateProjection && projection != m_projection && m_nside > 0
+        && isVisible())
+    {
+        m_prevProjection   = m_projectionFading ? m_prevProjection
+                                                : m_projection;
+        m_projectionFading = true;
+        m_projectionClock.start();
+    }
     m_projection = projection;
     if (!globeAnimates())
         stopGlobeAnimation();

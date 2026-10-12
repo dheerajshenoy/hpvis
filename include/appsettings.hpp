@@ -15,6 +15,9 @@ struct AppSettings
     bool rememberLastDir = true; // file dialogs start in the last used folder
     bool showToolbar     = true;
     bool showStatusBar   = true;
+    // Maps with a larger nside are streamed (coarse map + visible tiles)
+    // instead of being kept on the GPU in full
+    int streamingNside   = 4096;
 
     // New maps
     Colormap colormap       = Colormap::VIRIDIS;
@@ -39,6 +42,7 @@ struct AppSettings
     QColor plotForeground   = QColor(0xe6, 0xe6, 0xe6);
     QColor plotLine         = QColor(0x7f, 0xd1, 0xff);
     bool animateOrthoGlobe  = true; // orthographic globe rotation animation
+    bool animateProjection  = true; // fade between projections
 
     bool operator==(const AppSettings &) const = default;
 

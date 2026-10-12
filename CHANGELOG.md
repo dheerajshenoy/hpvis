@@ -22,7 +22,18 @@ First development release.
   ordering-specific code, and `nside` up to 8192 is accepted (limited by the
   GPU's maximum texture size). nside 8192 needs 3.2 GB of video memory; if the
   GPU cannot allocate it, a message is shown instead of loading the map.
-  Masks use the same layout.
+  Masks use the same layout. The faces are spread over several textures of at
+  most 1 GiB each, because some drivers (Mesa on Intel) refuse a single larger
+  texture even when there is plenty of memory.
+- Streaming for large maps: maps with an nside above a limit (Settings >
+  General > Large maps, default 4096) keep only a coarse copy (at most nside
+  2048, averaged from the full map) on the GPU, and the full-resolution tiles
+  (512 x 512 texels) that are on screen are loaded on demand into a 256 MB
+  atlas, found by the shader through a page table. Video memory use no longer
+  depends on nside, so nside 8192 works on GPUs with little memory. Tiles are
+  only loaded where a screen pixel covers less sky than a coarse texel, and
+  load a few per frame, falling back to the coarse map until they arrive.
+  Masks are shown at the coarse resolution while streaming.
 - Pixels marked `UNSEEN` (and NaN/Inf) are drawn in a configurable color.
 - Shaders are split into small files (`common`, `colormaps`, `healpix`,
   `projections`, `scale`, `masks`), assembled with an
@@ -50,7 +61,10 @@ First development release.
 - Configurable background color (outside the ellipse) and unseen-pixel color.
 
 ### Navigation
-- Zoom (1x to 50x) and pan, always zooming toward the cursor.
+- Switching projection fades from the old picture to the new one (300 ms); it
+  can be turned off in Settings > Appearance > Animation.
+- Zoom (1x to 1000x, i.e. up to 100000%) and pan, always zooming toward the
+  cursor.
 - Interactive sky rotation: Ctrl + left-drag or middle-drag in any projection
   (plain left-drag in the Orthographic and Azimuthal views) grabs the sky
   point under the cursor and keeps it there. Double-click or Reset View

@@ -26,7 +26,7 @@ void main() {
     if (colorbar_enabled) {
         if (px.x > bar_left && px.x < bar_right && px.y > bar_y0 && px.y < bar_y1) {
             float t = (px.x - bar_left) / bar_w;   // 0 at the left end, 1 at the right
-            FragColor = vec4(applyColormap(t, colormap, invert_colormap), 1.0);
+            FragColor = vec4(applyColormap(t, colormap, invert_colormap), out_alpha);
             return;
         }
     }
@@ -44,7 +44,7 @@ void main() {
             float shadow = 0.45 * exp(-(r - 1.0) * 12.0);
             outside = mix(bg_color, vec3(0.0), shadow);
         }
-        FragColor = vec4(outside, 1.0);
+        FragColor = vec4(outside, out_alpha);
         return;
     }
 
@@ -64,8 +64,20 @@ void main() {
     float nphi   = mod(atan(ndir.y, ndir.x), 2.0 * PI);
 
     // One texel per pixel, one array layer per base face
-    ivec3 texel  = ang2xyf(nside, ncolat, nphi);
-    float mapVal = texelFetch(mapTexture, texel, 0).r;
+    ivec3 texel = ang2xyf(nside, ncolat, nphi);
+    // The resident textures may hold a coarser level
+    ivec3 rt    = ivec3(texel.xy >> level_shift, texel.z);
+    int seg     = rt.z / seg_layers;
+    ivec3 tc    = ivec3(rt.xy, rt.z - seg * seg_layers);
+    float mapVal = (seg == 0) ? texelFetch(mapTexture0, tc, 0).r
+                 : (seg == 1) ? texelFetch(mapTexture1, tc, 0).r
+                              : texelFetch(mapTexture2, tc, 0).r;
+    if (streaming) {
+        // 512 = TileCache::kTileSize
+        float layer = texelFetch(tilePages, ivec3(texel.xy >> 9, texel.z), 0).r;
+        if (layer >= 0.0)
+            mapVal = texelFetch(tileAtlas, ivec3(texel.xy & 511, int(layer)), 0).r;
+    }
 
     vec3 color;
 
@@ -78,10 +90,10 @@ void main() {
         if (mask_bits != 0) {
             // Product of the enabled masks: 1 = keep, 0 = masked
             float keep = 1.0;
-            if ((mask_bits & 0x000F) != 0) keep *= maskProduct(maskTex0, texel, mask_bits, mask_invert_bits);
-            if ((mask_bits & 0x00F0) != 0) keep *= maskProduct(maskTex1, texel, mask_bits >> 4, mask_invert_bits >> 4);
-            if ((mask_bits & 0x0F00) != 0) keep *= maskProduct(maskTex2, texel, mask_bits >> 8, mask_invert_bits >> 8);
-            if ((mask_bits & 0xF000) != 0) keep *= maskProduct(maskTex3, texel, mask_bits >> 12, mask_invert_bits >> 12);
+            if ((mask_bits & 0x000F) != 0) keep *= maskProduct(fetchMask0(rt), mask_bits, mask_invert_bits);
+            if ((mask_bits & 0x00F0) != 0) keep *= maskProduct(fetchMask1(rt), mask_bits >> 4, mask_invert_bits >> 4);
+            if ((mask_bits & 0x0F00) != 0) keep *= maskProduct(fetchMask2(rt), mask_bits >> 8, mask_invert_bits >> 8);
+            if ((mask_bits & 0xF000) != 0) keep *= maskProduct(fetchMask3(rt), mask_bits >> 12, mask_invert_bits >> 12);
 
             if (mask_mode == 0)
                 color = (keep < 0.5) ? unseen_color : color;
@@ -101,5 +113,5 @@ void main() {
         color = mix(color, graticule_color.rgb,
                     graticule_color.a * graticule(colat, phi));
 
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(color, out_alpha);
 }

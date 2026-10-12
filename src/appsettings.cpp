@@ -21,6 +21,10 @@ AppSettings::load()
     a.showStatusBar
         = s.value("general/showStatusBar", d.showStatusBar).toBool();
 
+    a.streamingNside
+        = std::clamp(s.value("general/streamingNside", d.streamingNside).toInt(),
+                     512, 8192);
+
     const int ori     = s.value("view/orientation", int(d.orientation)).toInt();
     a.orientation     = (ori >= 0 && ori <= int(Orientation::Equatorial))
                             ? Orientation(ori)
@@ -76,6 +80,8 @@ AppSettings::load()
     a.plotLine       = color("plot/line", d.plotLine);
     a.animateOrthoGlobe
         = s.value("view/animateOrthoGlobe", d.animateOrthoGlobe).toBool();
+    a.animateProjection
+        = s.value("view/animateProjection", d.animateProjection).toBool();
     return a;
 }
 
@@ -87,6 +93,7 @@ AppSettings::save() const
     s.setValue("general/rememberLastDir", rememberLastDir);
     s.setValue("general/showToolbar", showToolbar);
     s.setValue("general/showStatusBar", showStatusBar);
+    s.setValue("general/streamingNside", streamingNside);
 
     s.setValue("view/projection", int(projection));
     s.setValue("view/fromOutside", viewFromOutside);
@@ -109,6 +116,7 @@ AppSettings::save() const
     s.setValue("view/globeShadow", globeShadow);
     s.setValue("view/limbDarkening", limbDarkening);
     s.setValue("view/animateOrthoGlobe", animateOrthoGlobe);
+    s.setValue("view/animateProjection", animateProjection);
     s.setValue("plot/background", plotBackground.name());
     s.setValue("plot/foreground", plotForeground.name());
     s.setValue("plot/line", plotLine.name());

@@ -1,7 +1,7 @@
 # TODO
 
 ## Rendering
-- [ ] Tiled rendering for large maps (nside > 2048)
+- [x] Tiled rendering for large maps (streaming above a configurable nside)
 - [ ] Smooth/bilinear interpolation option
 - [ ] HDR
 

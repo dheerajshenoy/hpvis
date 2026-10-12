@@ -6,6 +6,7 @@
 #include "pixelordering.hpp"
 #include "projection.hpp"
 #include "skyframe.hpp"
+#include "tilecache.hpp"
 
 #include <QElapsedTimer>
 #include <QOpenGLBuffer>
@@ -18,6 +19,7 @@
 #include <array>
 #include <cstdint>
 #include <healpix_map.h>
+#include <memory>
 #include <qobject.h>
 #include <vector>
 
@@ -40,6 +42,10 @@ public:
     }
 
     void setPixelOrdering(PixelOrdering ordering);
+    // Maps with a larger nside are streamed: a coarse copy stays on the GPU
+    // and only the full-resolution tiles on screen are loaded. Applies to the
+    // open map too.
+    void setStreamingNside(int nside);
 
     void setProjection(Projection projection);
 
@@ -251,6 +257,11 @@ public:
     {
         return m_animateGlobe;
     }
+    // Fade from the old picture to the new one when the projection changes
+    void setAnimateProjection(bool enabled)
+    {
+        m_animateProjection = enabled;
+    }
     void setLimbDarkening(bool enabled);
     bool graticuleEnabled() const
     {
@@ -307,7 +318,11 @@ signals:
 
 private:
     QVector2D toNdc(const QPointF &pos) const;
-    QVector2D viewScale() const;
+    QVector2D viewScale() const { return viewScale(m_projection); }
+    QVector2D viewScale(Projection projection) const;
+    // 0..1 progress of the fade from the previous projection, or 1 when not
+    // animating (also ends the animation once it is over)
+    float projectionFade();
     bool projectToWindow(double latRad, double lonRad, QPointF &out) const;
     void setRotation(const QQuaternion &rotation);
     bool viewDirectionAt(const QPointF &pos, QVector3D &dir) const;
@@ -319,6 +334,19 @@ private:
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
+    // Streaming: the tiles on screen that are finer than the coarse map, most
+    // central first, and loading them
+    std::vector<int> visibleTiles() const;
+    void updateTiles();
+    // Creates one segment texture (nside x nside x m_segLayers) with nearest
+    // filtering; false (nothing left allocated) if the driver refuses
+    bool allocSegment(GLuint &tex, GLenum internalFormat, GLenum format,
+                      GLenum type);
+    void deleteMapTextures();
+    void deleteMaskTextures();
+    // Binds map and mask segments: map on units 0..2, mask set g segment k on
+    // 3 + 3 g + k, the colormap LUT on kLutUnit
+    void bindDataTextures(bool setSamplers);
     QQuaternion withoutRoll(const QQuaternion &q) const;
     bool globeAnimates() const;
     void stopGlobeAnimation();
@@ -341,7 +369,22 @@ private:
     ColormapScale m_colormapScale = ColormapScale::LINEAR;
     long m_nside                  = 0;
     long m_npix                   = 0;
-    GLuint m_mapTexture           = 0;
+    // The 12 face layers are split over up to kMaxSegments textures, each
+    // holding m_segLayers faces (a single texture is capped at about 1 GB by
+    // some drivers). Masks use the same split, 4 masks per set.
+    // Streaming (nside above m_streamNside): the textures hold a coarse map of
+    // m_texNside = nside >> m_levelShift and the tile cache the visible part
+    // of the full-resolution map. Without it m_texNside == nside.
+    int m_streamNside   = 4096;
+    long m_texNside     = 0;
+    int m_levelShift    = 0;
+    bool m_streaming    = false;
+    bool m_needsReupload = false; // m_streamNside changed
+    std::unique_ptr<TileCache> m_tiles;
+    static constexpr int kMaxSegments = 3;
+    static constexpr int kLutUnit     = 3 + 4 * kMaxSegments; // 15
+    std::array<GLuint, kMaxSegments> m_mapTextures{};
+    int m_segLayers = 12;
     float m_vmin                  = 0.0f;
     float m_vmax                  = 1.0f;
     float m_dataMin               = 0.0f;
@@ -381,7 +424,7 @@ private:
 
     std::vector<MaskEntry> m_masks;
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels
-    std::array<GLuint, 4> m_maskTextures{};
+    std::array<GLuint, 4 * kMaxSegments> m_maskTextures{}; // [set * 3 + seg]
     bool m_maskDirty               = false; // mask textures need re-uploading
     bool m_colorBarVisible         = true;
     int m_maskMode                 = 0;
@@ -399,6 +442,9 @@ private:
     double m_graticuleStepDeg           = 30.0;
     QColor m_graticuleColor             = QColor(255, 255, 255, 128);
     Projection m_projection             = Projection::MOLLWEIDE;
+    Projection m_prevProjection         = Projection::MOLLWEIDE;
+    bool m_projectionFading             = false;
+    QElapsedTimer m_projectionClock;
     bool m_isRotating                   = false;
     QVector3D m_rotateGrab;      // view-frame direction grabbed at drag start
     QQuaternion m_rotation;      // current rotation quaternion for 3D view
@@ -414,6 +460,7 @@ private:
         Glide
     };
     bool m_animateGlobe   = true;
+    bool m_animateProjection = true;
     GlobeAnim m_globeAnim = GlobeAnim::None;
     QTimer m_globeTimer;
     QElapsedTimer m_globeClock; // frame time while animating

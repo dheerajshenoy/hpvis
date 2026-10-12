@@ -62,6 +62,7 @@ private:
 
     // General
     QSpinBox *m_recentMaxSpin       = nullptr;
+    QComboBox *m_streamCombo        = nullptr;
     QCheckBox *m_rememberDirCheck   = nullptr;
     QCheckBox *m_showToolbarCheck   = nullptr;
     QCheckBox *m_showStatusBarCheck = nullptr;
@@ -92,6 +93,7 @@ private:
     QCheckBox *m_globeShadowCheck   = nullptr;
     QCheckBox *m_limbDarkeningCheck = nullptr;
     QCheckBox *m_animateCheck       = nullptr;
+    QCheckBox *m_animateProjectionCheck = nullptr;
     QColor m_background;
     QColor m_unseen;
 
