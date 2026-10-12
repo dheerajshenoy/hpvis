@@ -252,9 +252,15 @@ include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(FILES ${CMAKE_SOURCE_DIR}/docs/hpvis.1
-    DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-
-install(FILES ${CMAKE_SOURCE_DIR}/example_config.toml
-    DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
+# Install the vendored shared libraries next to the executable's prefix so the
+# installed binary can find them (build-tree RPATH is dropped on install).
+install(DIRECTORY ${HEALPIX_PREFIX}/lib/
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/hpvis
+    FILES_MATCHING PATTERN "libhealpix_cxx.so*" PATTERN "libsharp.so*")
+if(WITH_NAMASTER)
+    install(DIRECTORY ${NMT_PREFIX}/lib/
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/hpvis
+        FILES_MATCHING PATTERN "libnmt.so*")
+endif()
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/hpvis")
