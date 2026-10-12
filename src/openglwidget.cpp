@@ -675,6 +675,12 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("view_scale", viewScale());
     m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
     m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
+    m_shaderProgram.setUniformValue("cell_grid_enabled", m_cellGridEnabled);
+    m_shaderProgram.setUniformValue("cell_grid_nside", m_cellGridNside);
+    m_shaderProgram.setUniformValue(
+        "cell_grid_color",
+        QVector4D(m_cellGridColor.redF(), m_cellGridColor.greenF(),
+                  m_cellGridColor.blueF(), m_cellGridColor.alphaF()));
     m_shaderProgram.setUniformValue("globe_shadow", m_globeShadow);
     m_shaderProgram.setUniformValue("view_outside", m_viewOutside);
     m_shaderProgram.setUniformValue("limb_darkening", m_limbDarkening);
@@ -746,6 +752,7 @@ OpenGLWidget::paintGL()
                                         QVector2D(physW, physH));
         m_shaderProgram.setUniformValue("colorbar_enabled", false);
         m_shaderProgram.setUniformValue("graticule_enabled", false);
+        m_shaderProgram.setUniformValue("cell_grid_enabled", false);
         m_shaderProgram.setUniformValue("view_scale", QVector2D(1.0f, 1.0f));
 
         bindDataTextures(false);
@@ -2782,6 +2789,33 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
         if (projectToWindow(lat, meridian, at))
             draw(at - QPointF(4, 0), QString("%1°").arg(deg), true);
     }
+}
+
+void
+OpenGLWidget::setCellGridEnabled(bool enabled)
+{
+    m_cellGridEnabled = enabled;
+    update();
+}
+
+void
+OpenGLWidget::setCellGridNside(int nside)
+{
+    // The shader needs a power of two; take the nearest one
+    int n = 1;
+    while (n < 8192 && n * 2 <= nside)
+        n *= 2;
+    if (n < 8192 && nside - n > 2 * n - nside)
+        n *= 2;
+    m_cellGridNside = n;
+    update();
+}
+
+void
+OpenGLWidget::setCellGridColor(const QColor &color)
+{
+    m_cellGridColor = color;
+    update();
 }
 
 void

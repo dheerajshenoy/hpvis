@@ -53,6 +53,7 @@ private:
         std::optional<double> min, max;
         bool reverse   = false;
         bool graticule = false;
+        std::optional<int> pixelGrid;
         QStringList masks;
         QString exportPath;
     };
@@ -139,6 +140,7 @@ private:
     QAction *m_ringAction            = nullptr;
     QMenu *m_graticuleMenu           = nullptr;
     QAction *m_graticuleShowAction   = nullptr;
+    QAction *m_cellGridShowAction    = nullptr;
     QMenu *m_graticuleStepMenu       = nullptr;
     QAction *m_reverseColormapAction = nullptr;
     QAction *m_scaleLinearAction     = nullptr;

@@ -44,6 +44,37 @@ void graticuleDerivatives(vec2 uv, float colat, float phi,
     }
 }
 
+// Id of the pixel of cell_grid_nside at a point of the projection plane, in
+// the frame of the map; -1 outside the projection
+int cellGridId(vec2 uv) {
+    float colat, phi;
+    if (!skyAngles(uv, colat, phi))
+        return -1;
+    vec3 ndir = frame_to_native * vec3(sin(colat) * cos(phi),
+                                       sin(colat) * sin(phi), cos(colat));
+    float nc = atan(length(ndir.xy), ndir.z);
+    float np = mod(atan(ndir.y, ndir.x), 2.0 * PI);
+    ivec3 xyf = ang2xyf(cell_grid_nside, nc, np);
+    return (xyf.z * cell_grid_nside + xyf.y) * cell_grid_nside + xyf.x;
+}
+
+// 1 on the boundary between two pixels of the grid. Fades out when the pixels
+// get smaller than a few screen pixels, where the lines would only smear.
+float cellGrid(vec2 uv, float dLat) {
+    float cellSize = sqrt(PI / 3.0) / float(cell_grid_nside); // radians
+    float fade = smoothstep(2.0, 6.0, cellSize / max(dLat, 1.0e-9));
+    if (fade <= 0.0)
+        return 0.0;
+    vec2 step = view_scale / (zoom * viewport_size);
+    int c = cellGridId(uv);
+    if (c < 0)
+        return 0.0;
+    int r = cellGridId(uv + vec2(step.x, 0.0));
+    int u = cellGridId(uv + vec2(0.0, step.y));
+    bool edge = (r >= 0 && r != c) || (u >= 0 && u != c);
+    return edge ? fade : 0.0;
+}
+
 void main() {
     float colat, phi;
 
@@ -147,6 +178,13 @@ void main() {
         graticuleDerivatives(viewUV, colat, phi, dLat, dPhi);
         color = mix(color, graticule_color.rgb,
                     graticule_color.a * graticule(colat, phi, dLat, dPhi));
+    }
+
+    if (cell_grid_enabled) {
+        float dLat, dPhi;
+        graticuleDerivatives(viewUV, colat, phi, dLat, dPhi);
+        color = mix(color, cell_grid_color.rgb,
+                    cell_grid_color.a * cellGrid(viewUV, dLat));
     }
 
     FragColor = vec4(color, out_alpha);

@@ -73,6 +73,12 @@ addArguments(argparse::ArgumentParser &parser)
         .flag()
         .help("Show the coordinate grid");
 
+    parser.add_argument("--pixel-grid")
+        .metavar("NSIDE")
+        .scan<'i', int>()
+        .help("Overlay the boundaries of the HEALPix pixels of this nside "
+              "(rounded to a power of two)");
+
     parser.add_argument("--mask").metavar("FILE").append().help(
         "Mask file to apply (can be given more than once)");
 

@@ -282,6 +282,14 @@ public:
     void setGraticuleColor(const QColor &color);
     void setGraticuleEnabled(bool enabled);
     void setGraticuleStep(double degrees);
+    // Boundaries of the HEALPix pixels of `nside` (a power of two) as an
+    // overlay
+    void setCellGridEnabled(bool enabled);
+    void setCellGridNside(int nside);
+    void setCellGridColor(const QColor &color);
+    bool cellGridEnabled() const { return m_cellGridEnabled; }
+    int cellGridNside() const { return m_cellGridNside; }
+    QColor cellGridColor() const { return m_cellGridColor; }
     void setGlobeShadow(bool enabled);
 
     // The frame the map is stored in (FITS COORDSYS)
@@ -537,6 +545,9 @@ private:
     static constexpr int kMinimapH = 100;
     static constexpr int kMinimapMargin = 12;
     bool m_minimapEnabled               = false;
+    bool m_cellGridEnabled              = false;
+    int m_cellGridNside                 = 4;
+    QColor m_cellGridColor              = QColor(255, 220, 60, 200);
     bool m_graticuleEnabled             = false;
     bool m_globeShadow                  = true;
     bool m_viewOutside                  = false;

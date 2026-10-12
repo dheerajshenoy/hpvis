@@ -2,7 +2,13 @@ uniform bool  graticule_enabled;
 uniform float graticule_step;   // radians
 uniform vec4  graticule_color;  // rgba
 
-// 1 on a line, 0 away from it, antialiased over ~1.5 px. x is in units of
+// Pixel grid: the boundaries of the HEALPix pixels of cell_grid_nside (a power
+// of two; the NESTED hierarchy is the same grid at every level)
+uniform bool  cell_grid_enabled;
+uniform int   cell_grid_nside;
+uniform vec4  cell_grid_color;  // rgba
+
+// 1 on a line, 0 away from it, 0 away from it, antialiased over ~1.5 px. x is in units of
 // graticule steps, so lines sit at integers; w is the change of x per pixel.
 // Where the lines get closer than about 2 px (a projection's edge, near the
 // poles) they fade out instead of turning into a smear.

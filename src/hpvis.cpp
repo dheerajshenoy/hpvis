@@ -23,6 +23,7 @@
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QFileDialog>
+#include <QInputDialog>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QGraphicsView>
@@ -120,6 +121,7 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
     m_cli.max       = parser.present<double>("--max");
     m_cli.reverse   = parser.get<bool>("--reverse");
     m_cli.graticule = parser.get<bool>("--graticule");
+    m_cli.pixelGrid = parser.present<int>("--pixel-grid");
 
     if (parser.is_used("--mask"))
         for (const auto &m : parser.get<std::vector<std::string>>("--mask"))
@@ -172,6 +174,11 @@ HpVis::applyCliOptions(View *view)
         gl->setViewFromOutside(*m_cli.viewFromOutside);
     if (m_cli.graticule)
         gl->setGraticuleEnabled(true);
+    if (m_cli.pixelGrid)
+    {
+        gl->setCellGridNside(*m_cli.pixelGrid);
+        gl->setCellGridEnabled(true);
+    }
     if (m_cli.min)
         gl->setColormapMin(*m_cli.min);
     if (m_cli.max)
@@ -471,6 +478,41 @@ HpVis::initMenubar()
                                           this, "Select Graticule Color");
         if (c.isValid())
             m_view->glWidget()->setGraticuleColor(c);
+    });
+
+    // Pixel grid: the boundaries of the HEALPix pixels of any nside
+    QMenu *cellMenu     = m_viewMenu->addMenu("&Pixel Grid");
+    m_cellGridShowAction = cellMenu->addAction("&Show Pixel Grid");
+    m_cellGridShowAction->setCheckable(true);
+    connect(m_cellGridShowAction, &QAction::toggled, this, [this](bool on)
+    {
+        if (m_view)
+            m_view->glWidget()->setCellGridEnabled(on);
+    });
+    cellMenu->addAction("&Nside...", this, [this]()
+    {
+        if (!m_view)
+            return;
+        bool ok = false;
+        const int n = QInputDialog::getInt(
+            this, "Pixel Grid",
+            "Nside of the grid (rounded to a power of two, 1 - 8192):",
+            m_view->glWidget()->cellGridNside(), 1, 8192, 1, &ok);
+        if (!ok)
+            return;
+        m_view->glWidget()->setCellGridNside(n);
+        m_view->glWidget()->setCellGridEnabled(true);
+        m_cellGridShowAction->setChecked(true);
+    });
+    cellMenu->addAction("&Color...", this, [this]()
+    {
+        if (!m_view)
+            return;
+        const QColor c = QColorDialog::getColor(
+            m_view->glWidget()->cellGridColor(), this,
+            "Select Pixel Grid Color", QColorDialog::ShowAlphaChannel);
+        if (c.isValid())
+            m_view->glWidget()->setCellGridColor(c);
     });
 
     QMenu *customMenu = m_viewMenu->addMenu("Custom Colormaps");
@@ -794,6 +836,10 @@ HpVis::updateControlsFromView(const View *view)
                             * 100.0)));
     }
     m_graticuleShowAction->setChecked(gl->graticuleEnabled());
+    {
+        const QSignalBlocker block(m_cellGridShowAction);
+        m_cellGridShowAction->setChecked(gl->cellGridEnabled());
+    }
     m_reverseColormapAction->setChecked(gl->colormapInvert());
     m_toolBar->setColormap(gl->colormap());
 
