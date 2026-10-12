@@ -4,6 +4,14 @@ A fast, GPU-accelerated viewer for [HEALPix](https://healpix.sourceforge.io/)
 maps. The projection and the HEALPix pixel lookup run per pixel in a fragment
 shader, so large maps (nside 2048 and above) stay responsive.
 
+## Screenshots
+
+![Home](./images/home.png)
+
+![Orthographic](./images/orthographic.png)
+
+![Map Expression Evaluation](./images/experssion_engine.png)
+
 ## Features
 
 - Galactic, Ecliptic and Equatorial orientations (converted on the GPU from
@@ -23,6 +31,7 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Map statistics, a FITS header viewer, power spectrum (via NaMaster) and
   image export.
 - Settings dialog for the defaults of new maps.
+
 
 ## Building
 
@@ -142,5 +151,9 @@ synthetic maps at nside 32 up to 8192).
 
 Preferences are stored with `QSettings` (on Linux, under `~/.config`), and
 the recent files list under `~/.local/share/hpvis/`.
+
+## Caveats
+
+- Maximum nside is 2048 (for now).
 
 See [CHANGELOG.md](CHANGELOG.md) for the list of changes.
