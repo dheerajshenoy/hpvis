@@ -2,6 +2,8 @@
 
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
+#include "npyreader.hpp"
+#include "openglwidget.hpp"
 #include "healpix_cxx/healpix_map_fitsio.h"
 
 #include <QDateTime>
@@ -49,11 +51,17 @@ readColumn(const QString &path, int hdu, int column)
                               .arg(info.fileName())
                               .toStdString()
                               .c_str());
-    fitshandle file;
-    file.open(path.toStdString());
-    file.goto_hdu(hdu > 0 ? hdu : 2);
-    auto map = std::make_shared<Healpix_Map<float>>();
-    read_Healpix_map_from_fits(file, *map, column > 0 ? column : 1);
+    std::shared_ptr<Healpix_Map<float>> map;
+    if (isNpyPath(path.toStdString()))
+        map = readNpyMap(path.toStdString(), column, kMaxSupportedNside);
+    else
+    {
+        fitshandle file;
+        file.open(path.toStdString());
+        file.goto_hdu(hdu > 0 ? hdu : 2);
+        map = std::make_shared<Healpix_Map<float>>();
+        read_Healpix_map_from_fits(file, *map, column > 0 ? column : 1);
+    }
 
     MapPtr result = map;
     QMutexLocker lock(&g_cacheMutex);

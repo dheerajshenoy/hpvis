@@ -1,6 +1,8 @@
 #include "argparse.hpp"
 #include "fitsinfo.hpp"
 #include "hpvis.hpp"
+#include "npyreader.hpp"
+#include "openglwidget.hpp"
 
 #include <QApplication>
 #include <algorithm>
@@ -14,18 +16,18 @@ void
 addArguments(argparse::ArgumentParser &parser)
 {
     parser.add_argument("files").remaining().metavar("FILE").help(
-        "FITS file(s) to open");
+        "FITS or .npy file(s) to open");
 
     // Data selection (1-based, as shown in the toolbar)
     parser.add_argument("-H", "--hdu")
         .metavar("HDU")
         .scan<'i', int>()
-        .help("HDU to visualize (default: first map HDU)");
+        .help("HDU to visualize (default: first map HDU; .npy has only HDU 1)");
 
     parser.add_argument("-c", "--column")
         .metavar("COLUMN")
         .scan<'i', int>()
-        .help("Column to visualize (default: first column)");
+        .help("Column to visualize (default: first column; for a 2-D .npy, the row)");
 
     // Appearance
     parser.add_argument("-m", "--colormap")
@@ -88,6 +90,17 @@ addArguments(argparse::ArgumentParser &parser)
 static void
 printInfo(const QString &path)
 {
+    if (isNpyPath(path.toStdString()))
+    {
+        int count = 0;
+        const auto map
+            = readNpyMap(path.toStdString(), 0, kMaxSupportedNside, &count);
+        std::cout << path.toStdString() << ": 1 HDU(s), 1 with a map\n"
+                  << "  HDU 1\n";
+        for (int i = 1; i <= count; ++i)
+            std::cout << "    column " << i << ": row " << i - 1 << "\n";
+        return;
+    }
     fitshandle file;
     file.open(path.toStdString());
     const FitsInfo info = scanFits(file);
@@ -110,21 +123,32 @@ printInfo(const QString &path)
 static void
 printStats(const QString &path, int hdu, int column)
 {
-    fitshandle file;
-    file.open(path.toStdString());
-    const FitsInfo info = scanFits(file);
-    if (info.hdus.isEmpty())
-        throw std::runtime_error("no HEALPix map found in "
-                                 + path.toStdString());
-
-    if (hdu <= 0)
-        hdu = info.hdus.first().index;
-    if (column <= 0)
-        column = 1;
-    file.goto_hdu(hdu);
-
     Healpix_Map<float> map;
-    read_Healpix_map_from_fits(file, map, column);
+    if (isNpyPath(path.toStdString()))
+    {
+        if (hdu > 1)
+            throw std::runtime_error(".npy files have a single HDU");
+        hdu    = 1;
+        column = std::max(column, 1);
+        map    = std::move(
+            *readNpyMap(path.toStdString(), column, kMaxSupportedNside));
+    }
+    else
+    {
+        fitshandle file;
+        file.open(path.toStdString());
+        const FitsInfo info = scanFits(file);
+        if (info.hdus.isEmpty())
+            throw std::runtime_error("no HEALPix map found in "
+                                     + path.toStdString());
+
+        if (hdu <= 0)
+            hdu = info.hdus.first().index;
+        if (column <= 0)
+            column = 1;
+        file.goto_hdu(hdu);
+        read_Healpix_map_from_fits(file, map, column);
+    }
 
     double sum = 0, sum2 = 0, min = 0, max = 0;
     long n = 0;

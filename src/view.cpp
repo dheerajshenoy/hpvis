@@ -4,6 +4,8 @@
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
+#include "npyreader.hpp"
+#include "openglwidget.hpp"
 
 #include <QFileInfo>
 #include <QFutureWatcher>
@@ -39,6 +41,30 @@ struct LoadResult
     QString error;
 };
 } // namespace
+
+// A binary 0/1 map is a mask: show its 0 pixels as unseen
+static void
+markBinaryMaskUnseen(Healpix_Map<float> &map)
+{
+    float *d     = const_cast<float *>(map.Map().begin());
+    const long n = map.Npix();
+    bool binary  = true;
+    bool hasZero = false;
+    bool hasOne  = false;
+    for (long i = 0; i < n && binary; ++i)
+    {
+        if (d[i] == 0.0f)
+            hasZero = true;
+        else if (d[i] == 1.0f)
+            hasOne = true;
+        else if (std::isfinite(d[i]) && d[i] > -1e30f)
+            binary = false;
+    }
+    if (binary && hasZero && hasOne)
+        for (long i = 0; i < n; ++i)
+            if (d[i] == 0.0f)
+                d[i] = float(Healpix_undef);
+}
 
 // Reads the file on a worker thread; the (large) map is handed to the GL
 // widget on the GUI thread once it is done. hdu <= 0 means "scan the file and
@@ -84,6 +110,21 @@ View::startLoad(int hdu, int column, bool initial)
         LoadResult result;
         try
         {
+            if (isNpyPath(filename.toStdString()))
+            {
+                if (hdu > 1)
+                    throw PlanckError(
+                        ".npy files have a single HDU (use --hdu 1 or omit it)");
+                int count = 0;
+                auto map  = readNpyMap(filename.toStdString(), column,
+                                       kMaxSupportedNside, &count);
+                markBinaryMaskUnseen(*map);
+                result.map    = std::move(map);
+                result.hdu    = 0;
+                result.column = column <= 0 ? 1 : column;
+                return result;
+            }
+
             fitshandle file;
             file.open(filename.toStdString());
 
@@ -116,27 +157,7 @@ View::startLoad(int hdu, int column, bool initial)
             auto map = std::make_shared<Healpix_Map<float>>();
             read_Healpix_map_from_fits(file, *map, useCol);
 
-            // A binary 0/1 map is a mask: show its 0 pixels as unseen
-            {
-                float *d     = const_cast<float *>(map->Map().begin());
-                const long n = map->Npix();
-                bool binary  = true;
-                bool hasZero = false;
-                bool hasOne  = false;
-                for (long i = 0; i < n && binary; ++i)
-                {
-                    if (d[i] == 0.0f)
-                        hasZero = true;
-                    else if (d[i] == 1.0f)
-                        hasOne = true;
-                    else if (std::isfinite(d[i]) && d[i] > -1e30f)
-                        binary = false;
-                }
-                if (binary && hasZero && hasOne)
-                    for (long i = 0; i < n; ++i)
-                        if (d[i] == 0.0f)
-                            d[i] = float(Healpix_undef);
-            }
+            markBinaryMaskUnseen(*map);
             result.map    = std::move(map);
             result.hdu    = useHdu;
             result.column = useCol;

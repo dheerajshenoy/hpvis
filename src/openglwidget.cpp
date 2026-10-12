@@ -2,6 +2,7 @@
 
 #include "colormapregistry.hpp"
 #include "fitsinfo.hpp"
+#include "npyreader.hpp"
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
@@ -765,6 +766,10 @@ OpenGLWidget::addMaskFiles(const QStringList &files)
                 // Use the file's first HEALPix map HDU / column (masks have
                 // their own layout, independent of the map's selection)
                 Healpix_Map<float> mask;
+                if (isNpyPath(file.toStdString()))
+                    mask = std::move(
+                        *readNpyMap(file.toStdString(), 0, kMaxSupportedNside));
+                else
                 {
                     fitshandle fits;
                     fits.open(file.toStdString());

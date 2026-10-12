@@ -287,6 +287,12 @@ HpVis::initMenubar()
                 "with File > Save Map As... to make a FITS file.");
             return;
         }
+        if (m_view->filePath().endsWith(".npy", Qt::CaseInsensitive))
+        {
+            QMessageBox::information(this, "FITS Header",
+                                     ".npy files have no header.");
+            return;
+        }
         FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
         dialog.exec();
     });
@@ -579,7 +585,8 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column)
     {
         auto files = QFileDialog::getOpenFileNames(
             this, "Open FITS File", startDirectory(),
-            "FITS Files (*.fits *.fit *.fts);;All Files (*)");
+            "Map Files (*.fits *.fit *.fts *.npy);;FITS Files (*.fits *.fit *.fts);;"
+            "NumPy Files (*.npy);;All Files (*)");
 
         if (!files.isEmpty())
             rememberDirectory(files.first());
@@ -790,7 +797,8 @@ HpVis::rebuildMasksMenu(const View *view)
     QAction *add = m_masksMenu->addAction("&Add Mask...", this, [this]()
     {
         const auto files = QFileDialog::getOpenFileNames(
-            this, "Load Mask(s)", "", "FITS Files (*.fits);;All Files (*)");
+            this, "Load Mask(s)", "", "Mask Files (*.fits *.npy);;FITS Files (*.fits);;"
+            "NumPy Files (*.npy);;All Files (*)");
         if (!files.isEmpty())
             onMaskFilesSelected(files);
     });

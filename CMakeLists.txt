@@ -126,6 +126,7 @@ add_executable(${PROJECT_NAME}
     src/hpvis.cpp
     src/view.cpp
     src/fitsinfo.cpp
+    src/npyreader.cpp
     src/recentfiles.cpp
     src/projectionmath.cpp
     src/appsettings.cpp
@@ -152,6 +153,7 @@ add_executable(${PROJECT_NAME}
 
     resources.qrc
 
+    include/npyreader.hpp
     include/settingsdialog.hpp
     include/exportoptions.hpp
     include/view.hpp
