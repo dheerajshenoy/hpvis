@@ -8,7 +8,7 @@ shader, so large maps (nside 2048 and above) stay responsive.
 
 ![Home](./images/home.png)
 
-![Orthographic](./images/orthographic.png)
+![Orthographic](./images/orthographic_projection.png)
 
 ![Map Expression Evaluation](./images/experssion_engine.png)
 
