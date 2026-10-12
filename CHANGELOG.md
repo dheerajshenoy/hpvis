@@ -14,15 +14,21 @@ First development release.
 - Support for both RING and NESTED pixel ordering, selectable from
   View > Pixel Ordering.
 - Longitude increases to the left, matching healpy.
-- Pixel indices use integer math (`texelFetch`) so large `nside` values stay
-  exact.
-- The map is packed into a 2D texture, avoiding the 1D texture size limit.
+- Pixels are looked up with integer math (`texelFetch`) so large `nside`
+  values stay exact.
+- The map is stored as a 12-layer 2D array texture, one `nside` x `nside` layer
+  per HEALPix base face, for both RING and NESTED files. The shader finds the
+  face and (x, y) of a pixel directly, so it needs no pixel numbers or
+  ordering-specific code, and `nside` up to 8192 is accepted (limited by the
+  GPU's maximum texture size). nside 8192 needs 3.2 GB of video memory; if the
+  GPU cannot allocate it, a message is shown instead of loading the map.
+  Masks use the same layout.
 - Pixels marked `UNSEEN` (and NaN/Inf) are drawn in a configurable color.
-- Shaders are split into small files (`common`, `colormaps`, `healpix_ring`,
-  `healpix_nest`, `projections`, `scale`, `masks`), assembled with an
+- Shaders are split into small files (`common`, `colormaps`, `healpix`,
+  `projections`, `scale`, `masks`), assembled with an
   `#include` loader, and embedded in the binary as Qt resources.
 - Shader compile and link errors are printed to the console.
-- The map uploads to the GPU without an intermediate CPU copy, and happens
+- The map uploads to the GPU one face at a time, in parallel, and happens
   when a file is opened rather than the first time its tab is shown.
 
 ### Color
