@@ -12,5 +12,10 @@ float applyScale(float v) {
         const float k = 1000.0;
         return log(1.0 + k * u) / log(1.0 + k);
     }
-    return clamp((v - vmin) / (vmax - vmin), 0.0, 1.0);
+    float u = clamp((v - vmin) / (vmax - vmin), 0.0, 1.0);
+    if (colormap_scale == 2) {
+        // Linear near vmin, logarithmic for large values; defined for any range
+        return asinh(u / asinh_softening) / asinh(1.0 / asinh_softening);
+    }
+    return u;
 }

@@ -22,5 +22,6 @@ enum class Colormap
 enum class ColormapScale
 {
     LINEAR = 0,
-    LOG    = 1
+    LOG    = 1,
+    ASINH  = 2
 };

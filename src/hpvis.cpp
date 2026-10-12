@@ -26,6 +26,8 @@
 #include <QGraphicsView>
 #include <QInputDialog>
 #include <QLabel>
+#include <QSlider>
+#include <QWidgetAction>
 #include <QLocale>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -82,7 +84,9 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
 
     if (auto scale = parser.present<std::string>("--scale"))
         m_cli.scale
-            = (*scale == "log") ? ColormapScale::LOG : ColormapScale::LINEAR;
+            = (*scale == "log")     ? ColormapScale::LOG
+              : (*scale == "asinh") ? ColormapScale::ASINH
+                                    : ColormapScale::LINEAR;
 
     if (auto proj = parser.present<std::string>("--projection"))
     {
@@ -473,7 +477,9 @@ HpVis::initMenubar()
     auto *scaleGroup    = new QActionGroup(this);
     m_scaleLinearAction = scaleMenu->addAction("&Linear");
     m_scaleLogAction    = scaleMenu->addAction("L&ogarithmic");
-    for (QAction *a : {m_scaleLinearAction, m_scaleLogAction})
+    m_scaleAsinhAction  = scaleMenu->addAction("&Asinh");
+    for (QAction *a :
+         {m_scaleLinearAction, m_scaleLogAction, m_scaleAsinhAction})
     {
         a->setCheckable(true);
         scaleGroup->addAction(a);
@@ -483,6 +489,30 @@ HpVis::initMenubar()
             [this]() { onColormapScaleChanged(ColormapScale::LINEAR); });
     connect(m_scaleLogAction, &QAction::triggered, this,
             [this]() { onColormapScaleChanged(ColormapScale::LOG); });
+    connect(m_scaleAsinhAction, &QAction::triggered, this,
+            [this]() { onColormapScaleChanged(ColormapScale::ASINH); });
+
+    // Softening of the asinh scale: 10^-3 (log-like) .. 1 (nearly linear)
+    auto *softWidget = new QWidget();
+    auto *softLayout = new QHBoxLayout(softWidget);
+    softLayout->setContentsMargins(12, 2, 12, 2);
+    softLayout->addWidget(new QLabel("Asinh softening:"));
+    m_asinhSlider = new QSlider(Qt::Horizontal);
+    m_asinhSlider->setRange(0, 100);
+    m_asinhSlider->setValue(67); // ~0.1
+    m_asinhSlider->setMinimumWidth(140);
+    m_asinhSlider->setToolTip("Left: more logarithmic. Right: more linear.");
+    softLayout->addWidget(m_asinhSlider);
+    auto *softAction = new QWidgetAction(this);
+    softAction->setDefaultWidget(softWidget);
+    scaleMenu->addSeparator();
+    scaleMenu->addAction(softAction);
+    connect(m_asinhSlider, &QSlider::valueChanged, this, [this](int v)
+    {
+        if (m_view)
+            m_view->glWidget()->setAsinhSoftening(
+                std::pow(10.0, -3.0 + 3.0 * v / 100.0));
+    });
 
     m_viewMenu->addAction("Color Bar &Range...", this,
                           &HpVis::onColormapRangeActionTriggered);
@@ -736,9 +766,18 @@ HpVis::updateControlsFromView(const View *view)
     const OpenGLWidget *gl = view->glWidget();
     m_toolBar->setFitsInfo(view->fitsInfo(), view->hdu(), view->column());
     m_toolBar->setProjection(gl->projection());
-    (gl->colormapScale() == ColormapScale::LINEAR ? m_scaleLinearAction
-                                                  : m_scaleLogAction)
-        ->setChecked(true);
+    switch (gl->colormapScale())
+    {
+    case ColormapScale::LINEAR: m_scaleLinearAction->setChecked(true); break;
+    case ColormapScale::LOG: m_scaleLogAction->setChecked(true); break;
+    case ColormapScale::ASINH: m_scaleAsinhAction->setChecked(true); break;
+    }
+    {
+        const QSignalBlocker block(m_asinhSlider);
+        m_asinhSlider->setValue(
+            int(std::lround((std::log10(gl->asinhSoftening()) + 3.0) / 3.0
+                            * 100.0)));
+    }
     m_graticuleShowAction->setChecked(gl->graticuleEnabled());
     m_reverseColormapAction->setChecked(gl->colormapInvert());
     m_toolBar->setColormap(gl->colormap());

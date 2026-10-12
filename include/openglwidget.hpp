@@ -113,6 +113,12 @@ public:
     void setColormapMin(double min);
     void setColormapMax(double max);
     void setColormapScale(ColormapScale scale);
+    void setAsinhSoftening(double softening); // (0, 1]; smaller = more log-like
+
+    inline double asinhSoftening() const
+    {
+        return m_asinhSoftening;
+    }
 
     inline ColormapScale colormapScale() const
     {
@@ -433,6 +439,7 @@ private:
     int m_lutRows                 = 1;
     bool m_lutDirty               = true;
     ColormapScale m_colormapScale = ColormapScale::LINEAR;
+    float m_asinhSoftening        = 0.1f;
     long m_nside                  = 0;
     long m_npix                   = 0;
     // The 12 face layers are split over up to kMaxSegments textures, each

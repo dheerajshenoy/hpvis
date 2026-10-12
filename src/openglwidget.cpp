@@ -326,6 +326,13 @@ OpenGLWidget::setColormapScale(ColormapScale scale)
 }
 
 void
+OpenGLWidget::setAsinhSoftening(double softening)
+{
+    m_asinhSoftening = static_cast<float>(std::clamp(softening, 1e-4, 1.0));
+    update();
+}
+
+void
 OpenGLWidget::setColormapInvert(bool invert)
 {
     m_invertColormap = invert;
@@ -656,6 +663,7 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("colormap", static_cast<int>(m_colormap));
     m_shaderProgram.setUniformValue("colormap_scale",
                                     static_cast<int>(m_colormapScale));
+    m_shaderProgram.setUniformValue("asinh_softening", m_asinhSoftening);
     m_shaderProgram.setUniformValue(
         "bg_color",
         QVector3D(m_bgColor.redF(), m_bgColor.greenF(), m_bgColor.blueF()));
@@ -2203,7 +2211,11 @@ OpenGLWidget::scaleValue(double v) const
         double u = std::clamp((v - m_vmin) / (m_vmax - m_vmin), 0.0, 1.0);
         return std::log(1.0 + 1000.0 * u) / std::log(1001.0);
     }
-    return std::clamp((v - m_vmin) / (m_vmax - m_vmin), 0.0, 1.0);
+    const double u = std::clamp((v - m_vmin) / (m_vmax - m_vmin), 0.0, 1.0);
+    if (m_colormapScale == ColormapScale::ASINH)
+        return std::asinh(u / m_asinhSoftening)
+               / std::asinh(1.0 / m_asinhSoftening);
+    return u;
 }
 
 void

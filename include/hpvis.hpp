@@ -141,6 +141,8 @@ private:
     QAction *m_reverseColormapAction = nullptr;
     QAction *m_scaleLinearAction     = nullptr;
     QAction *m_scaleLogAction        = nullptr;
+    QAction *m_scaleAsinhAction      = nullptr;
+    QSlider *m_asinhSlider           = nullptr;
     QMenu *m_masksMenu               = nullptr;
     QAction *m_viewResetViewAction   = nullptr;
     QMenu *m_viewZoomMenu            = nullptr;

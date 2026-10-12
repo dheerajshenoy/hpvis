@@ -18,7 +18,8 @@ uniform int nside;
 uniform float vmin;
 uniform float vmax;
 uniform int colormap;
-uniform int colormap_scale; // 0 = linear, 1 = log
+uniform int colormap_scale; // 0 = linear, 1 = log, 2 = asinh
+uniform float asinh_softening; // asinh knee, in units of the range (0, 1]
 uniform bool invert_colormap;
 // User colormaps: one 256-entry row each; ids >= 15 select row (id - 15)
 uniform sampler2D colormapLut;

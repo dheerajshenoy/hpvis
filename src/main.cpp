@@ -39,7 +39,7 @@ addArguments(argparse::ArgumentParser &parser)
     parser.add_argument("-s", "--scale")
         .choices("linear", "log")
         .metavar("SCALE")
-        .help("Colormap scale: linear or log");
+        .help("Colormap scale: linear, log or asinh");
 
     parser.add_argument("--min").metavar("VALUE").scan<'g', double>().help(
         "Lower end of the color range");

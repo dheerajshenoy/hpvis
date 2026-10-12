@@ -53,8 +53,9 @@ AppSettings::load()
         cm = s.value("view/colormap", int(d.colormap)).toInt(); // older files
     a.colormap = (cm >= 0 && cm < registry.count()) ? Colormap(cm) : d.colormap;
     const int sc = s.value("view/scale", int(d.scale)).toInt();
-    a.scale      = (sc == int(ColormapScale::LOG)) ? ColormapScale::LOG
-                                                   : ColormapScale::LINEAR;
+    a.scale      = (sc == int(ColormapScale::LOG))     ? ColormapScale::LOG
+                   : (sc == int(ColormapScale::ASINH)) ? ColormapScale::ASINH
+                                                       : ColormapScale::LINEAR;
 
     a.reverseColormap
         = s.value("view/reverseColormap", d.reverseColormap).toBool();

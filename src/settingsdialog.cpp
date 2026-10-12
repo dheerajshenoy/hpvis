@@ -446,7 +446,7 @@ SettingsDialog::createAppearanceSettingsPage()
     form->addRow(m_reverseCheck);
 
     m_scaleCombo = new QComboBox();
-    m_scaleCombo->addItems({"Linear", "Logarithmic"});
+    m_scaleCombo->addItems({"Linear", "Logarithmic", "Asinh"});
     form->addRow("Scale:", m_scaleCombo);
 
     m_backgroundButton = new QPushButton();
