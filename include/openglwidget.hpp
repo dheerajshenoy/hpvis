@@ -11,6 +11,7 @@
 
 #include <QElapsedTimer>
 #include <QFutureWatcher>
+#include <QKeyEvent>
 #include <QOpenGLBuffer>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
@@ -155,6 +156,17 @@ public:
     // Arms a rubber-band: the next left-drag zooms to the dragged rectangle
     void beginZoomToRegion();
 
+    // The shapes a statistics region can have. Rectangle, ellipse and polygon
+    // are drawn on the projection plane; a line is the great-circle arc
+    // between two points of the sky (the statistics are of the pixels on it).
+    enum class RegionShape
+    {
+        Rectangle,
+        Ellipse,
+        Polygon,
+        Line
+    };
+
     // Statistics of a part of the sky. The region is a rectangle drawn in the
     // current projection (Ctrl + Shift + drag, or armed with
     // beginStatsRegion()); it stays fixed on the sky when the view moves.
@@ -163,6 +175,7 @@ public:
         long pixels      = 0; // pixels inside the region
         long valid       = 0; // ... that are valid and not masked
         double areaDeg2  = 0.0;
+        double lengthDeg = 0.0; // of a line region, else 0
         double skyFrac   = 0.0; // of the whole sky
         double min       = 0.0;
         double max       = 0.0;
@@ -170,7 +183,10 @@ public:
         double rms       = 0.0;
         double std       = 0.0;
     };
-    void beginStatsRegion();
+    // Arms the selection: rectangle and ellipse by dragging, line by dragging
+    // between its ends, polygon by clicking the corners (double click or
+    // Enter closes it, Escape cancels, right click removes the last corner)
+    void beginStatsRegion(RegionShape shape = RegionShape::Rectangle);
     void clearStatsRegion();
     bool hasStatsRegion() const
     {
@@ -372,6 +388,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *e) override;
     void enterEvent(QEnterEvent *e) override;
     void mouseDoubleClickEvent(QMouseEvent *e) override;
+    void keyPressEvent(QKeyEvent *e) override;
 
 signals:
     void mapLoaded(long nside, long npix, double avg, double rms, double std,
@@ -431,7 +448,10 @@ private:
     // Stops the running computation; with wait, returns only once the worker
     // no longer touches the map
     void cancelRegionJob(bool wait);
-    void setStatsRegionFromRect(const QRectF &widgetRect);
+    // Fixes a region on the sky from points in widget coordinates: two
+    // corners (rectangle, ellipse), the two ends (line) or the corners
+    void setStatsRegion(RegionShape shape, const QVector<QPointF> &points);
+    void finishPolygon();
     void paintStatsRegion(QPainter &p);
     void applyMaskChange(bool texturesChanged);
     int maskBits(bool inverted = false) const;
@@ -502,6 +522,9 @@ private:
     bool m_zoomRegionArmed   = false;
     bool m_statsRegionArmed  = false;
     bool m_selectingStats    = false; // the rubber-band is for statistics
+    RegionShape m_statsShape = RegionShape::Rectangle; // the armed shape
+    RegionShape m_dragShape  = RegionShape::Rectangle; // of the current drag
+    QVector<QPointF> m_polyPoints; // corners placed so far
 
     struct StatsRegion
     {
@@ -510,7 +533,10 @@ private:
         bool outside          = false;
         // Map-frame direction -> the view frame it was drawn in (row-major)
         double toView[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-        QVector2D lo, hi; // the rectangle on the projection plane
+        QVector2D lo, hi; // bounds on the projection plane
+        RegionShape shape = RegionShape::Rectangle;
+        QVector<QVector2D> poly; // polygon corners on the plane
+        double lineA[3] = {1, 0, 0}, lineB[3] = {1, 0, 0}; // line ends, map frame
     };
     StatsRegion m_statsRegion;
     RegionStats m_regionStats;

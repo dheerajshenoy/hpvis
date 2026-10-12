@@ -804,6 +804,20 @@ OpenGLWidget::paintGL()
 
     paintStatsRegion(p);
 
+    if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon
+        && !m_polyPoints.isEmpty())
+    {
+        const QColor c(80, 200, 255);
+        QPolygonF poly(m_polyPoints);
+        poly << m_cursorPos;
+        p.setPen(QPen(c, 1.5));
+        p.setBrush(QColor(c.red(), c.green(), c.blue(), 40));
+        p.drawPolygon(poly);
+        p.setBrush(c);
+        for (const QPointF &q : m_polyPoints)
+            p.drawEllipse(q, 3.0, 3.0);
+    }
+
     if (m_isRegionSelecting)
     {
         const QColor c = m_selectingStats ? QColor(80, 200, 255)
@@ -813,7 +827,12 @@ OpenGLWidget::paintGL()
         QRectF r(m_regionStart, m_regionEnd);
         r = QRectF(std::min(r.left(), r.right()), std::min(r.top(), r.bottom()),
                    std::abs(r.width()), std::abs(r.height()));
-        p.drawRect(r);
+        if (m_selectingStats && m_dragShape == RegionShape::Line)
+            p.drawLine(m_regionStart, m_regionEnd);
+        else if (m_selectingStats && m_dragShape == RegionShape::Ellipse)
+            p.drawEllipse(r);
+        else
+            p.drawRect(r);
     }
 
     if (!m_colorBarVisible)
@@ -2034,6 +2053,23 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
     // View > Zoom > Zoom To Region, zooms. Ctrl + Shift + Left drag, or the
     // next drag after View > Select Statistics Region, picks the region the
     // statistics are computed over.
+    if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
+    {
+        if (e->button() == Qt::LeftButton)
+            m_polyPoints << e->position();
+        else if (e->button() == Qt::RightButton)
+        {
+            if (m_polyPoints.isEmpty())
+                m_statsRegionArmed = false;
+            else
+                m_polyPoints.removeLast();
+        }
+        m_cursorPos = e->position();
+        update();
+        e->accept();
+        return;
+    }
+
     const bool selectStats
         = e->button() == Qt::LeftButton
           && (m_statsRegionArmed
@@ -2043,6 +2079,9 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
             && (e->modifiers() == Qt::ShiftModifier || m_zoomRegionArmed)))
     {
         m_selectingStats    = selectStats;
+        m_dragShape         = (selectStats && m_statsRegionArmed)
+                                  ? m_statsShape
+                                  : RegionShape::Rectangle;
         m_isRegionSelecting = true;
         m_regionStart       = e->pos();
         m_regionEnd         = e->pos();
@@ -2098,6 +2137,9 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
     }
 
     m_cursorPos = e->position();
+    if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon
+        && !m_polyPoints.isEmpty())
+        update(); // the edge to the pointer
     if (m_draggingMinimap)
     {
         panToMinimapPoint(e->position());
@@ -2167,6 +2209,12 @@ OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
 void
 OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
 {
+    if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
+    {
+        finishPolygon();
+        e->accept();
+        return;
+    }
     if (e->button() == Qt::LeftButton && minimapVisible()
         && minimapRect().contains(e->pos()))
         return;
@@ -2178,6 +2226,46 @@ OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
         emitCursorData();
         update();
     }
+}
+
+void
+OpenGLWidget::keyPressEvent(QKeyEvent *e)
+{
+    if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
+    {
+        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)
+        {
+            finishPolygon();
+            return;
+        }
+        if (e->key() == Qt::Key_Escape)
+        {
+            m_polyPoints.clear();
+            m_statsRegionArmed = false;
+            unsetCursor();
+            update();
+            return;
+        }
+    }
+    else if (m_statsRegionArmed && e->key() == Qt::Key_Escape)
+    {
+        m_statsRegionArmed = false;
+        unsetCursor();
+        return;
+    }
+    QOpenGLWidget::keyPressEvent(e);
+}
+
+void
+OpenGLWidget::finishPolygon()
+{
+    const QVector<QPointF> pts = m_polyPoints;
+    m_polyPoints.clear();
+    m_statsRegionArmed = false;
+    unsetCursor();
+    if (pts.size() >= 3)
+        setStatsRegion(RegionShape::Polygon, pts);
+    update();
 }
 
 void
@@ -2309,12 +2397,21 @@ void
 OpenGLWidget::processSelectionRegion()
 {
     const QRectF r = QRectF(m_regionStart, m_regionEnd).normalized();
+
+    if (m_selectingStats && m_dragShape == RegionShape::Line)
+    {
+        if (QLineF(m_regionStart, m_regionEnd).length() >= 4)
+            setStatsRegion(RegionShape::Line,
+                           {QPointF(m_regionStart), QPointF(m_regionEnd)});
+        return;
+    }
+
     if (r.width() < 4 || r.height() < 4) // a click, not a drag
         return;
 
     if (m_selectingStats)
     {
-        setStatsRegionFromRect(r);
+        setStatsRegion(m_dragShape, {r.topLeft(), r.bottomRight()});
         return;
     }
 
@@ -2325,8 +2422,10 @@ OpenGLWidget::processSelectionRegion()
 }
 
 void
-OpenGLWidget::beginStatsRegion()
+OpenGLWidget::beginStatsRegion(RegionShape shape)
 {
+    m_statsShape       = shape;
+    m_polyPoints.clear();
     m_statsRegionArmed = true;
     m_zoomRegionArmed  = false;
     setCursor(Qt::CrossCursor);
@@ -2346,30 +2445,34 @@ OpenGLWidget::clearStatsRegion()
     update();
 }
 
-// Fixes the rectangle on the sky: remembers the projection and the view
+// View-frame direction -> map-frame direction, for a region drawn with `m`
+// (the transpose of toView)
+static QVector3D
+viewToMapDir(const double *m, const QVector3D &v)
+{
+    return QVector3D(float(m[0] * v.x() + m[3] * v.y() + m[6] * v.z()),
+                     float(m[1] * v.x() + m[4] * v.y() + m[7] * v.z()),
+                     float(m[2] * v.x() + m[5] * v.y() + m[8] * v.z()));
+}
+
+// Fixes the region on the sky: remembers the projection and the view
 // rotation it was drawn with, so it can be tested and drawn in any later view
 void
-OpenGLWidget::setStatsRegionFromRect(const QRectF &r)
+OpenGLWidget::setStatsRegion(RegionShape shape, const QVector<QPointF> &pts)
 {
-    if (m_pendingMap.Npix() == 0)
+    if (m_pendingMap.Npix() == 0 || pts.size() < 2)
         return;
 
     auto plane = [this](const QPointF &w)
     {
         return toNdc(w) / m_camera->zoom + m_camera->panOffset;
     };
-    const QVector2D a = plane(r.topLeft()), b = plane(r.bottomRight());
 
     StatsRegion region;
     region.active     = true;
+    region.shape      = shape;
     region.projection = m_projection;
     region.outside    = m_viewOutside;
-    region.lo         = QVector2D(std::max(-1.0f, std::min(a.x(), b.x())),
-                                  std::max(-1.0f, std::min(a.y(), b.y())));
-    region.hi         = QVector2D(std::min(1.0f, std::max(a.x(), b.x())),
-                                  std::min(1.0f, std::max(a.y(), b.y())));
-    if (region.lo.x() >= region.hi.x() || region.lo.y() >= region.hi.y())
-        return; // outside the picture
 
     // Map frame -> display frame -> the view frame (inverse of the shader's
     // rotation); column i is the image of the i-th map axis
@@ -2385,6 +2488,57 @@ OpenGLWidget::setStatsRegionFromRect(const QRectF &r)
         region.toView[6 + i] = v.z();
     }
 
+    if (shape == RegionShape::Line)
+    {
+        // The two ends on the sky (both must be on the map)
+        QVector3D ends[2];
+        for (int k = 0; k < 2; ++k)
+        {
+            double colat, phi;
+            if (!projectionmath::inverse(region.projection, plane(pts[k]),
+                                         colat, phi, region.outside))
+                return;
+            ends[k] = viewToMapDir(region.toView,
+                                   directionFromAngles(colat, phi))
+                          .normalized();
+        }
+        for (int i = 0; i < 3; ++i)
+        {
+            region.lineA[i] = ends[0][i];
+            region.lineB[i] = ends[1][i];
+        }
+    }
+    else if (shape == RegionShape::Polygon)
+    {
+        if (pts.size() < 3)
+            return;
+        QVector2D lo(1e9f, 1e9f), hi(-1e9f, -1e9f);
+        for (const QPointF &w : pts)
+        {
+            const QVector2D q = plane(w);
+            region.poly << q;
+            lo = QVector2D(std::min(lo.x(), q.x()), std::min(lo.y(), q.y()));
+            hi = QVector2D(std::max(hi.x(), q.x()), std::max(hi.y(), q.y()));
+        }
+        region.lo = lo;
+        region.hi = hi;
+    }
+    else
+    {
+        const QVector2D a = plane(pts[0]), b = plane(pts[1]);
+        QVector2D lo(std::min(a.x(), b.x()), std::min(a.y(), b.y()));
+        QVector2D hi(std::max(a.x(), b.x()), std::max(a.y(), b.y()));
+        if (shape == RegionShape::Rectangle) // keep to the picture
+        {
+            lo = QVector2D(std::max(-1.0f, lo.x()), std::max(-1.0f, lo.y()));
+            hi = QVector2D(std::min(1.0f, hi.x()), std::min(1.0f, hi.y()));
+        }
+        region.lo = lo;
+        region.hi = hi;
+        if (lo.x() >= hi.x() || lo.y() >= hi.y())
+            return; // outside the picture
+    }
+
     m_statsRegion = region;
     ++m_regionRevision;
     recomputeRegionStats();
@@ -2392,11 +2546,50 @@ OpenGLWidget::setStatsRegionFromRect(const QRectF &r)
     update();
 }
 
+// The sorted pixels the great-circle arc of a line region passes through
+template <class Region>
+static std::vector<long>
+regionLinePixels(const Region &reg, const Healpix_Base &base, double *lengthDeg)
+{
+    const vec3 a(reg.lineA[0], reg.lineA[1], reg.lineA[2]);
+    const vec3 b(reg.lineB[0], reg.lineB[1], reg.lineB[2]);
+    const double theta = std::acos(std::clamp(dotprod(a, b), -1.0, 1.0));
+    if (lengthDeg)
+        *lengthDeg = theta * 180.0 / M_PI;
+
+    const double res = std::sqrt(4.0 * M_PI / double(base.Npix()));
+    const int n      = std::max(1, int(std::ceil(theta / (0.5 * res))));
+    const double s   = std::sin(theta);
+    std::vector<long> pix;
+    pix.reserve(size_t(n) + 1);
+    for (int i = 0; i <= n; ++i)
+    {
+        const double t = double(i) / n;
+        vec3 v;
+        if (s < 1e-12)
+            v = a;
+        else
+        {
+            const double wa = std::sin((1.0 - t) * theta) / s;
+            const double wb = std::sin(t * theta) / s;
+            v = vec3(wa * a.x + wb * b.x, wa * a.y + wb * b.y,
+                     wa * a.z + wb * b.z);
+        }
+        pix.push_back(base.vec2pix(v));
+    }
+    std::sort(pix.begin(), pix.end());
+    pix.erase(std::unique(pix.begin(), pix.end()), pix.end());
+    return pix;
+}
+
 // Whether the centre of pixel i is inside the region
 template <class Region>
 static inline bool
 regionContainsPixel(const Region &reg, const Healpix_Base &base, long i)
 {
+    // A line is a list of pixels, handled by the callers
+    if (reg.shape == OpenGLWidget::RegionShape::Line)
+        return false;
     const double *m = reg.toView;
     const vec3 d    = base.pix2vec(i);
     const double x  = m[0] * d.x + m[1] * d.y + m[2] * d.z;
@@ -2408,8 +2601,37 @@ regionContainsPixel(const Region &reg, const Healpix_Base &base, long i)
                                  std::asin(std::clamp(z, -1.0, 1.0)),
                                  std::atan2(y, x), p, reg.outside))
         return false;
-    return p.x() >= reg.lo.x() && p.x() <= reg.hi.x() && p.y() >= reg.lo.y()
-           && p.y() <= reg.hi.y();
+    if (!(p.x() >= reg.lo.x() && p.x() <= reg.hi.x() && p.y() >= reg.lo.y()
+          && p.y() <= reg.hi.y()))
+        return false;
+
+    switch (reg.shape)
+    {
+    case OpenGLWidget::RegionShape::Ellipse: // inscribed in the bounds
+    {
+        const double rx = 0.5 * (reg.hi.x() - reg.lo.x());
+        const double ry = 0.5 * (reg.hi.y() - reg.lo.y());
+        const double dx = (p.x() - (reg.lo.x() + rx)) / rx;
+        const double dy = (p.y() - (reg.lo.y() + ry)) / ry;
+        return dx * dx + dy * dy <= 1.0;
+    }
+    case OpenGLWidget::RegionShape::Polygon: // even-odd rule
+    {
+        bool in      = false;
+        const int n  = reg.poly.size();
+        for (int i = 0, j = n - 1; i < n; j = i++)
+        {
+            const QVector2D &a = reg.poly[i], &b = reg.poly[j];
+            if ((a.y() > p.y()) != (b.y() > p.y())
+                && p.x() < (b.x() - a.x()) * (p.y() - a.y()) / (b.y() - a.y())
+                               + a.x())
+                in = !in;
+        }
+        return in;
+    }
+    default:
+        return true;
+    }
 }
 
 std::function<std::vector<uint8_t>()>
@@ -2432,6 +2654,13 @@ OpenGLWidget::regionKeepBuilder(bool withMasks) const
         const Healpix_Base base(nside, scheme, SET_NSIDE);
         std::vector<uint8_t> keep(size_t(npix), 0);
         uint8_t *out = keep.data();
+        if (reg.shape == OpenGLWidget::RegionShape::Line)
+        {
+            for (long i : regionLinePixels(reg, base, nullptr))
+                if (masks.empty() || masks[size_t(i)])
+                    out[i] = 1;
+            return keep;
+        }
         parallel::forRange(npix, [&](long begin, long end)
         {
             for (long i = begin; i < end; ++i)
@@ -2535,33 +2764,22 @@ OpenGLWidget::startRegionJob()
             float max    = std::numeric_limits<float>::lowest();
         };
 
-        const Acc acc = parallel::reduceRange<Acc>(npix,
-                                                   [&](long begin, long end)
+        // The pixels of the region that count: valid and not masked
+        auto visit = [&](Acc &a, long i)
         {
-            Acc a;
-            for (long i = begin; i < end; ++i)
-            {
-                // Stop early when superseded (the result is dropped)
-                if ((i & 0xFFFF) == 0 && cancel->load(std::memory_order_relaxed))
-                    break;
-
-                if (!regionContainsPixel(reg, base, i))
-                    continue;
-
-                ++a.pixels;
-                const float v = data[i];
-                if (!std::isfinite(v) || v < -1e30f)
-                    continue;
-                if (keepData && !keepData[i])
-                    continue;
-                ++a.valid;
-                a.sum += v;
-                a.sumSq += double(v) * v;
-                a.min = std::min(a.min, v);
-                a.max = std::max(a.max, v);
-            }
-            return a;
-        }, [](Acc &t, const Acc &p)
+            ++a.pixels;
+            const float v = data[i];
+            if (!std::isfinite(v) || v < -1e30f)
+                return;
+            if (keepData && !keepData[i])
+                return;
+            ++a.valid;
+            a.sum += v;
+            a.sumSq += double(v) * v;
+            a.min = std::min(a.min, v);
+            a.max = std::max(a.max, v);
+        };
+        auto merge = [](Acc &t, const Acc &p)
         {
             t.pixels += p.pixels;
             t.valid += p.valid;
@@ -2569,9 +2787,35 @@ OpenGLWidget::startRegionJob()
             t.sumSq += p.sumSq;
             t.min = std::min(t.min, p.min);
             t.max = std::max(t.max, p.max);
-        });
+        };
+
+        Acc acc;
+        double lengthDeg = 0.0;
+        if (reg.shape == OpenGLWidget::RegionShape::Line)
+        {
+            for (long i : regionLinePixels(reg, base, &lengthDeg))
+                visit(acc, i);
+        }
+        else
+        {
+            acc = parallel::reduceRange<Acc>(npix, [&](long begin, long end)
+            {
+                Acc a;
+                for (long i = begin; i < end; ++i)
+                {
+                    // Stop early when superseded (the result is dropped)
+                    if ((i & 0xFFFF) == 0
+                        && cancel->load(std::memory_order_relaxed))
+                        break;
+                    if (regionContainsPixel(reg, base, i))
+                        visit(a, i);
+                }
+                return a;
+            }, merge);
+        }
 
         RegionStats s;
+        s.lengthDeg = lengthDeg;
         s.pixels   = acc.pixels;
         s.valid    = acc.valid;
         s.skyFrac  = double(acc.pixels) / double(npix);
@@ -2589,8 +2833,8 @@ OpenGLWidget::startRegionJob()
     }));
 }
 
-// Outline of the region in the current view: the rectangle's edges, mapped to
-// the sky with the projection they were drawn in and back to the screen
+// Outline of the region in the current view: its edge, mapped to the sky with
+// the projection it was drawn in and back to the screen
 void
 OpenGLWidget::paintStatsRegion(QPainter &p)
 {
@@ -2598,40 +2842,89 @@ OpenGLWidget::paintStatsRegion(QPainter &p)
         return;
     const StatsRegion &r = m_statsRegion;
 
-    const auto toDisplay = skyframe::rotation(m_mapFrame, displayFrame());
-    constexpr int kSteps = 48;
-    QVector<QVector2D> ring;
-    for (int i = 0; i < kSteps; ++i)
-        ring << QVector2D(r.lo.x() + (r.hi.x() - r.lo.x()) * i / kSteps, r.lo.y());
-    for (int i = 0; i < kSteps; ++i)
-        ring << QVector2D(r.hi.x(), r.lo.y() + (r.hi.y() - r.lo.y()) * i / kSteps);
-    for (int i = 0; i < kSteps; ++i)
-        ring << QVector2D(r.hi.x() - (r.hi.x() - r.lo.x()) * i / kSteps, r.hi.y());
-    for (int i = 0; i < kSteps; ++i)
-        ring << QVector2D(r.lo.x(), r.hi.y() - (r.hi.y() - r.lo.y()) * i / kSteps);
-    ring << ring.first();
+    // The edge as directions on the sky (map frame); false marks a gap (a
+    // point that is not on the projection)
+    QVector<QVector3D> edge;
+    QVector<bool> onMap;
+    auto addPlane = [&](const QVector2D &q)
+    {
+        double colat, phi;
+        const bool ok = projectionmath::inverse(r.projection, q, colat, phi,
+                                                r.outside);
+        edge << (ok ? viewToMapDir(r.toView, directionFromAngles(colat, phi))
+                    : QVector3D());
+        onMap << ok;
+    };
+    // Straight on the plane from a to b
+    auto addSegment = [&](const QVector2D &a, const QVector2D &b, int steps)
+    {
+        for (int i = 0; i < steps; ++i)
+            addPlane(a + (b - a) * (float(i) / steps));
+    };
 
+    constexpr int kSteps = 48;
+    bool closed          = true;
+    if (r.shape == RegionShape::Line)
+    {
+        closed = false;
+        const QVector3D a(r.lineA[0], r.lineA[1], r.lineA[2]);
+        const QVector3D b(r.lineB[0], r.lineB[1], r.lineB[2]);
+        const double theta = std::acos(std::clamp(
+            double(QVector3D::dotProduct(a, b)), -1.0, 1.0));
+        const double sn    = std::sin(theta);
+        for (int i = 0; i <= kSteps; ++i)
+        {
+            const double t = double(i) / kSteps;
+            edge << (sn < 1e-12 ? a
+                                : a * float(std::sin((1.0 - t) * theta) / sn)
+                                      + b * float(std::sin(t * theta) / sn));
+            onMap << true;
+        }
+    }
+    else if (r.shape == RegionShape::Polygon)
+    {
+        for (int k = 0; k < r.poly.size(); ++k)
+            addSegment(r.poly[k], r.poly[(k + 1) % r.poly.size()], kSteps / 2);
+    }
+    else if (r.shape == RegionShape::Ellipse)
+    {
+        const QVector2D c = (r.lo + r.hi) * 0.5f;
+        const QVector2D h = (r.hi - r.lo) * 0.5f;
+        for (int i = 0; i < 4 * kSteps; ++i)
+        {
+            const double t = 2.0 * M_PI * i / (4 * kSteps);
+            addPlane(QVector2D(c.x() + h.x() * float(std::cos(t)),
+                               c.y() + h.y() * float(std::sin(t))));
+        }
+    }
+    else
+    {
+        const QVector2D ll = r.lo, lr(r.hi.x(), r.lo.y()), ur = r.hi,
+                        ul(r.lo.x(), r.hi.y());
+        addSegment(ll, lr, kSteps);
+        addSegment(lr, ur, kSteps);
+        addSegment(ur, ul, kSteps);
+        addSegment(ul, ll, kSteps);
+    }
+    if (closed && !edge.isEmpty())
+    {
+        edge << edge.first();
+        onMap << onMap.first();
+    }
+
+    const auto toDisplay = skyframe::rotation(m_mapFrame, displayFrame());
     p.setPen(QPen(QColor(80, 200, 255), 1.5, Qt::DashLine));
     p.setBrush(Qt::NoBrush);
     QPointF prev;
     bool havePrev = false;
-    for (const QVector2D &q : ring)
+    for (int k = 0; k < edge.size(); ++k)
     {
-        double colat, phi;
         QPointF w;
-        bool ok = projectionmath::inverse(r.projection, q, colat, phi,
-                                          r.outside);
+        bool ok = onMap[k];
         if (ok)
         {
-            // view frame it was drawn in -> map frame (transpose) -> display
-            const QVector3D v = directionFromAngles(colat, phi);
-            const double *m   = r.toView;
-            const QVector3D mapDir(
-                float(m[0] * v.x() + m[3] * v.y() + m[6] * v.z()),
-                float(m[1] * v.x() + m[4] * v.y() + m[7] * v.z()),
-                float(m[2] * v.x() + m[5] * v.y() + m[8] * v.z()));
             double c2, p2;
-            anglesFromDirection(skyframe::apply(toDisplay, mapDir), c2, p2);
+            anglesFromDirection(skyframe::apply(toDisplay, edge[k]), c2, p2);
             ok = projectToWindow(M_PI / 2.0 - c2, p2, w);
         }
         // A jump across the picture is the seam of the projection

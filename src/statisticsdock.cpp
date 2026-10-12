@@ -422,8 +422,12 @@ StatisticsDock::updateTable()
         set(RowNpix, 2, QString::number(s.pixels));
         set(RowValid, 2, QString::number(s.valid));
         set(RowFsky, 2, QString::number(validFrac, 'f', 6));
-        set(RowArea, 2,
-            QString("%1 deg\u00b2").arg(validFrac * kSkyDeg2, 0, 'g', 6));
+        if (s.lengthDeg > 0.0) // a line has a length, not an area
+            set(RowArea, 2,
+                QString("length %1\u00b0").arg(s.lengthDeg, 0, 'g', 6));
+        else
+            set(RowArea, 2, QString("%1 deg\u00b2").arg(validFrac * kSkyDeg2, 0,
+                                                       'g', 6));
         if (s.valid > 0)
         {
             set(RowMin, 2, num(s.min));

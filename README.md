@@ -81,7 +81,7 @@ Files can also be opened from File > Open or by dropping them on the window.
 | Pan | Left-drag, or two-finger scroll |
 | Rotate the sky | Ctrl + left-drag or middle-drag (plain left-drag in the Orthographic, Azimuthal, Gnomonic and Stereographic views) |
 | Zoom to a region | Shift + left-drag |
-| Statistics of a region | Ctrl + Shift + left-drag (or View > Select Statistics Region); shown in the Statistics dock |
+| Statistics of a region | Ctrl + Shift + left-drag for a rectangle, or View > Select Statistics Region for a rectangle, ellipse, polygon (click corners, double click or Enter to close, Esc cancels, right click removes the last corner) or line (great-circle arc, drag between its ends); shown in the Statistics dock |
 | Reset view | Double-click, or `0` |
 | Toggle minimap | `M` |
 | Toggle color bar | `C` |

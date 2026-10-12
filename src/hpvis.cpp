@@ -613,11 +613,19 @@ HpVis::initMenubar()
             m_view->glWidget()->resetZoom();
     });
 
-    m_viewMenu->addAction("Select &Statistics Region", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->beginStatsRegion();
-    });
+    QMenu *regionMenu = m_viewMenu->addMenu("Select &Statistics Region");
+    const std::pair<const char *, OpenGLWidget::RegionShape> shapes[] = {
+        {"&Rectangle", OpenGLWidget::RegionShape::Rectangle},
+        {"&Ellipse", OpenGLWidget::RegionShape::Ellipse},
+        {"&Polygon (double click or Enter to close)",
+         OpenGLWidget::RegionShape::Polygon},
+        {"&Line (great circle)", OpenGLWidget::RegionShape::Line}};
+    for (const auto &[name, shape] : shapes)
+        regionMenu->addAction(name, this, [this, shape = shape]()
+        {
+            if (m_view)
+                m_view->glWidget()->beginStatsRegion(shape);
+        });
     m_viewMenu->addAction("Clear Statistics Re&gion", this, [this]()
     {
         if (m_view)
