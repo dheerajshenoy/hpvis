@@ -17,9 +17,13 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QQuickItem>
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QHeaderView>
 #include <QQuickView>
 #include <QSettings>
 #include <QSpinBox>
+#include <QTableWidget>
 #include <QTextStream>
 #include <QTimer>
 #include <QToolButton>
@@ -29,51 +33,65 @@
 #include <QtConcurrent>
 #include <cmath>
 
+namespace
+{
+enum Row
+{
+    RowNside,
+    RowNpix,
+    RowValid,
+    RowFsky,
+    RowArea,
+    RowMin,
+    RowMax,
+    RowAverage,
+    RowRms,
+    RowStd,
+    kRowCount
+};
+} // namespace
+
 StatisticsDock::StatisticsDock(QWidget *parent)
     : QDockWidget("Statistics", parent)
 {
     setObjectName("StatisticsDock");
 
-    auto *content = new QWidget();
-    auto *form    = new QFormLayout(content);
-    form->setContentsMargins(0, 0, 0, 0);
-
-    auto add = [form](const QString &name, QLabel *&label)
+    // One row per statistic, a column for the whole map and one for the
+    // region picked on it
+    m_table = new QTableWidget(kRowCount, 3);
+    m_table->setHorizontalHeaderLabels({"Statistic", "Whole map", "Region"});
+    m_table->verticalHeader()->hide();
+    m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_table->horizontalHeader()->setSectionResizeMode(
+        0, QHeaderView::ResizeToContents);
+    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    m_table->setAlternatingRowColors(true);
+    m_table->setShowGrid(false);
+    m_table->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    static const char *const names[kRowCount]
+        = {"Nside",   "Npix",    "Valid pixels", "Sky fraction", "Area",
+           "Min",     "Max",     "Average",      "RMS",          "Std dev"};
+    for (int r = 0; r < kRowCount; ++r)
     {
-        label = new QLabel("-");
-        label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        form->addRow(name, label);
-    };
-    add("Nside:", m_nside);
-    add("Npix:", m_npix);
-    add("Min:", m_min);
-    add("Max:", m_max);
-    add("Average:", m_average);
-    add("RMS:", m_rms);
-    add("Std dev:", m_std);
-    add("Sky fraction:", m_fsky);
+        m_table->setItem(r, 0, new QTableWidgetItem(names[r]));
+        for (int c = 1; c < 3; ++c)
+        {
+            auto *item = new QTableWidgetItem("-");
+            item->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            m_table->setItem(r, c, item);
+        }
+    }
+    m_table->resizeRowsToContents();
+    int height = m_table->horizontalHeader()->height()
+                 + 2 * m_table->frameWidth();
+    for (int r = 0; r < kRowCount; ++r)
+        height += m_table->rowHeight(r);
+    m_table->setFixedHeight(height);
 
-    // The statistics of a region picked on the map
-    auto *regionBox  = new QGroupBox("Region");
-    auto *regionForm = new QFormLayout(regionBox);
-    m_regionHint = new QLabel("Ctrl + Shift + drag on the map, or View > "
-                              "Select Statistics Region.");
+    m_regionHint = new QLabel("Region: Ctrl + Shift + drag on the map, or "
+                              "View > Select Statistics Region.");
     m_regionHint->setWordWrap(true);
-    regionForm->addRow(m_regionHint);
-    auto addRegion = [regionForm](const QString &name, QLabel *&label)
-    {
-        label = new QLabel("-");
-        label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        regionForm->addRow(name, label);
-    };
-    addRegion("Pixels (valid):", m_regionPixels);
-    addRegion("Area:", m_regionArea);
-    addRegion("Sky fraction:", m_regionFsky);
-    addRegion("Min:", m_regionMin);
-    addRegion("Max:", m_regionMax);
-    addRegion("Average:", m_regionAvg);
-    addRegion("RMS:", m_regionRms);
-    addRegion("Std dev:", m_regionStd);
     m_regionClear = new QToolButton();
     m_regionClear->setText("Clear region");
     connect(m_regionClear, &QToolButton::clicked, this, [this]()
@@ -81,12 +99,20 @@ StatisticsDock::StatisticsDock(QWidget *parent)
         if (m_view)
             m_view->glWidget()->clearStatsRegion();
     });
-    regionForm->addRow(m_regionClear);
+    auto *copy = new QToolButton();
+    copy->setText("Copy table");
+    connect(copy, &QToolButton::clicked, this, [this]() { copyTable(); });
+
+    auto *buttons = new QHBoxLayout();
+    buttons->addWidget(m_regionHint, 1);
+    buttons->addWidget(m_regionClear);
+    buttons->addWidget(copy);
 
     auto *whole = new QWidget();
     auto *outer = new QVBoxLayout(whole);
-    outer->addWidget(content);
-    outer->addWidget(regionBox);
+    outer->addWidget(m_table);
+    outer->addLayout(buttons);
+    updateTable();
     initHistogramUI(whole);
     setWidget(whole);
 
@@ -306,10 +332,7 @@ StatisticsDock::setView(View *view)
     const OpenGLWidget *gl = view ? view->glWidget() : nullptr;
     if (!gl || !gl->healpixMap())
     {
-        for (QLabel *l :
-             {m_nside, m_npix, m_min, m_max, m_average, m_rms, m_std, m_fsky})
-            l->setText("-");
-        updateRegion();
+        updateTable();
         fillFields();
         m_result = HistogramResult();
         m_histStatus->setText("Open a map to see its histogram.");
@@ -318,20 +341,7 @@ StatisticsDock::setView(View *view)
         return;
     }
 
-    auto num = [](double v)
-    {
-        return QString::number(v, 'g', 6);
-    };
-    m_nside->setText(QString::number(gl->healpixMap()->Nside()));
-    m_npix->setText(QString::number(gl->healpixMap()->Npix()));
-    m_min->setText(num(gl->mapMin()));
-    m_max->setText(num(gl->mapMax()));
-    m_average->setText(num(gl->mapAverage()));
-    m_rms->setText(num(gl->mapRms()));
-    m_std->setText(num(gl->mapStd()));
-    m_fsky->setText(QString::number(gl->fsky(), 'f', 6));
-
-    updateRegion();
+    updateTable();
     fillFields();
     scheduleUpdate();
 }
@@ -339,33 +349,88 @@ StatisticsDock::setView(View *view)
 void
 StatisticsDock::updateRegion()
 {
+    updateTable();
+}
+
+void
+StatisticsDock::updateTable()
+{
     const OpenGLWidget *gl = m_view ? m_view->glWidget() : nullptr;
-    const bool has         = gl && gl->hasStatsRegion();
+    const bool hasMap      = gl && gl->healpixMap();
+    const bool hasRegion   = hasMap && gl->hasStatsRegion();
 
-    m_regionHint->setVisible(!has);
-    m_regionClear->setVisible(has);
-    for (QLabel *l : {m_regionPixels, m_regionArea, m_regionFsky, m_regionMin,
-                      m_regionMax, m_regionAvg, m_regionRms, m_regionStd})
-        l->setText("-");
-    if (!has)
-        return;
-
-    const OpenGLWidget::RegionStats &s = gl->regionStats();
     auto num = [](double v)
     {
         return QString::number(v, 'g', 6);
     };
-    m_regionPixels->setText(
-        QString("%1 (%2)").arg(s.pixels).arg(s.valid));
-    m_regionArea->setText(QString("%1 deg\u00b2").arg(s.areaDeg2, 0, 'g', 6));
-    m_regionFsky->setText(QString::number(s.skyFrac, 'f', 6));
-    if (s.valid == 0)
-        return; // nothing valid inside: the other numbers stay empty
-    m_regionMin->setText(num(s.min));
-    m_regionMax->setText(num(s.max));
-    m_regionAvg->setText(num(s.average));
-    m_regionRms->setText(num(s.rms));
-    m_regionStd->setText(num(s.std));
+    auto set = [this](int row, int col, const QString &text)
+    {
+        m_table->item(row, col)->setText(text);
+    };
+    for (int r = 0; r < kRowCount; ++r)
+        for (int c = 1; c < 3; ++c)
+            set(r, c, "-");
+
+    constexpr double kSkyDeg2
+        = 4.0 * M_PI * (180.0 / M_PI) * (180.0 / M_PI);
+
+    if (hasMap)
+    {
+        const long npix = gl->healpixMap()->Npix();
+        const bool any  = gl->fsky() > 0.0f;
+        set(RowNside, 1, QString::number(gl->healpixMap()->Nside()));
+        set(RowNpix, 1, QString::number(npix));
+        set(RowValid, 1,
+            QString::number(std::lround(double(gl->fsky()) * double(npix))));
+        set(RowFsky, 1, QString::number(gl->fsky(), 'f', 6));
+        set(RowArea, 1,
+            QString("%1 deg\u00b2").arg(gl->fsky() * kSkyDeg2, 0, 'g', 6));
+        if (any)
+        {
+            set(RowMin, 1, num(gl->mapMin()));
+            set(RowMax, 1, num(gl->mapMax()));
+            set(RowAverage, 1, num(gl->mapAverage()));
+            set(RowRms, 1, num(gl->mapRms()));
+            set(RowStd, 1, num(gl->mapStd()));
+        }
+    }
+
+    if (hasRegion)
+    {
+        const OpenGLWidget::RegionStats &s = gl->regionStats();
+        // Valid pixels, fraction and area are those of the valid pixels, as
+        // for the whole map; the region itself is s.pixels
+        const double validFrac
+            = double(s.valid) / double(gl->healpixMap()->Npix());
+        set(RowNpix, 2, QString::number(s.pixels));
+        set(RowValid, 2, QString::number(s.valid));
+        set(RowFsky, 2, QString::number(validFrac, 'f', 6));
+        set(RowArea, 2,
+            QString("%1 deg\u00b2").arg(validFrac * kSkyDeg2, 0, 'g', 6));
+        if (s.valid > 0)
+        {
+            set(RowMin, 2, num(s.min));
+            set(RowMax, 2, num(s.max));
+            set(RowAverage, 2, num(s.average));
+            set(RowRms, 2, num(s.rms));
+            set(RowStd, 2, num(s.std));
+        }
+    }
+
+    m_regionHint->setVisible(!hasRegion);
+    m_regionClear->setVisible(hasRegion);
+}
+
+void
+StatisticsDock::copyTable()
+{
+    QString text;
+    QTextStream out(&text);
+    out << "Statistic\tWhole map\tRegion\n";
+    for (int r = 0; r < kRowCount; ++r)
+        out << m_table->item(r, 0)->text() << '\t' << m_table->item(r, 1)->text()
+            << '\t' << m_table->item(r, 2)->text() << '\n';
+    QGuiApplication::clipboard()->setText(text);
 }
 
 void

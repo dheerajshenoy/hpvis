@@ -15,6 +15,7 @@ class QFormLayout;
 class QLabel;
 class QQuickView;
 class QSpinBox;
+class QTableWidget;
 class QTimer;
 class QToolButton;
 class View;
@@ -57,26 +58,11 @@ private:
     QString titleOf(const View *view) const;
     bool histogramWanted() const;
 
-    // Statistics
-    QLabel *m_nside   = nullptr;
-    QLabel *m_npix    = nullptr;
-    QLabel *m_min     = nullptr;
-    QLabel *m_max     = nullptr;
-    QLabel *m_average = nullptr;
-    QLabel *m_rms     = nullptr;
-    QLabel *m_std     = nullptr;
-    QLabel *m_fsky    = nullptr;
-
-    // Statistics of the selected region
-    QLabel *m_regionHint   = nullptr;
-    QLabel *m_regionPixels = nullptr;
-    QLabel *m_regionArea   = nullptr;
-    QLabel *m_regionFsky   = nullptr;
-    QLabel *m_regionMin    = nullptr;
-    QLabel *m_regionMax    = nullptr;
-    QLabel *m_regionAvg    = nullptr;
-    QLabel *m_regionRms    = nullptr;
-    QLabel *m_regionStd    = nullptr;
+    // Statistics of the whole map and of the selected region
+    void updateTable();
+    void copyTable();
+    QTableWidget *m_table      = nullptr;
+    QLabel *m_regionHint       = nullptr;
     QToolButton *m_regionClear = nullptr;
 
     // Histogram
