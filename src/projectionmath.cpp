@@ -23,6 +23,21 @@ wrap2Pi(double lon) // [0, 2pi)
 }
 } // namespace
 
+bool
+isDisk(Projection projection)
+{
+    switch (projection)
+    {
+        case Projection::ORTHOGRAPHIC:
+        case Projection::AZIMUTHAL_EQUIDISTANT:
+        case Projection::GNOMONIC:
+        case Projection::STEREOGRAPHIC:
+            return true;
+        default:
+            return false;
+    }
+}
+
 double
 aspect(Projection projection)
 {

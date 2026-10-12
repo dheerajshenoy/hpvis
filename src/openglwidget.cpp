@@ -1877,10 +1877,7 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
 
     // Rotate with the middle button or Ctrl + left drag; the globe-like
     // projections rotate with a plain left drag (panning them is pointless)
-    const bool disk = m_projection == Projection::ORTHOGRAPHIC
-                      || m_projection == Projection::AZIMUTHAL_EQUIDISTANT
-                      || m_projection == Projection::GNOMONIC
-                      || m_projection == Projection::STEREOGRAPHIC;
+    const bool disk = projectionmath::isDisk(m_projection);
     const bool wantsRotate
         = e->button() == Qt::MiddleButton
           || (e->button() == Qt::LeftButton
@@ -2604,6 +2601,18 @@ OpenGLWidget::setProjection(Projection projection)
                                                 : m_projection;
         m_projectionFading = true;
         m_projectionClock.start();
+    }
+    // A globe can be tilted and rolled freely, which a full-sky map cannot show
+    // sensibly (the poles would be off the top and bottom): keep only the
+    // longitude at the center when going from one to the other
+    if (projection != m_projection && projectionmath::isDisk(m_projection)
+        && !projectionmath::isDisk(projection))
+    {
+        stopGlobeAnimation();
+        const QVector3D c = m_rotation.rotatedVector(QVector3D(1, 0, 0));
+        const double lon  = std::atan2(double(c.y()), double(c.x()));
+        setRotation(QQuaternion::fromAxisAndAngle(
+            0, 0, 1, float(qRadiansToDegrees(lon))));
     }
     m_projection = projection;
     if (!globeAnimates())

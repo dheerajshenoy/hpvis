@@ -9,6 +9,11 @@
 // with the GLSL.
 namespace projectionmath
 {
+// The globe-like projections (a disk centered on a point you rotate), as
+// opposed to the full-sky maps with the poles on top and bottom
+bool
+isDisk(Projection projection);
+
 // Width / height of the plane's picture: 2 for the full-sky rectangles and
 // ellipses, 1 for the disks
 double
