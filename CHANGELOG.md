@@ -116,7 +116,9 @@ First development release.
   marking a pixel UNSEEN when any sub-pixel is). "Through the harmonics" does
   map2alm (iterated), drops the a_lm above the new resolution and runs
   alm2map, which filters out the power the new resolution cannot hold instead
-  of aliasing it. The pixel window functions are not corrected for.
+  of aliasing it. Optionally the input map's pixel window function is divided
+  out and the new nside's multiplied in; the windows are read from a FITS
+  table (HEALPix's pixel_window_n*.fits), a .npy array or a text file.
 
 ### Masks
 - Masks > Add Mask From Map Column... lists the columns of the open maps' files

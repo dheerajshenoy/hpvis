@@ -5,6 +5,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QFutureWatcher>
 #include <QGroupBox>
@@ -78,6 +79,16 @@ DowngradeDialog::DowngradeDialog(std::function<View *()> currentView,
     m_keepUnseen = new QCheckBox("Keep mostly-UNSEEN pixels UNSEEN");
     m_keepUnseen->setChecked(true);
     harmForm->addRow(m_keepUnseen);
+    harmForm->addRow(
+        "Input pixel window:",
+        windowRow(m_windowIn,
+                  "Pixel window function w_l of the map's current nside, "
+                  "divided out of the a_lm. Optional."));
+    harmForm->addRow(
+        "Output pixel window:",
+        windowRow(m_windowOut,
+                  "Pixel window function w_l of the new nside, multiplied "
+                  "into the a_lm. Optional."));
     methodLay->addLayout(harmForm);
 
     m_hint = new QLabel();
@@ -116,6 +127,32 @@ DowngradeDialog::DowngradeDialog(std::function<View *()> currentView,
             [this](int) { updateOptions(); });
     connect(m_lmax, &QSpinBox::valueChanged, this,
             [this](int) { updateOptions(); });
+}
+
+// A file path with a Browse button. The file is a FITS table (HEALPix's
+// pixel_window_n*.fits), a .npy array or a text file with one w_l per line.
+QWidget *
+DowngradeDialog::windowRow(QLineEdit *&edit, const QString &tip)
+{
+    auto *row = new QWidget();
+    auto *lay = new QHBoxLayout(row);
+    lay->setContentsMargins(0, 0, 0, 0);
+    edit = new QLineEdit();
+    edit->setPlaceholderText("none (FITS, .npy or text: w_l from l = 0)");
+    edit->setToolTip(tip);
+    auto *browse = new QPushButton("Browse...");
+    lay->addWidget(edit, 1);
+    lay->addWidget(browse);
+    connect(browse, &QPushButton::clicked, this, [this, edit]()
+    {
+        const QString f = QFileDialog::getOpenFileName(
+            this, "Pixel window function", QString(),
+            "Window Files (*.fits *.fit *.fts *.npy *.txt *.dat *.csv);;All "
+            "Files (*)");
+        if (!f.isEmpty())
+            edit->setText(f);
+    });
+    return row;
 }
 
 int
@@ -169,6 +206,8 @@ DowngradeDialog::updateOptions()
     m_iterations->setEnabled(harmonic);
     m_lmax->setEnabled(harmonic);
     m_keepUnseen->setEnabled(harmonic);
+    m_windowIn->setEnabled(harmonic);
+    m_windowOut->setEnabled(harmonic);
 
     if (m_nside < 2 || m_nsideCombo->count() == 0)
     {
@@ -238,6 +277,24 @@ DowngradeDialog::compute()
     o.iterations  = m_iterations->value();
     o.lmaxIn      = m_lmax->value();
     o.keepUnseen  = m_keepUnseen->isChecked();
+
+    // The pixel windows (small files, read here so a bad one is reported
+    // before anything starts)
+    if (o.method == DowngradeMethod::Harmonic)
+    {
+        try
+        {
+            if (!m_windowIn->text().trimmed().isEmpty())
+                o.windowIn = readPixelWindow(m_windowIn->text().trimmed());
+            if (!m_windowOut->text().trimmed().isEmpty())
+                o.windowOut = readPixelWindow(m_windowOut->text().trimmed());
+        }
+        catch (const std::exception &e)
+        {
+            showMessage(QString("Pixel window: %1").arg(e.what()), true);
+            return;
+        }
+    }
 
     const QString title = m_title->text().trimmed().isEmpty()
                               ? QString("nside %1").arg(o.nsideOut)

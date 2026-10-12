@@ -1,9 +1,14 @@
 #include "resolution.hpp"
 
 #include "alm.h"
+#include "healpix_cxx/fitshandle.h"
+#include "npyreader.hpp"
 #include "alm_healpix_tools.h"
 #include "healpix_cxx/error_handling.h"
 
+#include <QFile>
+#include <QStringList>
+#include <QTextStream>
 #include <algorithm>
 #include <cmath>
 
@@ -85,6 +90,38 @@ harmonicDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
         for (int l = m; l <= lmaxOut; ++l)
             low(l, m) = alm(l, m);
 
+    // Swap the pixel window of the input for that of the output
+    std::vector<double> factor(size_t(lmaxOut) + 1, 1.0);
+    auto need = [lmaxOut](const std::vector<double> &w, const char *which)
+    {
+        if (int(w.size()) <= lmaxOut)
+            throw PlanckError((std::string("the ") + which
+                               + " pixel window has " + std::to_string(w.size())
+                               + " values, l up to " + std::to_string(lmaxOut)
+                               + " is needed")
+                                  .c_str());
+    };
+    if (!o.windowIn.empty())
+    {
+        need(o.windowIn, "input");
+        for (int l = 0; l <= lmaxOut; ++l)
+        {
+            if (!(std::abs(o.windowIn[size_t(l)]) > 1e-12))
+                throw PlanckError(("the input pixel window is zero at l = "
+                                   + std::to_string(l))
+                                      .c_str());
+            factor[size_t(l)] /= o.windowIn[size_t(l)];
+        }
+    }
+    if (!o.windowOut.empty())
+    {
+        need(o.windowOut, "output");
+        for (int l = 0; l <= lmaxOut; ++l)
+            factor[size_t(l)] *= o.windowOut[size_t(l)];
+    }
+    if (!o.windowIn.empty() || !o.windowOut.empty())
+        low.ScaleL(factor);
+
     Healpix_Map<double> down(o.nsideOut, RING, SET_NSIDE);
     alm2map(low, down);
 
@@ -122,10 +159,127 @@ harmonicDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
                            "transform; on a cut sky this leaks power across "
                            "the edge of the mask.")
                        .arg(unseen);
-    r.notes << "The pixel window functions are not corrected for.";
+    if (o.windowIn.empty() && o.windowOut.empty())
+        r.notes << "No pixel window function was applied.";
+    else
+        r.notes << QString("Pixel window: %1%2.")
+                       .arg(o.windowIn.empty() ? ""
+                                               : "input divided out")
+                       .arg(o.windowOut.empty()
+                                ? ""
+                                : (o.windowIn.empty() ? "output applied"
+                                                      : ", output applied"));
     return r;
 }
 } // namespace
+
+std::vector<double>
+readPixelWindow(const QString &path)
+{
+    const std::string file = path.toStdString();
+    std::vector<double> w;
+    const QString lower = path.toLower();
+
+    if (lower.endsWith(".fits") || lower.endsWith(".fit")
+        || lower.endsWith(".fts"))
+    {
+        try
+        {
+            fitshandle f;
+            f.open(file);
+            // HEALPix's files keep the windows in the first table
+            for (int hdu = 1; hdu <= f.num_hdus(); ++hdu)
+            {
+                f.goto_hdu(hdu);
+                if (!f.key_present("TFIELDS"))
+                    continue; // not a table, e.g. the empty primary HDU
+                const int ncols = f.ncols();
+                if (ncols < 1)
+                    continue;
+                int col = 1;
+                for (int c = 1; c <= ncols; ++c)
+                    if (QString::fromStdString(f.colname(c))
+                            .trimmed()
+                            .toUpper()
+                            .startsWith("TEMP"))
+                        col = c;
+                f.read_entire_column(col, w);
+                break;
+            }
+        }
+        catch (const PlanckError &e)
+        {
+            throw std::runtime_error(std::string("cannot read ") + file + ": "
+                                     + e.what());
+        }
+        if (w.empty())
+            throw std::runtime_error(file + " has no table column");
+        return w;
+    }
+
+    if (lower.endsWith(".npy"))
+    {
+        const NpyArray a = readNpy(file);
+        const size_t n   = a.shape.back();
+        w.assign(a.data.begin(), a.data.begin() + long(n));
+        return w;
+    }
+
+    // Text
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+        throw std::runtime_error("cannot open " + file);
+    QTextStream in(&f);
+    std::vector<std::pair<long, double>> rows;
+    bool twoColumns = false;
+    int lineNo      = 0;
+    while (!in.atEnd())
+    {
+        QString line = in.readLine();
+        ++lineNo;
+        const int hash = line.indexOf('#');
+        if (hash >= 0)
+            line.truncate(hash);
+        line.replace(',', ' ').replace(';', ' ');
+        const QStringList parts = line.split(' ', Qt::SkipEmptyParts);
+        if (parts.isEmpty())
+            continue;
+        bool ok1 = false, ok2 = true;
+        const double a = parts[0].toDouble(&ok1);
+        double b       = 0.0;
+        if (parts.size() >= 2)
+            b = parts[1].toDouble(&ok2);
+        if (!ok1 || !ok2)
+        {
+            if (rows.empty()) // a header line
+                continue;
+            throw std::runtime_error("line " + std::to_string(lineNo)
+                                     + " of " + file + " is not numeric");
+        }
+        if (parts.size() >= 2)
+        {
+            twoColumns = true;
+            rows.push_back({std::lround(a), b});
+        }
+        else
+            rows.push_back({long(rows.size()), a});
+    }
+    if (rows.empty())
+        throw std::runtime_error(file + " has no values");
+    if (twoColumns)
+    {
+        if (rows.front().first != 0)
+            throw std::runtime_error(file + " must start at l = 0");
+        for (size_t i = 0; i < rows.size(); ++i)
+            if (rows[i].first != long(i))
+                throw std::runtime_error(
+                    file + ": l must go 0, 1, 2, ... without gaps (line "
+                    + std::to_string(i + 1) + ")");
+    }
+    for (const auto &r : rows)
+        w.push_back(r.second);
+    return w;
+}
 
 DowngradeResult
 downgradeMap(const Healpix_Map<float> &in, const DowngradeOptions &o)

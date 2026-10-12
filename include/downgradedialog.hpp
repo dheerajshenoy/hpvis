@@ -43,6 +43,7 @@ private:
     void showMessage(const QString &text, bool error);
     void updateOptions();
     int nsideOut() const;
+    QWidget *windowRow(QLineEdit *&edit, const QString &tip);
 
     std::function<View *()> m_currentView;
     QPointer<View> m_view;
@@ -56,6 +57,8 @@ private:
     QSpinBox *m_iterations       = nullptr;
     QSpinBox *m_lmax             = nullptr;
     QCheckBox *m_keepUnseen      = nullptr;
+    QLineEdit *m_windowIn        = nullptr;
+    QLineEdit *m_windowOut       = nullptr;
     QLabel *m_hint               = nullptr;
     QLineEdit *m_title           = nullptr;
     QLabel *m_message            = nullptr;
