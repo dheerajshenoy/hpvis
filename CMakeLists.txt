@@ -30,7 +30,9 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 
-add_subdirectory(thirdparty/cfitsio)
+# Bundled copy is not built/installed by default; we link the system cfitsio
+# below (installing it would overwrite the system library).
+add_subdirectory(thirdparty/cfitsio EXCLUDE_FROM_ALL)
 pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
 
 # --- HEALPix C++ (and libsharp) ----------------------------------------
@@ -251,6 +253,23 @@ include(GNUInstallDirs)
 
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Man page: generated from docs/MAN.md with pandoc
+find_program(PANDOC_EXECUTABLE pandoc)
+if(PANDOC_EXECUTABLE)
+    set(HPVIS_MANPAGE ${CMAKE_BINARY_DIR}/hpvis.1)
+    add_custom_command(
+        OUTPUT ${HPVIS_MANPAGE}
+        COMMAND ${PANDOC_EXECUTABLE} -s -f markdown -t man
+                ${CMAKE_SOURCE_DIR}/docs/MAN.md -o ${HPVIS_MANPAGE}
+        DEPENDS ${CMAKE_SOURCE_DIR}/docs/MAN.md
+        COMMENT "Generating man page")
+    add_custom_target(manpage ALL DEPENDS ${HPVIS_MANPAGE})
+    install(FILES ${HPVIS_MANPAGE}
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+else()
+    message(STATUS "pandoc not found: man page will not be installed")
+endif()
 
 # Install the vendored shared libraries next to the executable's prefix so the
 # installed binary can find them (build-tree RPATH is dropped on install).

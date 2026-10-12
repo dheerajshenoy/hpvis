@@ -34,28 +34,10 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Settings dialog for the defaults of new maps.
 
 
-## Building
+## Installation
 
-Requirements: a C++20 compiler, CMake 3.22+, Qt 6 (Core, Gui, Widgets,
-OpenGLWidgets, Concurrent, Graphs), OpenMP and cfitsio. HEALPix C++ and
-libsharp are built from the vendored sources as part of the normal build.
-
-```sh
-git clone --recurse-submodules https://github.com/dheerajshenoy/hpvis hpvis
-cd hpvis
-cmake -B build -S .
-cmake --build build -j
-./build/hpvis
-```
-
-The first build is slower because it compiles HEALPix.
-
-CMake options:
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `WITH_NAMASTER` | `ON` | Build NaMaster (power spectrum support) |
-| `CMAKE_BUILD_TYPE` | `Release` | Build type |
+See [INSTALLATION.md](INSTALLATION.md) for dependencies, build options and
+install instructions.
 
 ## Usage
 
