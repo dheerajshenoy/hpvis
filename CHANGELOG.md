@@ -5,6 +5,9 @@
 First development release.
 
 ### Rendering
+- Zoom out to 10%: the wheel, pinch and View > Zoom now go below 100%, which
+  shrinks the map inside the window. View > Zoom levels set the zoom
+  absolutely.
 - Pixel numbers: View > Pixel Grid > Show Pixel Numbers labels the pixels of the
   grid with their index in the map's pixel ordering, where they are big enough
   on screen to hold the label.

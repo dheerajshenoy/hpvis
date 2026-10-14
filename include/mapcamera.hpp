@@ -9,6 +9,8 @@
 // plane in 32-bit floats, which still resolve a pixel of an nside 8192 map
 // at this zoom.
 constexpr float kMaxZoom = 1000.0f;
+// Smallest zoom factor (0.1 = 10%): the whole map shrinks inside the window
+constexpr float kMinZoom = 0.1f;
 
 struct MapCamera
 {
@@ -27,7 +29,7 @@ struct MapCamera
     }
 
     // Clamp zoom levels to prevent inverse flipping or infinite scaling
-    void adjustZoom(float factor, float minZoom = 0.1f, float maxZoom = kMaxZoom)
+    void adjustZoom(float factor, float minZoom = kMinZoom, float maxZoom = kMaxZoom)
     {
         zoom = std::clamp(zoom * factor, minZoom, maxZoom);
         if (zoom <= minZoom)
@@ -48,15 +50,20 @@ struct MapCamera
 
     // Zoom by `factor` keeping the point under `ndc` (cursor, [-1,1]^2, y up)
     // fixed on screen. The shader samples p = ndc / zoom + panOffset.
-    void zoomAt(float factor, QVector2D ndc, float minZoom = 1.0f,
+    void zoomAt(float factor, QVector2D ndc, float minZoom = kMinZoom,
                 float maxZoom = kMaxZoom)
     {
         const QVector2D anchor = ndc / zoom + panOffset;
         adjustZoom(factor, minZoom, maxZoom);
-        if (zoom > minZoom)
+        if (zoom > 1.0f)
         {
             panOffset = anchor - ndc / zoom;
             clampPan();
+        }
+        else
+        {
+            // The whole map is in view: keep it centred
+            panOffset = QVector2D(0.0f, 0.0f);
         }
     }
 

@@ -2410,7 +2410,8 @@ OpenGLWidget::resetZoom()
 void
 OpenGLWidget::setZoom(float zoom)
 {
-    m_camera->adjustZoom(zoom);
+    // Absolute level, about the window centre
+    m_camera->zoomAt(zoom / m_camera->zoom, QVector2D(0.0f, 0.0f));
     emit zoomChanged(m_camera->zoom);
     emitCursorData();
     update();
