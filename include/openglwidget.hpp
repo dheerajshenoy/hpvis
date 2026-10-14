@@ -5,6 +5,7 @@
 #include "mapcamera.hpp"
 #include "masksource.hpp"
 #include "pixelordering.hpp"
+#include <QKeySequence>
 #include "projection.hpp"
 #include "skyframe.hpp"
 #include "tilecache.hpp"
@@ -155,6 +156,12 @@ public:
     void resetZoom();
     // Arms a rubber-band: the next left-drag zooms to the dragged rectangle
     void beginZoomToRegion();
+    // Zoom about the window centre by `factor`, or pan by a fraction of the
+    // window (right and up are positive; only moves a zoomed-in view)
+    void zoomStep(float factor);
+    void panStep(float right, float up);
+    // Keys that close (or cancel) a region being drawn
+    void setRegionKeys(const QKeySequence &finish, const QKeySequence &cancel);
 
     // The shapes a statistics region can have. Rectangle, ellipse and polygon
     // are drawn on the projection plane; a line is the great-circle arc
@@ -456,6 +463,8 @@ private:
     // corners (rectangle, ellipse), the two ends (line) or the corners
     void setStatsRegion(RegionShape shape, const QVector<QPointF> &points);
     void finishPolygon();
+    QKeySequence m_regionFinishKey = QKeySequence(Qt::Key_Return);
+    QKeySequence m_regionCancelKey = QKeySequence(Qt::Key_Escape);
     void paintStatsRegion(QPainter &p);
     void applyMaskChange(bool texturesChanged);
     int maskBits(bool inverted = false) const;

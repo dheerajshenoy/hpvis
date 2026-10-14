@@ -5,6 +5,7 @@
 #include "skyframe.hpp"
 
 #include <QColor>
+#include <QMap>
 #include <QString>
 
 // User preferences, stored with QSettings (~/.config/hpvis/hpvis.conf
@@ -50,6 +51,10 @@ struct AppSettings
     int theoryPreset        = 0; // TheoryPreset
     QString theoryFile;          // for the custom preset
     int theoryUnit          = 0; // TheoryUnit: the maps' unit (uK, mK, K)
+
+    // Key bindings that differ from the built-in ones: command id -> key
+    // sequence (PortableText). An empty sequence means the key was removed.
+    QMap<QString, QString> shortcuts;
 
     bool operator==(const AppSettings &) const = default;
 

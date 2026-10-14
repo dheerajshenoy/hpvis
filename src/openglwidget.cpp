@@ -2252,16 +2252,35 @@ OpenGLWidget::mouseDoubleClickEvent(QMouseEvent *e)
 }
 
 void
+OpenGLWidget::setRegionKeys(const QKeySequence &finish,
+                            const QKeySequence &cancel)
+{
+    m_regionFinishKey = finish;
+    m_regionCancelKey = cancel;
+}
+
+void
 OpenGLWidget::keyPressEvent(QKeyEvent *e)
 {
+    // The keypad Enter counts as Return
+    const QKeyCombination combo
+        = e->key() == Qt::Key_Enter
+              ? QKeyCombination(e->modifiers() & ~Qt::KeypadModifier,
+                                Qt::Key_Return)
+              : QKeyCombination(e->modifiers() & ~Qt::KeypadModifier,
+                                Qt::Key(e->key()));
+    const QKeySequence pressed(combo);
+    const bool finish = !m_regionFinishKey.isEmpty() && pressed == m_regionFinishKey;
+    const bool cancel = !m_regionCancelKey.isEmpty() && pressed == m_regionCancelKey;
+
     if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
     {
-        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter)
+        if (finish)
         {
             finishPolygon();
             return;
         }
-        if (e->key() == Qt::Key_Escape)
+        if (cancel)
         {
             m_polyPoints.clear();
             m_statsRegionArmed = false;
@@ -2270,7 +2289,7 @@ OpenGLWidget::keyPressEvent(QKeyEvent *e)
             return;
         }
     }
-    else if (m_statsRegionArmed && e->key() == Qt::Key_Escape)
+    else if (m_statsRegionArmed && cancel)
     {
         m_statsRegionArmed = false;
         unsetCursor();
@@ -2403,6 +2422,25 @@ OpenGLWidget::resetZoom()
 {
     m_camera->resetZoom();
     emit zoomChanged(m_camera->zoom);
+    emitCursorData();
+    update();
+}
+
+void
+OpenGLWidget::zoomStep(float factor)
+{
+    m_camera->zoomAt(factor, QVector2D(0.0f, 0.0f));
+    emit zoomChanged(m_camera->zoom);
+    emitCursorData();
+    update();
+}
+
+void
+OpenGLWidget::panStep(float right, float up)
+{
+    // A fraction of the window: panBy takes the content's screen movement
+    constexpr float kStep = 0.25f;
+    m_camera->panBy(QVector2D(-right * kStep, -up * kStep));
     emitCursorData();
     update();
 }

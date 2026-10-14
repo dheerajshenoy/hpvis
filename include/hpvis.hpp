@@ -8,6 +8,7 @@
 #include "openmap.hpp"
 #include "powerspectrumdock.hpp"
 #include "recentfiles.hpp"
+#include "shortcuts.hpp"
 #include "statisticsdock.hpp"
 #include "statusbar.hpp"
 #include "tabwidget.hpp"
@@ -75,6 +76,21 @@ private:
     void setOrientation(Orientation orientation);
     void rebuildMasksMenu(const View *view);
     void initShortcuts();
+    // Every command a key can be bound to (menu actions and the viewer's
+    // own keys), and the QAction behind each menu one
+    struct ShortcutTarget
+    {
+        ShortcutCommand command;
+        QAction *action = nullptr; // null for the viewer's own keys
+    };
+    QList<ShortcutTarget> shortcutTargets();
+    void collectShortcutTargets(QMenu *menu, const QStringList &path,
+                                QList<ShortcutTarget> &out,
+                                QSet<QString> &seen);
+    QKeySequence effectiveKey(const ShortcutCommand &command) const;
+    QList<ShortcutCommand> shortcutCommands();
+    void applyShortcuts();
+    void buildMasksMenu(const View *view);
     void applyInterfaceSettings();
     QString startDirectory() const;
     void rememberDirectory(const QString &path) const;
@@ -110,6 +126,9 @@ private slots:
     void onColormapRangeActionTriggered();
 
 private:
+    QPair<QKeySequence, QKeySequence> m_regionKeys{QKeySequence(Qt::Key_Return),
+                                                   QKeySequence(Qt::Key_Escape)};
+    bool m_shortcutsReady = false; // the built-in keys are in place
     CliOptions m_cli;
     QSet<QString> m_cliPaths; // files opened from the command line
 

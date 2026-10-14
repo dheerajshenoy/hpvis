@@ -1,12 +1,16 @@
 #pragma once
 
 #include "appsettings.hpp"
+#include "shortcuts.hpp"
 
 #include <QDialog>
 #include <QStringList>
 
 class QCheckBox;
 class QComboBox;
+class QKeySequenceEdit;
+class QTableWidget;
+class QLabel;
 class QLineEdit;
 class QListView;
 class QPushButton;
@@ -19,7 +23,9 @@ class SettingsDialog : public QDialog
 {
     Q_OBJECT
 public:
-    explicit SettingsDialog(QWidget *parent = nullptr);
+    // `commands` are the commands a key can be bound to
+    explicit SettingsDialog(const QList<ShortcutCommand> &commands,
+                            QWidget *parent = nullptr);
 
     void reject() override; // asks first when there are unsaved changes
 
@@ -45,6 +51,10 @@ private:
     QWidget *createAppearanceSettingsPage();
     QWidget *createOverlaysSettingsPage();
     QWidget *createTheorySettingsPage();
+    QWidget *createShortcutsPage();
+    // `row` was just given a key: any other command with the same key loses it
+    void commitShortcut(int row);
+    void filterShortcuts(const QString &text);
     QWidget *createAboutPage();
 
     void setColorButton(QPushButton *button, const QColor &color);
@@ -60,6 +70,13 @@ private:
 
     // Words each page answers to in the search box (same order as the pages)
     QStringList m_pageKeywords;
+
+    // Shortcuts
+    QList<ShortcutCommand> m_commands;
+    QTableWidget *m_shortcutTable = nullptr;
+    QList<QKeySequenceEdit *> m_keyEdits; // same order as m_commands
+    QLabel *m_shortcutNotice      = nullptr;
+    int m_lastEditedShortcut      = -1;
 
     // General
     QSpinBox *m_recentMaxSpin       = nullptr;

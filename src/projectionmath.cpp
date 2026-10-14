@@ -93,6 +93,8 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
         }
 
         case Projection::EQUIRECTANGULAR:
+            if (std::abs(px) > 1.0 || std::abs(py) > 1.0)
+                return false;
             colat = M_PI / 2.0 - py * M_PI / 2.0;
             phi   = wrap2Pi(-px * M_PI);
             return true;
@@ -131,6 +133,8 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
         }
 
         case Projection::MERCATOR:
+            if (std::abs(px) > 1.0 || std::abs(py) > 1.0)
+                return false;
             colat = M_PI / 2.0 - std::atan(std::sinh(py * M_PI));
             phi   = wrap2Pi(-px * M_PI);
             return true;
@@ -149,6 +153,8 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
 
         case Projection::LAMBERT_CYLINDRICAL:
         case Projection::GALL_PETERS:
+            if (std::abs(px) > 1.0 || std::abs(py) > 1.0)
+                return false;
             colat = M_PI / 2.0 - std::asin(std::clamp(py, -1.0, 1.0));
             phi   = wrap2Pi(-px * M_PI);
             return true;

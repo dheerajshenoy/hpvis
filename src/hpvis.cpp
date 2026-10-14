@@ -44,6 +44,7 @@
 #include <QVBoxLayout>
 #include <cmath>
 #include <iostream>
+#include <tuple>
 
 HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
@@ -624,6 +625,31 @@ HpVis::initMenubar()
             m_view->glWidget()->resetZoom();
     });
 
+    m_viewZoomMenu->addAction("Zoom &In", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->zoomStep(1.25f);
+    });
+    m_viewZoomMenu->addAction("Zoom &Out", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->zoomStep(0.8f);
+    });
+
+    // Moves a zoomed-in view; the keys are up to the user (Settings > Shortcuts)
+    QMenu *panMenu = m_viewMenu->addMenu("&Pan");
+    const std::tuple<const char *, float, float> pans[]
+        = {{"&Left", -1.0f, 0.0f},
+           {"&Right", 1.0f, 0.0f},
+           {"&Up", 0.0f, 1.0f},
+           {"&Down", 0.0f, -1.0f}};
+    for (const auto &[name, dx, dy] : pans)
+        panMenu->addAction(name, this, [this, dx = dx, dy = dy]()
+        {
+            if (m_view)
+                m_view->glWidget()->panStep(dx, dy);
+        });
+
     QMenu *regionMenu = m_viewMenu->addMenu("Select &Statistics Region");
     const std::pair<const char *, OpenGLWidget::RegionShape> shapes[] = {
         {"&Rectangle", OpenGLWidget::RegionShape::Rectangle},
@@ -686,6 +712,8 @@ void
 HpVis::updateRecentMenu()
 {
     m_fileOpenRecentMenu->clear();
+    // Only the menu itself can have a key: its entries change
+    m_fileOpenRecentMenu->menuAction()->setProperty("hpvisBindMenu", true);
 
     const QStringList files = m_recentFiles.files();
     if (files.isEmpty())
@@ -950,6 +978,15 @@ HpVis::updateMaskListFromView(const View *view)
 void
 HpVis::rebuildMasksMenu(const View *view)
 {
+    buildMasksMenu(view);
+    // The menu's actions were just recreated
+    if (m_shortcutsReady)
+        applyShortcuts();
+}
+
+void
+HpVis::buildMasksMenu(const View *view)
+{
     m_masksMenu->clear();
     OpenGLWidget *gl = view ? view->glWidget() : nullptr;
 
@@ -985,6 +1022,7 @@ HpVis::rebuildMasksMenu(const View *view)
     for (int i = 0; i < gl->maskCount(); ++i)
     {
         QMenu *sub = m_masksMenu->addMenu(gl->maskName(i));
+        sub->menuAction()->setProperty("hpvisNoBind", true); // one per mask
         sub->menuAction()->setCheckable(true);
         sub->setToolTipsVisible(true);
         sub->setToolTip(gl->maskPath(i));
@@ -1016,6 +1054,7 @@ HpVis::rebuildMasksMenu(const View *view)
 
     m_masksMenu->addSeparator();
     QMenu *mode = m_masksMenu->addMenu("&Mode");
+    mode->menuAction()->setProperty("hpvisNoBind", true);
     auto *group = new QActionGroup(mode);
     for (int m = 0; m < 2; ++m)
     {
@@ -1191,7 +1230,7 @@ HpVis::onExportActionTriggered()
 void
 HpVis::onSettingsActionTriggered()
 {
-    SettingsDialog dialog(this);
+    SettingsDialog dialog(shortcutCommands(), this);
     connect(&dialog, &SettingsDialog::settingsSaved, this,
             &HpVis::applySavedSettings);
     dialog.exec();
@@ -1203,6 +1242,7 @@ HpVis::applySavedSettings()
 {
     const AppSettings previous = m_settings;
     m_settings                 = AppSettings::load();
+    applyShortcuts();
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     updateRecentMenu();
     applyInterfaceSettings();
@@ -1322,6 +1362,7 @@ void
 HpVis::applyDefaults(View *view)
 {
     OpenGLWidget *gl = view->glWidget();
+    gl->setRegionKeys(m_regionKeys.first, m_regionKeys.second);
     gl->setColormap(m_settings.colormap);
     gl->setColormapInvert(m_settings.reverseColormap);
     gl->setColormapScale(m_settings.scale);
@@ -1380,6 +1421,149 @@ HpVis::initShortcuts()
     m_viewMinimapAction->setShortcut(QKeySequence("M"));
     m_viewColorBarAction->setShortcut(QKeySequence("C"));
     m_viewResetViewAction->setShortcut(QKeySequence("0"));
+
+    // Those are the defaults; the user's own keys go on top
+    m_shortcutsReady = true;
+    applyShortcuts();
+}
+
+namespace
+{
+const char *const kFinishRegionId = "region/finish-polygon";
+const char *const kCancelRegionId = "region/cancel-selection";
+
+QString
+shortcutSlug(const QString &text)
+{
+    QString out;
+    for (const QChar c : text.toLower())
+    {
+        if (c.isLetterOrNumber())
+            out += c;
+        else if (!out.isEmpty() && !out.endsWith('-'))
+            out += '-';
+    }
+    while (out.endsWith('-'))
+        out.chop(1);
+    return out;
+}
+} // namespace
+
+void
+HpVis::collectShortcutTargets(QMenu *menu, const QStringList &path,
+                              QList<ShortcutTarget> &out, QSet<QString> &seen)
+{
+    for (QAction *a : menu->actions())
+    {
+        if (a->isSeparator() || a->property("hpvisNoBind").toBool())
+            continue;
+        QString text = a->text();
+        text.remove('&');
+        if (text.isEmpty())
+            continue;
+
+        QMenu *sub = a->menu();
+        if (sub && !a->property("hpvisBindMenu").toBool())
+        {
+            collectShortcutTargets(sub, path + QStringList{text}, out, seen);
+            continue;
+        }
+
+        // The built-in key is whatever the action has the first time it is
+        // seen, before any of the user's keys are applied
+        if (!a->property("hpvisDefaultKey").isValid())
+            a->setProperty("hpvisDefaultKey",
+                           a->shortcut().toString(QKeySequence::PortableText));
+
+        QStringList slugs;
+        for (const QString &part : path + QStringList{text})
+            slugs << shortcutSlug(part);
+        QString id = slugs.join('/');
+        for (int n = 2; seen.contains(id); ++n)
+            id = slugs.join('/') + "-" + QString::number(n);
+        seen.insert(id);
+
+        ShortcutTarget t;
+        t.action = a;
+        t.command.id       = id;
+        t.command.label    = (path.mid(1) + QStringList{text}).join(" > ");
+        t.command.category = path.value(0);
+        t.command.defaultKey = QKeySequence(
+            a->property("hpvisDefaultKey").toString(),
+            QKeySequence::PortableText);
+        out.append(t);
+    }
+}
+
+QList<HpVis::ShortcutTarget>
+HpVis::shortcutTargets()
+{
+    QList<ShortcutTarget> out;
+    QSet<QString> seen;
+    for (QAction *top : menuBar()->actions())
+    {
+        QString title = top->text();
+        title.remove('&');
+        if (top->menu())
+            collectShortcutTargets(top->menu(), {title}, out, seen);
+    }
+
+    // Keys read by the viewer rather than being menu actions
+    const std::pair<const char *, const char *> region[]
+        = {{kFinishRegionId, "Finish polygon region"},
+           {kCancelRegionId, "Cancel region selection"}};
+    for (const auto &[id, label] : region)
+    {
+        ShortcutTarget t;
+        t.command.id       = id;
+        t.command.label    = label;
+        t.command.category = "Region selection";
+        t.command.defaultKey
+            = QKeySequence(QString(id) == kFinishRegionId ? Qt::Key_Return
+                                                          : Qt::Key_Escape);
+        out.append(t);
+    }
+    return out;
+}
+
+QList<ShortcutCommand>
+HpVis::shortcutCommands()
+{
+    QList<ShortcutCommand> out;
+    for (const ShortcutTarget &t : shortcutTargets())
+        out.append(t.command);
+    return out;
+}
+
+QKeySequence
+HpVis::effectiveKey(const ShortcutCommand &command) const
+{
+    const auto it = m_settings.shortcuts.constFind(command.id);
+    if (it == m_settings.shortcuts.cend())
+        return command.defaultKey;
+    return QKeySequence(it.value(), QKeySequence::PortableText);
+}
+
+// Puts the built-in keys, with the user's changes on top, on the actions and
+// on the viewers
+void
+HpVis::applyShortcuts()
+{
+    QKeySequence finish(Qt::Key_Return), cancel(Qt::Key_Escape);
+    for (const ShortcutTarget &t : shortcutTargets())
+    {
+        const QKeySequence key = effectiveKey(t.command);
+        if (t.action)
+            t.action->setShortcut(key);
+        else if (t.command.id == kFinishRegionId)
+            finish = key;
+        else if (t.command.id == kCancelRegionId)
+            cancel = key;
+    }
+    m_regionKeys = {finish, cancel};
+    for (int i = 0; i < m_tabWidget->count(); ++i)
+        if (auto *view = qobject_cast<View *>(m_tabWidget->widget(i)))
+            view->glWidget()->setRegionKeys(finish, cancel);
 }
 
 void

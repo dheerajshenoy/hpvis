@@ -166,6 +166,12 @@ First development release.
   count adapts to the width, and labels use a compact or scientific format.
 
 ### Interface
+- Custom keyboard shortcuts: Settings > Shortcuts lists every menu command and
+  the viewer's region keys (finish polygon, cancel selection) and lets you bind
+  any key or key chord to them. Binding a key that another command already
+  uses takes it from that command, and says which one lost it.
+- View > Zoom > Zoom In / Zoom Out and View > Pan > Left / Right / Up / Down
+  commands, with no key by default, to bind in Settings > Shortcuts.
 - Tabbed interface: open several maps at once, each with its own view and
   settings.
 - A toolbar with the frequently used controls: HDU, Column, Projection,

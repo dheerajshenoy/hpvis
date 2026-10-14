@@ -10,6 +10,9 @@
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QHeaderView>
+#include <QKeySequenceEdit>
+#include <QTableWidget>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListView>
@@ -21,7 +24,9 @@
 #include <QStringListModel>
 #include <QVBoxLayout>
 
-SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
+SettingsDialog::SettingsDialog(const QList<ShortcutCommand> &commands,
+                               QWidget *parent)
+    : QDialog(parent), m_commands(commands)
 {
     initUI();
     initConnections();
@@ -42,6 +47,7 @@ SettingsDialog::initUI()
         "Appearance",
         "Overlays",
         "Theory",
+        "Shortcuts",
         "About",
     });
     m_pageKeywords = {
@@ -60,6 +66,8 @@ SettingsDialog::initUI()
         "hide dim strength opacity",
         "theory theoretical cmb power spectrum planck 2018 best fit cosmology "
         "camb class custom file beam overplot units microkelvin kelvin",
+        "shortcuts keyboard keys keybindings bindings hotkeys commands menu "
+        "customize remap conflict reset",
         "about version author license",
     };
 
@@ -78,6 +86,7 @@ SettingsDialog::initUI()
     m_stackedWidget->addWidget(createAppearanceSettingsPage());
     m_stackedWidget->addWidget(createOverlaysSettingsPage());
     m_stackedWidget->addWidget(createTheorySettingsPage());
+    m_stackedWidget->addWidget(createShortcutsPage());
     m_stackedWidget->addWidget(createAboutPage());
 
     hlayout->addWidget(m_listView);
@@ -226,6 +235,9 @@ SettingsDialog::reject()
 void
 SettingsDialog::onSaveClicked()
 {
+    // A key typed a moment ago may not have been committed yet
+    if (m_lastEditedShortcut >= 0)
+        commitShortcut(m_lastEditedShortcut);
     saveSettings();
     emit settingsSaved();
 }
@@ -265,6 +277,14 @@ SettingsDialog::currentSettings() const
     a.plotBackground     = m_plotBackground;
     a.plotForeground     = m_plotForeground;
     a.plotLine           = m_plotLine;
+    // Only the keys that differ from the built-in ones are stored
+    for (int i = 0; i < m_commands.size(); ++i)
+    {
+        const QKeySequence key = m_keyEdits[i]->keySequence();
+        if (key != m_commands[i].defaultKey)
+            a.shortcuts.insert(m_commands[i].id,
+                               key.toString(QKeySequence::PortableText));
+    }
     return a;
 }
 
@@ -328,6 +348,16 @@ SettingsDialog::loadSettings()
     setColorButton(m_plotBgButton, m_plotBackground);
     setColorButton(m_plotFgButton, m_plotForeground);
     setColorButton(m_plotLineButton, m_plotLine);
+
+    for (int i = 0; i < m_commands.size(); ++i)
+    {
+        const auto it = a.shortcuts.constFind(m_commands[i].id);
+        const QSignalBlocker block(m_keyEdits[i]);
+        m_keyEdits[i]->setKeySequence(
+            it == a.shortcuts.cend()
+                ? m_commands[i].defaultKey
+                : QKeySequence(it.value(), QKeySequence::PortableText));
+    }
 
     m_saved = currentSettings(); // normalised by the widgets (e.g. step)
     updateSaveEnabled();
@@ -652,6 +682,120 @@ SettingsDialog::createOverlaysSettingsPage()
     outer->addWidget(maskBox);
     outer->addStretch();
     return page;
+}
+
+QWidget *
+SettingsDialog::createShortcutsPage()
+{
+    QWidget *page       = new QWidget();
+    QVBoxLayout *layout = new QVBoxLayout(page);
+
+    auto *filter = new QLineEdit();
+    filter->setPlaceholderText("Filter commands...");
+    layout->addWidget(filter);
+
+    m_shortcutTable = new QTableWidget(int(m_commands.size()), 3);
+    m_shortcutTable->setHorizontalHeaderLabels(
+        {"Command", "Shortcut", "Default"});
+    m_shortcutTable->verticalHeader()->hide();
+    m_shortcutTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_shortcutTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_shortcutTable->horizontalHeader()->setSectionResizeMode(
+        0, QHeaderView::Stretch);
+    m_shortcutTable->horizontalHeader()->setSectionResizeMode(
+        1, QHeaderView::ResizeToContents);
+    m_shortcutTable->horizontalHeader()->setSectionResizeMode(
+        2, QHeaderView::ResizeToContents);
+    layout->addWidget(m_shortcutTable);
+
+    for (int row = 0; row < m_commands.size(); ++row)
+    {
+        const ShortcutCommand &c = m_commands[row];
+        auto *name               = new QTableWidgetItem(
+            c.label.isEmpty() ? c.category : c.category + " > " + c.label);
+        m_shortcutTable->setItem(row, 0, name);
+
+        auto *edit = new QKeySequenceEdit(c.defaultKey);
+        edit->setClearButtonEnabled(true);
+        edit->setMinimumWidth(150);
+        m_keyEdits.append(edit);
+        m_shortcutTable->setCellWidget(row, 1, edit);
+        connect(edit, &QKeySequenceEdit::keySequenceChanged, this,
+                [this, row]()
+        {
+            m_lastEditedShortcut = row;
+            updateSaveEnabled();
+        });
+        connect(edit, &QKeySequenceEdit::editingFinished, this,
+                [this, row]() { commitShortcut(row); });
+
+        auto *def = new QTableWidgetItem(
+            c.defaultKey.isEmpty() ? QString("-")
+                                   : c.defaultKey.toString(
+                                       QKeySequence::NativeText));
+        m_shortcutTable->setItem(row, 2, def);
+    }
+
+    m_shortcutNotice = new QLabel();
+    m_shortcutNotice->setWordWrap(true);
+    layout->addWidget(m_shortcutNotice);
+
+    auto *reset = new QPushButton("Reset All to Defaults");
+    layout->addWidget(reset, 0, Qt::AlignRight);
+
+    connect(filter, &QLineEdit::textChanged, this,
+            &SettingsDialog::filterShortcuts);
+    connect(reset, &QPushButton::clicked, this, [this]()
+    {
+        for (int i = 0; i < m_commands.size(); ++i)
+            m_keyEdits[i]->setKeySequence(m_commands[i].defaultKey);
+        m_lastEditedShortcut = -1;
+        m_shortcutNotice->clear();
+        updateSaveEnabled();
+    });
+    return page;
+}
+
+void
+SettingsDialog::commitShortcut(int row)
+{
+    m_lastEditedShortcut = -1;
+    const QKeySequence key = m_keyEdits[row]->keySequence();
+    if (key.isEmpty())
+    {
+        m_shortcutNotice->clear();
+        return;
+    }
+
+    QStringList lost;
+    for (int i = 0; i < m_commands.size(); ++i)
+    {
+        if (i == row || m_keyEdits[i]->keySequence() != key)
+            continue;
+        m_keyEdits[i]->setKeySequence(QKeySequence());
+        lost << m_shortcutTable->item(i, 0)->text();
+    }
+    if (lost.isEmpty())
+    {
+        m_shortcutNotice->clear();
+        return;
+    }
+    m_shortcutNotice->setText(
+        QString("%1 now belongs to <b>%2</b>. It was removed from: %3.")
+            .arg(key.toString(QKeySequence::NativeText).toHtmlEscaped(),
+                 m_shortcutTable->item(row, 0)->text().toHtmlEscaped(),
+                 lost.join("; ").toHtmlEscaped()));
+    updateSaveEnabled();
+}
+
+void
+SettingsDialog::filterShortcuts(const QString &text)
+{
+    for (int row = 0; row < m_shortcutTable->rowCount(); ++row)
+        m_shortcutTable->setRowHidden(
+            row, !text.isEmpty()
+                     && !m_shortcutTable->item(row, 0)->text().contains(
+                         text, Qt::CaseInsensitive));
 }
 
 QWidget *

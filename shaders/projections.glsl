@@ -54,6 +54,10 @@ bool inverseEquirectangular(
     out float colat,
     out float phi
 ) {
+    // Outside the map: nothing to wrap around to
+    if (abs(uv.x - 0.5) > 0.5 || abs(uv.y - 0.5) > 0.5)
+        return false;
+
     float lon = -(uv.x - 0.5) * 2.0 * PI;
     float lat = (uv.y - 0.5) * PI;
 
@@ -139,6 +143,10 @@ bool inverseMercator(
     out float colat,
     out float phi
 ) {
+    // Outside the map: nothing to wrap around to
+    if (abs(uv.x - 0.5) > 0.5 || abs(uv.y - 0.5) > 0.5)
+        return false;
+
     float lon = -(uv.x - 0.5) * 2.0 * PI;
     float y = (uv.y - 0.5) * 2.0 * PI;
     float lat = atan(sinh(y));
@@ -180,6 +188,10 @@ bool inverseLambertCylindrical(
     out float colat,
     out float phi
 ) {
+    // Outside the map: nothing to wrap around to
+    if (abs(uv.x - 0.5) > 0.5 || abs(uv.y - 0.5) > 0.5)
+        return false;
+
     float lon = -(uv.x - 0.5) * 2.0 * PI;
     float s = (uv.y - 0.5) * 2.0;
 

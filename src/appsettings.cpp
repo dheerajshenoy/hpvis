@@ -91,6 +91,17 @@ AppSettings::load()
     a.theoryFile = s.value("theory/file", d.theoryFile).toString();
     a.theoryUnit
         = std::clamp(s.value("theory/unit", d.theoryUnit).toInt(), 0, 2);
+
+    s.beginGroup("shortcuts");
+    for (const QString &id : s.allKeys())
+    {
+        // A comma in the value (a key chord) makes the ini reader return a list
+        const QVariant v = s.value(id);
+        a.shortcuts.insert(id, v.metaType().id() == QMetaType::QStringList
+                                   ? v.toStringList().join(", ")
+                                   : v.toString());
+    }
+    s.endGroup();
     return a;
 }
 
@@ -133,5 +144,8 @@ AppSettings::save() const
     s.setValue("theory/preset", theoryPreset);
     s.setValue("theory/file", theoryFile);
     s.setValue("theory/unit", theoryUnit);
+    s.remove("shortcuts");
+    for (auto it = shortcuts.cbegin(); it != shortcuts.cend(); ++it)
+        s.setValue("shortcuts/" + it.key(), it.value());
     s.sync();
 }
