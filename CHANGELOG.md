@@ -6,6 +6,14 @@ First development release.
 
 ### Rendering
 - Add colorbar tick label antialiasing.
+- Pixel grid overlay: View > Pixel Grid draws the boundaries of the HEALPix
+  pixels of any nside (rounded to a power of two, 1 to 8192, independent of
+  the map's own nside), with its own color, and `--pixel-grid NSIDE` on the
+  command line. The lines fade out when the pixels get smaller than a few
+  screen pixels.
+- Overlay text (color bar labels, graticule labels) is rasterized with
+  antialiasing, which the GL paint engine did not apply on a surface without
+  multisampling.
 - GPU Mollweide projection of HEALPix maps, computed per pixel in a fragment
   shader (inverse projection plus HEALPix pixel lookup).
 - Eleven projections (Mollweide, Hammer, Equirectangular, Mercator, Sinusoidal,
@@ -108,6 +116,11 @@ First development release.
   validity and mask rules as the whole map. The region stays fixed on the sky
   and is outlined on the map; View > Clear Statistics Region removes it.
   The numbers are computed on a worker thread.
+- The region can also be an ellipse, a polygon (click the corners; double
+  click or Enter closes it, Esc cancels, right click removes the last corner)
+  or a line (the great-circle arc between two dragged points, whose pixels are
+  measured and whose length is shown instead of an area). View > Select
+  Statistics Region is now a submenu with the four shapes.
 - The histogram can plot the region next to the whole map (the "Region"
   option of the Statistics dock, remembered between sessions).
 
@@ -225,7 +238,7 @@ First development release.
 - Open files from the File menu, or from the command line (`hpvis
   file.fits ...`). Command-line options override the saved defaults: `--hdu`,
   `--column`, `--colormap`, `--reverse`, `--scale`, `--min`, `--max`,
-  `--projection`, `--graticule` and `--mask`. `--export FILE` saves the view as
+  `--projection`, `--graticule`, `--pixel-grid` and `--mask`. `--export FILE` saves the view as
   an image and exits, and `--info` / `--stats` print the HDUs and columns or
   the map statistics without opening a window.
 - Files are opened with `fitshandle`: every HDU that holds a HEALPix map (NSIDE and
@@ -252,8 +265,21 @@ First development release.
 - Map statistics (range, f_sky, average, RMS, standard deviation) and the mask
   weight conversion run on all CPU cores.
 - Error dialog when a map cannot be loaded, including HEALPix library errors.
+- Export Image opens a dialog first, asking for an optional title (drawn above
+  the map), the format (PNG, JPEG, BMP), the width in device pixels, the JPEG
+  quality and whether to keep a transparent background; the file name gets the
+  extension of the chosen format when none is typed.
 
 ### Build and packaging
+- A man page is written in `docs/MAN.md` and converted with pandoc during the
+  build; it is installed to `share/man/man1` when pandoc is found.
+- `INSTALLATION.md` lists the dependencies (CFITSIO, autotools, GSL, FFTW3,
+  CBLAS, ...) with package commands for Arch, Debian/Ubuntu and Fedora, and
+  the build and install steps.
+- `cmake --install` installs the vendored HEALPix, libsharp and libnmt shared
+  libraries to `lib/hpvis` and sets the binary's RPATH to find them. The
+  bundled cfitsio is no longer built or installed, so it cannot overwrite the
+  system library.
 - CMake build with Qt 6, vendored cfitsio, and OpenMP linked. HEALPix C++ and
   libsharp are built from the vendored sources into the build tree, so no
   prebuilt libraries or absolute paths are kept in the repository. They are
