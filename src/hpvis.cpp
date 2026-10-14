@@ -504,6 +504,17 @@ HpVis::initMenubar()
         m_view->glWidget()->setCellGridEnabled(true);
         m_cellGridShowAction->setChecked(true);
     });
+    m_cellLabelsAction = cellMenu->addAction("Show Pixel &Numbers");
+    m_cellLabelsAction->setCheckable(true);
+    connect(m_cellLabelsAction, &QAction::toggled, this, [this](bool on)
+    {
+        if (!m_view)
+            return;
+        m_view->glWidget()->setCellLabelsEnabled(on);
+        // The numbers are those of the grid's pixels
+        if (on && !m_view->glWidget()->cellGridEnabled())
+            m_cellGridShowAction->setChecked(true);
+    });
     cellMenu->addAction("&Color...", this, [this]()
     {
         if (!m_view)
@@ -847,6 +858,10 @@ HpVis::updateControlsFromView(const View *view)
     {
         const QSignalBlocker block(m_cellGridShowAction);
         m_cellGridShowAction->setChecked(gl->cellGridEnabled());
+    }
+    {
+        const QSignalBlocker block(m_cellLabelsAction);
+        m_cellLabelsAction->setChecked(gl->cellLabelsEnabled());
     }
     m_reverseColormapAction->setChecked(gl->colormapInvert());
     m_toolBar->setColormap(gl->colormap());

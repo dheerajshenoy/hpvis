@@ -5,6 +5,9 @@
 First development release.
 
 ### Rendering
+- Pixel numbers: View > Pixel Grid > Show Pixel Numbers labels the pixels of the
+  grid with their index in the map's pixel ordering, where they are big enough
+  on screen to hold the label.
 - Add colorbar tick label antialiasing.
 - Pixel grid overlay: View > Pixel Grid draws the boundaries of the HEALPix
   pixels of any nside (rounded to a power of two, 1 to 8192, independent of

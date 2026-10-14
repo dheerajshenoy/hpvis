@@ -303,6 +303,9 @@ public:
     void setCellGridEnabled(bool enabled);
     void setCellGridNside(int nside);
     void setCellGridColor(const QColor &color);
+    // Number each pixel of the grid (in the map's pixel ordering)
+    void setCellLabelsEnabled(bool enabled);
+    bool cellLabelsEnabled() const { return m_cellLabelsEnabled; }
     bool cellGridEnabled() const { return m_cellGridEnabled; }
     int cellGridNside() const { return m_cellGridNside; }
     QColor cellGridColor() const { return m_cellGridColor; }
@@ -417,6 +420,7 @@ private:
     void updateRotation(const QPointF &pos);
     int minimapWidth() const;
     void paintGraticuleLabels(QPainter &p);
+    void paintCellLabels(QPainter &p);
     static constexpr int kMapPadding = 24; // logical px around the map
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
@@ -572,6 +576,7 @@ private:
     static constexpr int kMinimapMargin = 12;
     bool m_minimapEnabled               = false;
     bool m_cellGridEnabled              = false;
+    bool m_cellLabelsEnabled            = false;
     int m_cellGridNside                 = 4;
     QColor m_cellGridColor              = QColor(255, 220, 60, 200);
     bool m_graticuleEnabled             = false;

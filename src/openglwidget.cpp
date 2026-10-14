@@ -786,7 +786,8 @@ OpenGLWidget::paintGL()
     m_shaderProgram.release();
 
     if (!m_colorBarVisible && !showMinimap && !m_isRegionSelecting
-        && !m_graticuleEnabled && !m_statsRegion.active)
+        && !m_graticuleEnabled && !m_cellLabelsEnabled
+        && !m_statsRegion.active)
         return;
 
     QPainter p(this);
@@ -820,6 +821,9 @@ OpenGLWidget::paintGL()
 
     if (m_graticuleEnabled && !m_projectionFading)
         paintGraticuleLabels(p);
+
+    if (m_cellLabelsEnabled && !m_projectionFading)
+        paintCellLabels(p);
 
     paintStatsRegion(p);
 
@@ -3100,6 +3104,84 @@ OpenGLWidget::paintGraticuleLabels(QPainter &p)
         const double deg = std::round(qRadiansToDegrees(lat) * 100.0) / 100.0;
         if (projectToWindow(lat, meridian, at))
             draw(at - QPointF(4, 0), QString("%1°").arg(deg), true);
+    }
+}
+
+void
+OpenGLWidget::setCellLabelsEnabled(bool enabled)
+{
+    m_cellLabelsEnabled = enabled;
+    update();
+}
+
+// Numbers the pixels of the grid nside that are big enough on screen to hold
+// a label, in the pixel ordering of the map
+void
+OpenGLWidget::paintCellLabels(QPainter &p)
+{
+    constexpr int kSample    = 8;   // screen sampling step, px
+    constexpr size_t kMaxPix = 1500; // beyond this the labels cannot fit
+    if (m_nside <= 0)
+        return;
+
+    const Healpix_Base base(m_cellGridNside, NEST, SET_NSIDE);
+    const auto toMap = skyframe::rotation(displayFrame(), m_mapFrame);
+
+    // The pixels under a coarse screen grid
+    std::vector<int64_t> ids;
+    for (int y = kSample / 2; y < height(); y += kSample)
+        for (int x = kSample / 2; x < width(); x += kSample)
+        {
+            const QVector2D plane = toNdc(QPointF(x, y)) / m_camera->zoom
+                                    + m_camera->panOffset;
+            double colat, phi;
+            if (!projectionmath::inverse(m_projection, plane, colat, phi,
+                                         m_viewOutside))
+                continue;
+            double mc, mp;
+            anglesFromDirection(
+                skyframe::apply(toMap, m_rotation.rotatedVector(
+                                           directionFromAngles(colat, phi))),
+                mc, mp);
+            ids.push_back(base.ang2pix(pointing(mc, mp)));
+        }
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    if (ids.size() > kMaxPix)
+        return;
+
+    const auto toDisplay = skyframe::rotation(m_mapFrame, displayFrame());
+    const QFontMetrics fm = p.fontMetrics();
+    const QRectF bounds(0, 0, width(), height());
+    std::vector<QRectF> taken;
+
+    for (const int64_t id : ids)
+    {
+        const pointing c = base.pix2ang(id);
+        double colat, phi;
+        anglesFromDirection(
+            skyframe::apply(toDisplay, directionFromAngles(c.theta, c.phi)),
+            colat, phi);
+        QPointF at;
+        if (!projectToWindow(M_PI / 2.0 - colat, phi, at))
+            continue;
+
+        const int64_t label
+            = m_pixelOrdering == PixelOrdering::NESTED ? id : base.nest2ring(id);
+        const QString text = QString::number(qlonglong(label));
+        const QPointF origin(at.x() - fm.horizontalAdvance(text) / 2.0,
+                             at.y() + fm.ascent() / 2.0);
+        const QRectF box(origin.x(), origin.y() - fm.ascent(),
+                         fm.horizontalAdvance(text), fm.height());
+        if (!bounds.contains(box))
+            continue;
+        const QRectF padded = box.adjusted(-4, -2, 4, 2);
+        if (std::any_of(taken.begin(), taken.end(), [&](const QRectF &r)
+                        { return r.intersects(padded); }))
+            continue;
+        taken.push_back(padded);
+        drawTextPath(p, origin + QPointF(1, 1), text, QColor(0, 0, 0, 200));
+        drawTextPath(p, origin, text, Qt::white);
     }
 }
 

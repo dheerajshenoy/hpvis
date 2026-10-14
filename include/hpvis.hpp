@@ -141,6 +141,7 @@ private:
     QMenu *m_graticuleMenu           = nullptr;
     QAction *m_graticuleShowAction   = nullptr;
     QAction *m_cellGridShowAction    = nullptr;
+    QAction *m_cellLabelsAction      = nullptr;
     QMenu *m_graticuleStepMenu       = nullptr;
     QAction *m_reverseColormapAction = nullptr;
     QAction *m_scaleLinearAction     = nullptr;
