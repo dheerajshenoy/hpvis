@@ -13,6 +13,7 @@
 #include <QElapsedTimer>
 #include <QFutureWatcher>
 #include <QKeyEvent>
+#include <QImage>
 #include <QOpenGLBuffer>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
@@ -451,6 +452,13 @@ private:
     void rotateTo(const QQuaternion &target);
     void tickGlobeAnimation();
     void uploadColormapLut();
+    // Colorbar: the colormap is baked on the GPU into a 256x1 strip, drawn
+    // with the ticks and labels into m_colorbarImage, uploaded as a texture
+    // and composited by m_colorbarProgram
+    QImage bakeColormapStrip();
+    QImage renderColorbarImage(const QImage &strip) const;
+    void updateColorbarTexture();
+    QRectF colorbarOverlayRect() const; // device pixels, y up
     void recomputeDataRange();
     void recomputeRegionStats();
     void applyPixelOrdering(PixelOrdering ordering,
@@ -479,6 +487,9 @@ private:
     unsigned int m_lutTexture     = 0; // custom colormaps, one row each
     int m_lutRows                 = 1;
     bool m_lutDirty               = true;
+    int m_lutVersion              = 0;
+    unsigned int m_colorbarTexture = 0;
+    QVector<double> m_colorbarKey; // what the texture was last built from
     ColormapScale m_colormapScale = ColormapScale::LINEAR;
     float m_asinhSoftening        = 0.1f;
     long m_nside                  = 0;
@@ -516,6 +527,8 @@ private:
     QOpenGLVertexArrayObject m_vao;
     QOpenGLBuffer m_vbo{QOpenGLBuffer::VertexBuffer}; // VBO wrapper
     QOpenGLShaderProgram m_shaderProgram;
+    QOpenGLShaderProgram m_stripProgram;    // colormap -> 256x1 strip
+    QOpenGLShaderProgram m_colorbarProgram; // draws the colorbar texture
     MapCamera *m_camera = nullptr;
     bool m_isPanning    = false;
     QPoint m_lastMousePos;

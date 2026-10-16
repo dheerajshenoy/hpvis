@@ -3,11 +3,11 @@
 #include "appsettings.hpp"
 #include "colormapregistry.hpp"
 #include "fitsinfo.hpp"
-#include "npyreader.hpp"
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "healpix_map.h"
+#include "npyreader.hpp"
 #include "parallel.hpp"
 #include "projectionmath.hpp"
 #include "shaderloader.hpp"
@@ -18,6 +18,7 @@
 #include <QFutureWatcher>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QOpenGLFramebufferObject>
 #include <QNativeGestureEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -30,10 +31,10 @@
 #include <initializer_list>
 #include <iostream>
 #include <limits>
-#include <unordered_map>
 #include <pointing.h>
 #include <qcoreapplication.h>
 #include <qsurfaceformat.h>
+#include <unordered_map>
 #include <vector>
 
 static QVector<double>
@@ -111,6 +112,13 @@ OpenGLWidget::~OpenGLWidget()
         m_lutTexture = 0;
         doneCurrent();
     }
+    if (m_colorbarTexture)
+    {
+        makeCurrent();
+        glDeleteTextures(1, &m_colorbarTexture);
+        m_colorbarTexture = 0;
+        doneCurrent();
+    }
 }
 
 // Reads the map's pixel values as the other ordering, for files whose ORDERING
@@ -124,15 +132,18 @@ OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
 {
     if (m_pendingMap.Npix() == 0)
     {
-        m_pixelOrdering   = ordering;
+        m_pixelOrdering     = ordering;
         m_orderingRequested = ordering;
         return;
     }
+
     if (ordering == m_orderingRequested)
         return;
+
     m_orderingRequested = ordering;
     const int job       = ++m_orderingJob; // supersedes a running request
     setCursor(Qt::CrossCursor);            // (a busy cursor of the old one)
+
     if (ordering == m_pixelOrdering)
         return; // back to what is shown: the running request is dropped
 
@@ -147,11 +158,11 @@ OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
     {
         std::vector<std::vector<uint8_t>> masks;
     };
+
     auto snap = std::make_shared<Snapshot>();
     for (const MaskEntry &m : m_masks)
-        snap->masks.push_back(m.data.size() == size_t(npix)
-                                  ? m.data
-                                  : std::vector<uint8_t>());
+        snap->masks.push_back(
+            m.data.size() == size_t(npix) ? m.data : std::vector<uint8_t>());
     if (std::all_of(snap->masks.begin(), snap->masks.end(),
                     [](const std::vector<uint8_t> &d) { return d.empty(); }))
     {
@@ -166,14 +177,12 @@ OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
         maskKeys << m.path;
     setCursor(Qt::BusyCursor);
 
-    auto *watcher
-        = new QFutureWatcher<std::shared_ptr<std::vector<std::vector<uint8_t>>>>(
-            this);
+    auto *watcher = new QFutureWatcher<
+        std::shared_ptr<std::vector<std::vector<uint8_t>>>>(this);
     connect(watcher,
             &QFutureWatcher<
                 std::shared_ptr<std::vector<std::vector<uint8_t>>>>::finished,
-            this,
-            [this, watcher, job, ordering, mapRevision, maskKeys]()
+            this, [this, watcher, job, ordering, mapRevision, maskKeys]()
     {
         auto moved = watcher->result();
         watcher->deleteLater();
@@ -189,8 +198,8 @@ OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
             now << m.path;
         applyPixelOrdering(ordering, now == maskKeys ? moved.get() : nullptr);
     });
-    watcher->setFuture(QtConcurrent::run(
-        [snap, nside, npix, oldScheme, newScheme]()
+    watcher->setFuture(
+        QtConcurrent::run([snap, nside, npix, oldScheme, newScheme]()
     {
         const Healpix_Base base(nside, oldScheme, SET_NSIDE);
         auto out = std::make_shared<std::vector<std::vector<uint8_t>>>();
@@ -208,8 +217,7 @@ OpenGLWidget::setPixelOrdering(PixelOrdering ordering)
             {
                 for (long i = begin; i < end; ++i)
                     dst[oldScheme == RING ? base.ring2nest(i)
-                                          : base.nest2ring(i)]
-                        = src[i];
+                                          : base.nest2ring(i)] = src[i];
             });
             out->push_back(std::move(moved));
         }
@@ -522,8 +530,8 @@ OpenGLWidget::setMap(Healpix_Map<float> &&map)
     }
     m_hasPendingMap = true;
 
-    m_pixelOrdering = static_cast<PixelOrdering>(m_pendingMap.Scheme());
-    m_loadedOrdering = m_pixelOrdering;
+    m_pixelOrdering     = static_cast<PixelOrdering>(m_pendingMap.Scheme());
+    m_loadedOrdering    = m_pixelOrdering;
     m_orderingRequested = m_pixelOrdering;
     ++m_orderingJob; // an ordering change still running is obsolete
     ++m_mapRevision;
@@ -575,6 +583,19 @@ OpenGLWidget::initializeGL()
     if (!m_shaderProgram.link())
         std::cerr << "[Shader error] " << m_shaderProgram.log().toStdString()
                   << std::endl;
+
+    auto build = [&](QOpenGLShaderProgram &prog, const QString &frag)
+    {
+        const QString src = loadShaderSource(frag);
+        if (src.isEmpty()
+            || !prog.addShaderFromSourceCode(QOpenGLShader::Vertex, vertSrc)
+            || !prog.addShaderFromSourceCode(QOpenGLShader::Fragment, src)
+            || !prog.link())
+            std::cerr << "[Shader error] " << frag.toStdString() << "\n"
+                      << prog.log().toStdString() << std::endl;
+    };
+    build(m_stripProgram, ":/shaders/colormapstrip.frag");
+    build(m_colorbarProgram, ":/shaders/colorbar.frag");
 }
 
 void
@@ -624,12 +645,6 @@ OpenGLWidget::paintGL()
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // ---------------------------
-    // Main Render              //
-    // ---------------------------
-
-    QRectF colorbar_rect = colorbarRect();
-
     if (m_hasPendingMap)
     {
         uploadMapToGPU(m_pendingMap);
@@ -651,6 +666,8 @@ OpenGLWidget::paintGL()
         uploadMaskToGPU();
     if (m_lutDirty)
         uploadColormapLut();
+    if (m_colorBarVisible)
+        updateColorbarTexture();
 
     m_shaderProgram.bind();
 
@@ -692,7 +709,6 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("invert_colormap",
                                     m_invertColormap ? 1 : 0);
     m_shaderProgram.setUniformValue("view_scale", viewScale());
-    m_shaderProgram.setUniformValue("colorbar_enabled", m_colorBarVisible);
     m_shaderProgram.setUniformValue("graticule_enabled", m_graticuleEnabled);
     m_shaderProgram.setUniformValue("cell_grid_enabled", m_cellGridEnabled);
     m_shaderProgram.setUniformValue("cell_grid_nside", m_cellGridNside);
@@ -709,10 +725,6 @@ OpenGLWidget::paintGL()
         "graticule_color",
         QVector4D(m_graticuleColor.redF(), m_graticuleColor.greenF(),
                   m_graticuleColor.blueF(), m_graticuleColor.alphaF()));
-    m_shaderProgram.setUniformValue(
-        "colorbar_rect",
-        QVector4D(colorbar_rect.left(), colorbar_rect.top(),
-                  colorbar_rect.right(), colorbar_rect.bottom()));
     m_shaderProgram.setUniformValue("projection_type",
                                     static_cast<int>(m_projection));
     m_shaderProgram.setUniformValue("globe_rotation",
@@ -769,7 +781,6 @@ OpenGLWidget::paintGL()
         m_shaderProgram.setUniformValue("panOffset", QVector2D(0.0f, 0.0f));
         m_shaderProgram.setUniformValue("viewport_size",
                                         QVector2D(physW, physH));
-        m_shaderProgram.setUniformValue("colorbar_enabled", false);
         m_shaderProgram.setUniformValue("graticule_enabled", false);
         m_shaderProgram.setUniformValue("cell_grid_enabled", false);
         m_shaderProgram.setUniformValue("view_scale", QVector2D(1.0f, 1.0f));
@@ -785,9 +796,28 @@ OpenGLWidget::paintGL()
 
     m_shaderProgram.release();
 
-    if (!m_colorBarVisible && !showMinimap && !m_isRegionSelecting
-        && !m_graticuleEnabled && !m_cellLabelsEnabled
-        && !m_statsRegion.active)
+    if (m_colorBarVisible && m_colorbarTexture && m_colorbarProgram.isLinked())
+    {
+        const QRectF o = colorbarOverlayRect();
+        glViewport(qRound(o.x()), qRound(o.y()), qRound(o.width()),
+                   qRound(o.height()));
+        m_colorbarProgram.bind();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_colorbarTexture);
+        m_colorbarProgram.setUniformValue("colorbarTex", 0);
+        glEnable(GL_BLEND);
+        glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+        m_vao.bind();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        m_vao.release();
+        glDisable(GL_BLEND);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        m_colorbarProgram.release();
+        glViewport(0, 0, qRound(width() * dpr), qRound(height() * dpr));
+    }
+
+    if (!showMinimap && !m_isRegionSelecting
+        && !m_graticuleEnabled && !m_cellLabelsEnabled && !m_statsRegion.active)
         return;
 
     QPainter p(this);
@@ -843,8 +873,8 @@ OpenGLWidget::paintGL()
 
     if (m_isRegionSelecting)
     {
-        const QColor c = m_selectingStats ? QColor(80, 200, 255)
-                                          : QColor(255, 80, 80);
+        const QColor c
+            = m_selectingStats ? QColor(80, 200, 255) : QColor(255, 80, 80);
         p.setPen(QPen(c, 1.5));
         p.setBrush(QColor(c.red(), c.green(), c.blue(), 40));
         QRectF r(m_regionStart, m_regionEnd);
@@ -856,68 +886,6 @@ OpenGLWidget::paintGL()
             p.drawEllipse(r);
         else
             p.drawRect(r);
-    }
-
-    if (!m_colorBarVisible)
-        return;
-
-    const QRectF r      = colorbarRect(); // device px, y up
-    // Painter wants logical px with y DOWN:
-    const double left   = r.left() / dpr;
-    const double width  = r.width() / dpr;
-    const double bottom = height() - r.top() / dpr; // bar's bottom edge, y down
-    // Dark backdrop so the labels stay readable over bright parts of the map
-    const double barTop = bottom - r.height() / dpr;
-    // (clipped so it doesn't darken the gradient bar drawn by the shader)
-    const QRect outer(qRound(left - 14), qRound(barTop - 6), qRound(width + 28),
-                      qRound(r.height() / dpr + 36));
-    const QRect barRect(qRound(left), qRound(barTop), qRound(width),
-                        qRound(r.height() / dpr));
-    p.setClipRegion(QRegion(outer).subtracted(QRegion(barRect)));
-    p.fillRect(outer, QColor(0, 0, 0, 140));
-    p.setClipping(false);
-    p.setPen(Qt::white);
-
-    // Use as many ticks as fit without the labels touching (5 down to 2)
-    const double maxAbs
-        = std::max({std::abs(double(m_vmin)), std::abs(double(m_vmax)), 1e-30});
-    struct Tick
-    {
-        double x;
-        QString label;
-        double w;
-    };
-    QVector<Tick> ticks;
-    for (int count = 5; count >= 2; --count)
-    {
-        const QVector<double> values = niceTicks(m_vmin, m_vmax, count);
-        if (values.isEmpty())
-            continue;
-        const double step
-            = values.size() > 1 ? values[1] - values[0] : m_vmax - m_vmin;
-
-        ticks.clear();
-        bool fits        = true;
-        double lastRight = -1e9;
-        for (double v : values)
-        {
-            Tick t;
-            t.x     = left + width * scaleValue(v);
-            t.label = formatTick(v, step, maxAbs);
-            t.w     = p.fontMetrics().horizontalAdvance(t.label);
-            if (t.x - t.w / 2 < lastRight + 6)
-                fits = false;
-            lastRight = t.x + t.w / 2;
-            ticks << t;
-        }
-        if (fits)
-            break;
-    }
-    for (const Tick &t : ticks)
-    {
-        p.drawLine(QPointF(t.x, bottom), QPointF(t.x, bottom + 5));
-        drawTextPath(p, QPointF(t.x - t.w / 2, bottom + 18), t.label,
-                     Qt::white);
     }
 }
 
@@ -1032,9 +1000,8 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
         for (const MaskSource &src : todo)
         {
             const QString file = src.path;
-            QString shown      = src.label.isEmpty()
-                                     ? QFileInfo(file).fileName()
-                                     : src.label;
+            QString shown
+                = src.label.isEmpty() ? QFileInfo(file).fileName() : src.label;
             try
             {
                 Healpix_Map<float> mask;
@@ -1042,8 +1009,7 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
                     mask = *src.map;
                 else if (isNpyPath(file.toStdString()))
                 {
-                    mask = std::move(*readNpyMap(file.toStdString(),
-                                                 src.column,
+                    mask = std::move(*readNpyMap(file.toStdString(), src.column,
                                                  kMaxSupportedNside));
                     if (src.column > 0 && src.label.isEmpty())
                         shown += QString(" [column %1]").arg(src.column);
@@ -1056,11 +1022,10 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
                     fitshandle fits;
                     fits.open(file.toStdString());
                     const FitsInfo info = scanFits(fits);
-                    const FitsHdu *h
-                        = src.hdu > 0 ? info.find(src.hdu)
-                                      : (info.hdus.isEmpty()
-                                             ? nullptr
-                                             : &info.hdus.first());
+                    const FitsHdu *h = src.hdu > 0 ? info.find(src.hdu)
+                                                   : (info.hdus.isEmpty()
+                                                          ? nullptr
+                                                          : &info.hdus.first());
                     if (!h)
                     {
                         result.errors
@@ -1074,7 +1039,7 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
                     int column = h->columns.first().index;
                     if (src.column > 0)
                     {
-                        column = src.column;
+                        column     = src.column;
                         bool found = false;
                         for (const FitsColumn &c : h->columns)
                             if (c.index == column)
@@ -1218,6 +1183,7 @@ void
 OpenGLWidget::uploadColormapLut()
 {
     m_lutDirty = false;
+    ++m_lutVersion;
 
     const auto &registry = ColormapRegistry::instance();
     QByteArray data      = registry.lutData();
@@ -1250,7 +1216,8 @@ static void
 gatherFace(const Healpix_Base &base, int face, int texNside, Put put)
 {
     const int r = base.Nside() / texNside;
-    parallel::forRange(texNside, [&](long y0, long y1) {
+    parallel::forRange(texNside, [&](long y0, long y1)
+    {
         std::vector<int> pix(size_t(r) * r);
         for (long y = y0; y < y1; ++y)
             for (int x = 0; x < texNside; ++x)
@@ -1283,7 +1250,8 @@ void
 OpenGLWidget::bindDataTextures(bool setSamplers)
 {
     const int segs = 12 / m_segLayers;
-    auto setUnit   = [&](const QByteArray &name, int unit) {
+    auto setUnit   = [&](const QByteArray &name, int unit)
+    {
         if (setSamplers)
             m_shaderProgram.setUniformValue(name.constData(), unit);
     };
@@ -1330,8 +1298,8 @@ OpenGLWidget::allocSegment(GLuint &tex, GLenum internalFormat, GLenum format,
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
     glGetError(); // clear
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, ns, ns, m_segLayers,
-                 0, format, type, nullptr);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, internalFormat, ns, ns, m_segLayers, 0,
+                 format, type, nullptr);
     if (const GLenum e = glGetError(); e != GL_NO_ERROR)
     {
         std::cerr << "[GL] allocating a " << ns << "x" << ns << "x"
@@ -1373,10 +1341,9 @@ OpenGLWidget::uploadMaskToGPU()
 
     // With streaming the masks are only kept at the coarse level
     const int ns = int(m_texNside);
-    const Healpix_Base base(int(m_nside),
-                            m_pixelOrdering == PixelOrdering::NESTED ? NEST
-                                                                     : RING,
-                            SET_NSIDE);
+    const Healpix_Base base(
+        int(m_nside), m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING,
+        SET_NSIDE);
     std::vector<uint8_t> buf(size_t(ns) * ns * 4);
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1394,25 +1361,25 @@ OpenGLWidget::uploadMaskToGPU()
             }
             for (int l = 0; l < m_segLayers; ++l)
             {
-                gatherFace(
-                    base, seg * m_segLayers + l, ns,
-                    [&](size_t texel, const int *pix, int n) {
-                        for (size_t c = 0; c < 4; ++c)
+                gatherFace(base, seg * m_segLayers + l, ns,
+                           [&](size_t texel, const int *pix, int n)
+                {
+                    for (size_t c = 0; c < 4; ++c)
+                    {
+                        // Unused channels stay 255 (keep)
+                        const size_t m = g * 4 + c;
+                        if (m >= m_masks.size())
                         {
-                            // Unused channels stay 255 (keep)
-                            const size_t m = g * 4 + c;
-                            if (m >= m_masks.size())
-                            {
-                                buf[texel * 4 + c] = 255;
-                                continue;
-                            }
-                            const std::vector<uint8_t> &d = m_masks[m].data;
-                            int sum                       = 0;
-                            for (int i = 0; i < n; ++i)
-                                sum += d[size_t(pix[i])];
-                            buf[texel * 4 + c] = uint8_t((sum + n / 2) / n);
+                            buf[texel * 4 + c] = 255;
+                            continue;
                         }
-                    });
+                        const std::vector<uint8_t> &d = m_masks[m].data;
+                        int sum                       = 0;
+                        for (int i = 0; i < n; ++i)
+                            sum += d[size_t(pix[i])];
+                        buf[texel * 4 + c] = uint8_t((sum + n / 2) / n);
+                    }
+                });
                 glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, l, ns, ns, 1,
                                 GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
             }
@@ -1443,9 +1410,9 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
 
     // Streaming: keep a coarse level (at most nside 2048, and not above the
     // user's limit) resident, and the rest as tiles on demand
-    const int ns   = int(m_nside);
-    m_streaming    = false;
-    m_levelShift   = 0;
+    const int ns = int(m_nside);
+    m_streaming  = false;
+    m_levelShift = 0;
     if (ns > m_streamNside && TileCache::supports(ns))
     {
         const int limit = std::min(m_streamNside, 2048);
@@ -1493,27 +1460,27 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
         for (int l = 0; l < m_segLayers; ++l)
         {
             gatherFace(base, seg * m_segLayers + l, tex,
-                       [&](size_t texel, const int *pix, int n) {
-                           if (n == 1)
-                           {
-                               buf[texel] = mapDataPtr[pix[0]];
-                               return;
-                           }
-                           // Average of the valid pixels of the block
-                           double sum = 0.0;
-                           int valid  = 0;
-                           for (int i = 0; i < n; ++i)
-                           {
-                               const float v = mapDataPtr[pix[i]];
-                               if (v > -1.0e30f && std::isfinite(v))
-                               {
-                                   sum += v;
-                                   ++valid;
-                               }
-                           }
-                           buf[texel] = valid ? float(sum / valid)
-                                              : -1.6375e30f; // UNSEEN
-                       });
+                       [&](size_t texel, const int *pix, int n)
+            {
+                if (n == 1)
+                {
+                    buf[texel] = mapDataPtr[pix[0]];
+                    return;
+                }
+                // Average of the valid pixels of the block
+                double sum = 0.0;
+                int valid  = 0;
+                for (int i = 0; i < n; ++i)
+                {
+                    const float v = mapDataPtr[pix[i]];
+                    if (v > -1.0e30f && std::isfinite(v))
+                    {
+                        sum += v;
+                        ++valid;
+                    }
+                }
+                buf[texel] = valid ? float(sum / valid) : -1.6375e30f; // UNSEEN
+            });
             glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, l, tex, tex, 1,
                             GL_RED, GL_FLOAT, buf.data());
         }
@@ -1550,13 +1517,14 @@ anglesFromDirection(const QVector3D &v, double &colat, double &phi);
 // same mapping as the fragment shader. False outside the projection.
 static bool
 mapDirectionAt(const QVector2D &plane, Projection projection, bool outside,
-               const QQuaternion &rotation, const QGenericMatrix<3, 3, float> &toMap,
-               QVector3D &dir)
+               const QQuaternion &rotation,
+               const QGenericMatrix<3, 3, float> &toMap, QVector3D &dir)
 {
     double colat, phi;
     if (!projectionmath::inverse(projection, plane, colat, phi, outside))
         return false;
-    const QVector3D shown = rotation.rotatedVector(directionFromAngles(colat, phi));
+    const QVector3D shown
+        = rotation.rotatedVector(directionFromAngles(colat, phi));
     dir = skyframe::apply(toMap, shown);
     return true;
 }
@@ -1570,10 +1538,10 @@ OpenGLWidget::visibleTiles() const
     constexpr int kGrid = 96;
     const int t         = m_tiles->tilesPerSide();
     const double coarse = std::sqrt(4.0 * M_PI / 12.0) / double(m_texNside);
-    const auto toMap
-        = skyframe::rotation(displayFrame(), m_mapFrame);
-    const Healpix_Base base(int(m_nside), m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING,
-                            SET_NSIDE);
+    const auto toMap    = skyframe::rotation(displayFrame(), m_mapFrame);
+    const Healpix_Base base(
+        int(m_nside), m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING,
+        SET_NSIDE);
 
     const double stepX = double(width()) / (kGrid - 1);
     const double stepY = double(height()) / (kGrid - 1);
@@ -1610,8 +1578,8 @@ OpenGLWidget::visibleTiles() const
             base.pix2xyf(base.ang2pix(pointing(colat, phi)), ix, iy, face);
             const int key = TileCache::key(face, ix / TileCache::kTileSize,
                                            iy / TileCache::kTileSize, t);
-            const double d = std::hypot(i * stepX - centre.x(),
-                                        j * stepY - centre.y());
+            const double d
+                = std::hypot(i * stepX - centre.x(), j * stepY - centre.y());
             auto [it, inserted] = nearest.try_emplace(key, d);
             if (!inserted)
                 it->second = std::min(it->second, d);
@@ -1634,8 +1602,7 @@ OpenGLWidget::updateTiles()
     if (!m_tiles || m_pendingMap.Npix() == 0)
         return;
     // A few tiles per frame keep the view responsive; more follow
-    const bool more
-        = m_tiles->update(m_pendingMap, visibleTiles(), 6);
+    const bool more = m_tiles->update(m_pendingMap, visibleTiles(), 6);
     if (more)
         QTimer::singleShot(0, this, [this]() { update(); });
 }
@@ -2270,8 +2237,10 @@ OpenGLWidget::keyPressEvent(QKeyEvent *e)
               : QKeyCombination(e->modifiers() & ~Qt::KeypadModifier,
                                 Qt::Key(e->key()));
     const QKeySequence pressed(combo);
-    const bool finish = !m_regionFinishKey.isEmpty() && pressed == m_regionFinishKey;
-    const bool cancel = !m_regionCancelKey.isEmpty() && pressed == m_regionCancelKey;
+    const bool finish
+        = !m_regionFinishKey.isEmpty() && pressed == m_regionFinishKey;
+    const bool cancel
+        = !m_regionCancelKey.isEmpty() && pressed == m_regionCancelKey;
 
     if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
     {
@@ -2335,6 +2304,186 @@ OpenGLWidget::colorbarRect() const // device pixels, y up
     const double bw  = std::min(300.0 * dpr, 0.6 * W);
     const double x0  = 0.5 * (W - bw);
     return QRectF(x0, 34.0 * dpr, bw, 16.0 * dpr); // x, y, w, h
+}
+
+// The colorbar image spans the bar plus a margin for the backdrop, ticks and
+// labels (logical px: 14 left/right, 6 above the bar, 30 below it)
+QRectF
+OpenGLWidget::colorbarOverlayRect() const // device pixels, y up
+{
+    const double dpr = devicePixelRatioF();
+    const QRectF r   = colorbarRect();
+    return QRectF(r.x() - 14.0 * dpr, r.y() - 30.0 * dpr,
+                  r.width() + 28.0 * dpr, r.height() + 36.0 * dpr);
+}
+
+// Samples the colormap (built-in or custom) through the shader into a 256x1
+// image, so the colorbar uses exactly the colors of the map
+QImage
+OpenGLWidget::bakeColormapStrip()
+{
+    if (!m_stripProgram.isLinked())
+        return {};
+
+    QOpenGLFramebufferObject fbo(ColormapRegistry::kLutSize, 1);
+    if (!fbo.isValid())
+        return {};
+    fbo.bind();
+    glViewport(0, 0, ColormapRegistry::kLutSize, 1);
+
+    m_stripProgram.bind();
+    glActiveTexture(GL_TEXTURE0 + kLutUnit);
+    glBindTexture(GL_TEXTURE_2D, m_lutTexture);
+    m_stripProgram.setUniformValue("colormapLut", kLutUnit);
+    m_stripProgram.setUniformValue("lut_rows", m_lutRows);
+    m_stripProgram.setUniformValue("colormap", static_cast<int>(m_colormap));
+    m_stripProgram.setUniformValue("invert_colormap", m_invertColormap);
+    m_vao.bind();
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    m_vao.release();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0);
+    m_stripProgram.release();
+
+    const QImage strip = fbo.toImage();
+
+    // Back to the widget's own framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+    const qreal dpr = devicePixelRatioF();
+    glViewport(0, 0, qRound(width() * dpr), qRound(height() * dpr));
+    return strip;
+}
+
+// Draws the backdrop, the gradient (from `strip`), the ticks and the labels
+QImage
+OpenGLWidget::renderColorbarImage(const QImage &strip) const
+{
+    const double dpr   = devicePixelRatioF();
+    const QRectF outer = colorbarOverlayRect(); // device px
+    const QRectF bar   = colorbarRect();
+
+    QImage img(outer.size().toSize(), QImage::Format_ARGB32_Premultiplied);
+    img.fill(Qt::transparent);
+    img.setDevicePixelRatio(dpr);
+
+    // Logical px, y down, origin at the image's top-left
+    const double left   = 14.0;
+    const double top    = 6.0;
+    const double width  = bar.width() / dpr;
+    const double height = bar.height() / dpr;
+    const double bottom = top + height;
+
+    {
+        QPainter p(&img);
+        p.fillRect(QRectF(0, 0, img.width() / dpr, img.height() / dpr),
+                   QColor(0, 0, 0, 140));
+    }
+
+    // Gradient: one device pixel column at a time, interpolating the strip
+    const int x0 = qRound(left * dpr), y0 = qRound(top * dpr);
+    const int bw = qRound(bar.width()), bh = qRound(bar.height());
+    if (!strip.isNull() && bw > 0)
+    {
+        const int last = strip.width() - 1;
+        for (int x = 0; x < bw; ++x)
+        {
+            const double f = (bw > 1 ? double(x) / (bw - 1) : 0.0) * last;
+            const int i    = std::min(int(f), last - 1);
+            const double w = f - i;
+            const QRgb a = strip.pixel(i, 0), b = strip.pixel(i + 1, 0);
+            auto mix = [w](int u, int v) { return qRound(u + (v - u) * w); };
+            const QRgb c = qRgb(mix(qRed(a), qRed(b)), mix(qGreen(a), qGreen(b)),
+                                mix(qBlue(a), qBlue(b)));
+            for (int y = 0; y < bh; ++y)
+                img.setPixel(x0 + x, y0 + y, c);
+        }
+    }
+
+    QPainter p(&img);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setFont(font());
+    p.setPen(Qt::white);
+
+    // Use as many ticks as fit without the labels touching (5 down to 2)
+    const double maxAbs = std::max(
+        {std::abs(double(m_vmin)), std::abs(double(m_vmax)), 1e-30});
+    struct Tick
+    {
+        double x;
+        QString label;
+        double w;
+    };
+    QVector<Tick> ticks;
+    for (int count = 5; count >= 2; --count)
+    {
+        const QVector<double> values = niceTicks(m_vmin, m_vmax, count);
+        if (values.isEmpty())
+            continue;
+        const double step
+            = values.size() > 1 ? values[1] - values[0] : m_vmax - m_vmin;
+
+        ticks.clear();
+        bool fits        = true;
+        double lastRight = -1e9;
+        for (double v : values)
+        {
+            Tick t;
+            t.x     = left + width * scaleValue(v);
+            t.label = formatTick(v, step, maxAbs);
+            t.w     = p.fontMetrics().horizontalAdvance(t.label);
+            if (t.x - t.w / 2 < lastRight + 6)
+                fits = false;
+            lastRight = t.x + t.w / 2;
+            ticks << t;
+        }
+        if (fits)
+            break;
+    }
+
+    for (const Tick &t : ticks)
+    {
+        p.drawLine(QPointF(t.x, bottom), QPointF(t.x, bottom + 5));
+        p.drawText(QPointF(t.x - t.w / 2, bottom + 18), t.label);
+    }
+    return img;
+}
+
+// Rebuilds the colorbar texture when anything it shows has changed
+void
+OpenGLWidget::updateColorbarTexture()
+{
+    const double dpr = devicePixelRatioF();
+    const QVector<double> key{double(m_colormap),
+                              double(m_invertColormap),
+                              double(m_colormapScale),
+                              double(m_asinhSoftening),
+                              double(m_vmin),
+                              double(m_vmax),
+                              double(width()),
+                              double(height()),
+                              dpr,
+                              double(m_lutVersion)};
+    if (m_colorbarTexture && key == m_colorbarKey)
+        return;
+
+    const QImage strip = bakeColormapStrip();
+    if (strip.isNull())
+        return;
+    const QImage img = renderColorbarImage(strip).convertToFormat(
+        QImage::Format_RGBA8888_Premultiplied);
+
+    if (!m_colorbarTexture)
+        glGenTextures(1, &m_colorbarTexture);
+    glBindTexture(GL_TEXTURE_2D, m_colorbarTexture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, img.width(), img.height(), 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, img.constBits());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    m_colorbarKey = key;
 }
 
 double
@@ -2486,7 +2635,7 @@ OpenGLWidget::processSelectionRegion()
 void
 OpenGLWidget::beginStatsRegion(RegionShape shape)
 {
-    m_statsShape       = shape;
+    m_statsShape = shape;
     m_polyPoints.clear();
     m_statsRegionArmed = true;
     m_zoomRegionArmed  = false;
@@ -2538,13 +2687,13 @@ OpenGLWidget::setStatsRegion(RegionShape shape, const QVector<QPointF> &pts)
 
     // Map frame -> display frame -> the view frame (inverse of the shader's
     // rotation); column i is the image of the i-th map axis
-    const auto toMap     = skyframe::rotation(displayFrame(), m_mapFrame);
-    const auto fromMap   = toMap.transposed(); // a rotation: inverse = transpose
+    const auto toMap   = skyframe::rotation(displayFrame(), m_mapFrame);
+    const auto fromMap = toMap.transposed(); // a rotation: inverse = transpose
     const QQuaternion inv = m_rotation.inverted();
     for (int i = 0; i < 3; ++i)
     {
         QVector3D e(i == 0, i == 1, i == 2);
-        const QVector3D v = inv.rotatedVector(skyframe::apply(fromMap, e));
+        const QVector3D v    = inv.rotatedVector(skyframe::apply(fromMap, e));
         region.toView[0 + i] = v.x();
         region.toView[3 + i] = v.y();
         region.toView[6 + i] = v.z();
@@ -2560,9 +2709,9 @@ OpenGLWidget::setStatsRegion(RegionShape shape, const QVector<QPointF> &pts)
             if (!projectionmath::inverse(region.projection, plane(pts[k]),
                                          colat, phi, region.outside))
                 return;
-            ends[k] = viewToMapDir(region.toView,
-                                   directionFromAngles(colat, phi))
-                          .normalized();
+            ends[k]
+                = viewToMapDir(region.toView, directionFromAngles(colat, phi))
+                      .normalized();
         }
         for (int i = 0; i < 3; ++i)
         {
@@ -2634,8 +2783,8 @@ regionLinePixels(const Region &reg, const Healpix_Base &base, double *lengthDeg)
         {
             const double wa = std::sin((1.0 - t) * theta) / s;
             const double wb = std::sin(t * theta) / s;
-            v = vec3(wa * a.x + wb * b.x, wa * a.y + wb * b.y,
-                     wa * a.z + wb * b.z);
+            v               = vec3(wa * a.x + wb * b.x, wa * a.y + wb * b.y,
+                                   wa * a.z + wb * b.z);
         }
         pix.push_back(base.vec2pix(v));
     }
@@ -2669,30 +2818,31 @@ regionContainsPixel(const Region &reg, const Healpix_Base &base, long i)
 
     switch (reg.shape)
     {
-    case OpenGLWidget::RegionShape::Ellipse: // inscribed in the bounds
-    {
-        const double rx = 0.5 * (reg.hi.x() - reg.lo.x());
-        const double ry = 0.5 * (reg.hi.y() - reg.lo.y());
-        const double dx = (p.x() - (reg.lo.x() + rx)) / rx;
-        const double dy = (p.y() - (reg.lo.y() + ry)) / ry;
-        return dx * dx + dy * dy <= 1.0;
-    }
-    case OpenGLWidget::RegionShape::Polygon: // even-odd rule
-    {
-        bool in      = false;
-        const int n  = reg.poly.size();
-        for (int i = 0, j = n - 1; i < n; j = i++)
+        case OpenGLWidget::RegionShape::Ellipse: // inscribed in the bounds
         {
-            const QVector2D &a = reg.poly[i], &b = reg.poly[j];
-            if ((a.y() > p.y()) != (b.y() > p.y())
-                && p.x() < (b.x() - a.x()) * (p.y() - a.y()) / (b.y() - a.y())
-                               + a.x())
-                in = !in;
+            const double rx = 0.5 * (reg.hi.x() - reg.lo.x());
+            const double ry = 0.5 * (reg.hi.y() - reg.lo.y());
+            const double dx = (p.x() - (reg.lo.x() + rx)) / rx;
+            const double dy = (p.y() - (reg.lo.y() + ry)) / ry;
+            return dx * dx + dy * dy <= 1.0;
         }
-        return in;
-    }
-    default:
-        return true;
+        case OpenGLWidget::RegionShape::Polygon: // even-odd rule
+        {
+            bool in     = false;
+            const int n = reg.poly.size();
+            for (int i = 0, j = n - 1; i < n; j = i++)
+            {
+                const QVector2D &a = reg.poly[i], &b = reg.poly[j];
+                if ((a.y() > p.y()) != (b.y() > p.y())
+                    && p.x()
+                           < (b.x() - a.x()) * (p.y() - a.y()) / (b.y() - a.y())
+                                 + a.x())
+                    in = !in;
+            }
+            return in;
+        }
+        default:
+            return true;
     }
 }
 
@@ -2784,7 +2934,7 @@ OpenGLWidget::startRegionJob()
         = m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING;
     const StatsRegion reg = m_statsRegion;
 
-    auto *watcher = new QFutureWatcher<RegionStats>(this);
+    auto *watcher   = new QFutureWatcher<RegionStats>(this);
     m_regionWatcher = watcher;
     connect(watcher, &QFutureWatcher<RegionStats>::finished, this,
             [this, watcher, cancel]()
@@ -2878,10 +3028,10 @@ OpenGLWidget::startRegionJob()
 
         RegionStats s;
         s.lengthDeg = lengthDeg;
-        s.pixels   = acc.pixels;
-        s.valid    = acc.valid;
-        s.skyFrac  = double(acc.pixels) / double(npix);
-        s.areaDeg2 = s.skyFrac * 4.0 * M_PI * (180.0 / M_PI) * (180.0 / M_PI);
+        s.pixels    = acc.pixels;
+        s.valid     = acc.valid;
+        s.skyFrac   = double(acc.pixels) / double(npix);
+        s.areaDeg2  = s.skyFrac * 4.0 * M_PI * (180.0 / M_PI) * (180.0 / M_PI);
         if (acc.valid > 0)
         {
             s.min     = acc.min;
@@ -2911,8 +3061,8 @@ OpenGLWidget::paintStatsRegion(QPainter &p)
     auto addPlane = [&](const QVector2D &q)
     {
         double colat, phi;
-        const bool ok = projectionmath::inverse(r.projection, q, colat, phi,
-                                                r.outside);
+        const bool ok
+            = projectionmath::inverse(r.projection, q, colat, phi, r.outside);
         edge << (ok ? viewToMapDir(r.toView, directionFromAngles(colat, phi))
                     : QVector3D());
         onMap << ok;
@@ -2931,9 +3081,9 @@ OpenGLWidget::paintStatsRegion(QPainter &p)
         closed = false;
         const QVector3D a(r.lineA[0], r.lineA[1], r.lineA[2]);
         const QVector3D b(r.lineB[0], r.lineB[1], r.lineB[2]);
-        const double theta = std::acos(std::clamp(
-            double(QVector3D::dotProduct(a, b)), -1.0, 1.0));
-        const double sn    = std::sin(theta);
+        const double theta = std::acos(
+            std::clamp(double(QVector3D::dotProduct(a, b)), -1.0, 1.0));
+        const double sn = std::sin(theta);
         for (int i = 0; i <= kSteps; ++i)
         {
             const double t = double(i) / kSteps;
@@ -3158,7 +3308,7 @@ OpenGLWidget::setCellLabelsEnabled(bool enabled)
 void
 OpenGLWidget::paintCellLabels(QPainter &p)
 {
-    constexpr int kSample    = 8;   // screen sampling step, px
+    constexpr int kSample    = 8;    // screen sampling step, px
     constexpr size_t kMaxPix = 1500; // beyond this the labels cannot fit
     if (m_nside <= 0)
         return;
@@ -3171,8 +3321,8 @@ OpenGLWidget::paintCellLabels(QPainter &p)
     for (int y = kSample / 2; y < height(); y += kSample)
         for (int x = kSample / 2; x < width(); x += kSample)
         {
-            const QVector2D plane = toNdc(QPointF(x, y)) / m_camera->zoom
-                                    + m_camera->panOffset;
+            const QVector2D plane
+                = toNdc(QPointF(x, y)) / m_camera->zoom + m_camera->panOffset;
             double colat, phi;
             if (!projectionmath::inverse(m_projection, plane, colat, phi,
                                          m_viewOutside))
@@ -3189,7 +3339,7 @@ OpenGLWidget::paintCellLabels(QPainter &p)
     if (ids.size() > kMaxPix)
         return;
 
-    const auto toDisplay = skyframe::rotation(m_mapFrame, displayFrame());
+    const auto toDisplay  = skyframe::rotation(m_mapFrame, displayFrame());
     const QFontMetrics fm = p.fontMetrics();
     const QRectF bounds(0, 0, width(), height());
     std::vector<QRectF> taken;
@@ -3205,9 +3355,10 @@ OpenGLWidget::paintCellLabels(QPainter &p)
         if (!projectToWindow(M_PI / 2.0 - colat, phi, at))
             continue;
 
-        const int64_t label
-            = m_pixelOrdering == PixelOrdering::NESTED ? id : base.nest2ring(id);
-        const QString text = QString::number(qlonglong(label));
+        const int64_t label = m_pixelOrdering == PixelOrdering::NESTED
+                                  ? id
+                                  : base.nest2ring(id);
+        const QString text  = QString::number(qlonglong(label));
         const QPointF origin(at.x() - fm.horizontalAdvance(text) / 2.0,
                              at.y() + fm.ascent() / 2.0);
         const QRectF box(origin.x(), origin.y() - fm.ascent(),
@@ -3215,8 +3366,8 @@ OpenGLWidget::paintCellLabels(QPainter &p)
         if (!bounds.contains(box))
             continue;
         const QRectF padded = box.adjusted(-4, -2, 4, 2);
-        if (std::any_of(taken.begin(), taken.end(), [&](const QRectF &r)
-                        { return r.intersects(padded); }))
+        if (std::any_of(taken.begin(), taken.end(),
+                        [&](const QRectF &r) { return r.intersects(padded); }))
             continue;
         taken.push_back(padded);
         drawTextPath(p, origin + QPointF(1, 1), text, QColor(0, 0, 0, 200));
@@ -3264,7 +3415,7 @@ OpenGLWidget::projectionFade()
     if (!m_projectionFading)
         return 1.0f;
     constexpr double kDurationMs = 300.0;
-    const double t = m_projectionClock.elapsed() / kDurationMs;
+    const double t               = m_projectionClock.elapsed() / kDurationMs;
     if (t >= 1.0)
     {
         m_projectionFading = false;
@@ -3281,8 +3432,7 @@ OpenGLWidget::setProjection(Projection projection)
     if (m_animateProjection && projection != m_projection && m_nside > 0
         && isVisible())
     {
-        m_prevProjection   = m_projectionFading ? m_prevProjection
-                                                : m_projection;
+        m_prevProjection = m_projectionFading ? m_prevProjection : m_projection;
         m_projectionFading = true;
         m_projectionClock.start();
     }
