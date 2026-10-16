@@ -617,6 +617,11 @@ private:
     QVector3D m_rotateGrab;      // view-frame direction grabbed at drag start
     QQuaternion m_rotation;      // current rotation quaternion for 3D view
     QQuaternion m_rotationStart; // rotation at the start of a drag
+    // Dragging outside the globe's disc twists it about the view axis
+    bool m_dragOutside = false;
+    QQuaternion m_outsideBase; // rotation when the cursor left the disc
+    float m_outsideLast  = 0.0f; // cursor angle at the last move
+    float m_outsideTotal = 0.0f; // swept since leaving (rad, unwrapped)
 
     // Globe animation. Spin: the drag's angular velocity (deg/s, around an
     // axis in the globe's own frame) decays with friction after release.

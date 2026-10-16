@@ -1840,6 +1840,7 @@ OpenGLWidget::startRotation(const QPointF &pos)
     stopGlobeAnimation();
     m_dragClock.invalidate();
     m_isRotating    = true;
+    m_dragOutside   = false;
     m_rotationStart = m_rotation;
     setCursor(Qt::ClosedHandCursor);
     m_dragClock.start();
@@ -1851,41 +1852,77 @@ OpenGLWidget::startRotation(const QPointF &pos)
 void
 OpenGLWidget::updateRotation(const QPointF &pos)
 {
+    const QQuaternion previous = m_rotation;
+    QQuaternion next;
     QVector3D v1;
-    if (!viewDirectionAt(pos, v1))
+    if (viewDirectionAt(pos, v1))
     {
-        // The cursor left the shape. Orthographic keeps following it like a
-        // trackball: past the limb the surface carries on over the horizon,
-        // so the further out the cursor goes the more the globe tilts away.
-        // Other projections keep the last rotation.
+        if (m_dragOutside)
+        {
+            // Back inside after a twist: grab what is under the cursor now,
+            // so the rotation carries on from the twisted orientation
+            m_dragOutside   = false;
+            m_rotateGrab    = v1;
+            m_rotationStart = m_rotation;
+        }
+        next = (m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
+                   .normalized();
+    }
+    else
+    {
+        // The cursor left the shape. Orthographic then twists the globe about
+        // the view axis by the angle the cursor sweeps around the disc
+        // centre, like dragging the rim of a dial. Other projections keep the
+        // last rotation.
         if (m_projection != Projection::ORTHOGRAPHIC)
             return;
         const QVector2D p = toNdc(pos) / m_camera->zoom + m_camera->panOffset;
-        const float r     = p.length();
-        if (r < 1e-6f)
+        if (p.length() < 1e-6f)
             return;
+        const float angle = std::atan2(p.y(), p.x()); // ccw on screen
 
+        // View axis (toward the viewer) with the sign that makes a positive
+        // turn counter-clockwise on screen
         double colat, phi;
-        if (!projectionmath::inverse(m_projection, p * (0.9999f / r), colat,
-                                     phi, m_viewOutside))
-            return;
-        const QVector3D limb = directionFromAngles(colat, phi); // on the edge
         if (!projectionmath::inverse(m_projection, QVector2D(0, 0), colat, phi,
                                      m_viewOutside))
             return;
-        const QVector3D front = directionFromAngles(colat, phi); // disc center
+        const QVector3D front = directionFromAngles(colat, phi);
+        if (!projectionmath::inverse(m_projection, QVector2D(0.5f, 0), colat,
+                                     phi, m_viewOutside))
+            return;
+        const QVector3D a = directionFromAngles(colat, phi);
+        if (!projectionmath::inverse(m_projection, QVector2D(0, 0.5f), colat,
+                                     phi, m_viewOutside))
+            return;
+        const QVector3D b = directionFromAngles(colat, phi);
+        const QVector3D axis
+            = QVector3D::dotProduct(front, QVector3D::crossProduct(a, b)) >= 0
+                  ? front
+                  : -front;
 
-        // Angle from the view axis: 90 deg at the limb, growing with the
-        // distance outside it (one globe radius out = one more radian),
-        // capped at the far pole
-        const float theta = std::min(float(M_PI), float(M_PI_2) + (r - 1.0f));
-        v1                = limb * std::sin(theta) + front * std::cos(theta);
+        if (!m_dragOutside)
+        {
+            m_dragOutside  = true;
+            m_outsideBase  = m_rotation;
+            m_outsideLast  = angle;
+            m_outsideTotal = 0.0f;
+        }
+        float d = angle - m_outsideLast; // unwrap across +-pi
+        if (d > float(M_PI))
+            d -= 2.0f * float(M_PI);
+        else if (d < -float(M_PI))
+            d += 2.0f * float(M_PI);
+        m_outsideTotal += d;
+        m_outsideLast = angle;
+
+        // The surface under the cursor turns with it: R = Rbase * rot(-total)
+        next = (m_outsideBase
+                * QQuaternion::fromAxisAndAngle(
+                    axis, -qRadiansToDegrees(m_outsideTotal)))
+                   .normalized();
     }
 
-    const QQuaternion previous = m_rotation;
-    QQuaternion next
-        = (m_rotationStart * QQuaternion::rotationTo(v1, m_rotateGrab))
-              .normalized();
     if (orientationLocked())
         next = withoutRoll(next);
     setRotation(next);
