@@ -2,6 +2,10 @@
 
 # High Priority
 
+- [ ] Plot axis labels close to the axes (not in the margins)
+- [ ] Theory curve overlay add ability to change cosmo parameters realtime
+- [x] Add plot reset view pushbutton
+- [x] Add PDF and SVG export options
 - [ ] Drag and drop map as images to other apps
 
 # Medium Priority

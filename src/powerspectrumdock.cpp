@@ -9,6 +9,7 @@
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "powspec.h"
+#include "masterspectrum.hpp"
 #include "theoryspectrum.hpp"
 #include "view.hpp"
 
@@ -39,6 +40,9 @@
 #include <QTextStream>
 #include <QTimer>
 #include <QToolButton>
+#include <QGroupBox>
+#include <QDoubleSpinBox>
+#include <QGridLayout>
 #include <QVBoxLayout>
 #include <QValueAxis>
 #include <QVariantList>
@@ -154,9 +158,11 @@ struct PowerSpectrumJob
     // Reading + converting the map, the first transform, then a synthesis and
     // an analysis for each refinement iteration
     int iterations = 1;
+    std::atomic<int> total{0}; // set when the work differs from the default
     int totalSteps() const
     {
-        return 1 + 1 + 2 * iterations;
+        const int t = total;
+        return t > 0 ? t : 1 + 1 + 2 * iterations;
     }
 
     std::atomic<int> step{0}; // finished steps
@@ -267,7 +273,132 @@ struct CalcResult
     Spectra spectra;
     bool unseen    = false;
     bool cancelled = false;
+    QString error;
+    // Set when the spectra were corrected for the mask
+    bool corrected = false;
+    int lmax       = 0;
+    double fsky    = 0.0;
+    double condition = 1.0;
+    QStringList notes;
+    std::shared_ptr<const master::Result> master;
 };
+
+// Bandpowers of a mask-corrected computation as the plot's spectra
+static Spectra
+fromMaster(const master::Result &r)
+{
+    Spectra s;
+    s.ell = r.ell;
+    s.TT  = r.TT;
+    s.EE  = r.EE;
+    s.BB  = r.BB;
+    s.TE  = r.TE;
+    s.TB  = r.TB;
+    s.EB  = r.EB;
+    return s;
+}
+
+// The spectra corrected for the mask (MASTER, with optional purification).
+// `st` is consumed.
+static CalcResult
+computeMasked(const PowerSpectrumInput &in, Stokes &st, int wanted,
+              PowerSpectrumJob &job)
+{
+    CalcResult r;
+    r.unseen          = st.unseen;
+    const MaskCorrection &c = in.correction;
+    const bool pol    = st.polarized;
+
+    // The correction keeps several full-resolution copies of the map, and
+    // NaMaster's apodization takes a time that grows with nside^2 times the
+    // apodization area (minutes at nside 1024, hours above)
+    const long nside = st.T.Nside();
+    if (nside > 2048)
+        throw std::runtime_error(
+            "Correcting for a mask is limited to maps up to nside 2048 (it "
+            "keeps several copies of the map in memory). Downgrade the map "
+            "first (Tools > Change Resolution).");
+    if (c.apodization != 0 && nside > 1024)
+        throw std::runtime_error(
+            "Apodizing the mask is too slow above nside 1024. Downgrade the "
+            "map, or load a mask that is already apodized and choose \"No "
+            "apodization\".");
+
+    // The coupling matrix grows with lmax^2 (four times that for E and B)
+    const int cap = pol ? 2048 : 4096;
+    const int lmax = std::min(wanted, cap);
+    if (lmax < wanted)
+        r.notes << QString("lmax was limited to %1: the mode-coupling matrix "
+                           "of the mask grows with lmax\u00b2.")
+                       .arg(lmax);
+
+    bool pureE = c.purifyE, pureB = c.purifyB;
+    if ((pureE || pureB) && !pol)
+    {
+        r.notes << "Purification needs Q and U maps, so it was not applied "
+                   "to this intensity map.";
+        pureE = pureB = false;
+    }
+    if ((pureE || pureB) && c.apodization == 0)
+    {
+        r.notes << "Purification needs an apodized mask, so it was not "
+                   "applied.";
+        pureE = pureB = false;
+    }
+
+    master::Options o;
+    o.lmax       = lmax;
+    o.bandwidth  = c.bandwidth;
+    o.apodization = c.apodization == 1   ? master::Apodization::C1
+                    : c.apodization == 2 ? master::Apodization::C2
+                    : c.apodization == 3 ? master::Apodization::Smooth
+                                         : master::Apodization::None;
+    o.apodizationScale = c.apodizationScale;
+    o.purifyE    = pureE;
+    o.purifyB    = pureB;
+    o.iterations = job.iterations;
+
+    master::Input mi;
+    mi.polarized = pol;
+    mi.T         = std::move(st.T);
+    if (pol)
+    {
+        mi.Q = std::move(st.Q);
+        mi.U = std::move(st.U);
+    }
+    // The weights follow the map's pixel order; unseen pixels have none
+    {
+        const Healpix_Map<float> &map = *in.map;
+        Healpix_Map<double> w(map.Nside(), map.Scheme(), SET_NSIDE);
+        const std::vector<float> &weights = *in.weights;
+        for (long i = 0; i < map.Npix(); ++i)
+        {
+            const bool good = std::isfinite(map[i]) && map[i] > -1e30f;
+            w[i]            = good ? double(weights[size_t(i)]) : 0.0;
+        }
+        if (w.Scheme() == NEST)
+            w.swap_scheme();
+        mi.weights = std::move(w);
+    }
+
+    master::Hooks hooks;
+    hooks.total = [&job](int n)
+    {
+        job.total = n + 1; // the map was read already
+    };
+    hooks.stage = [&job](const char *what) { job.begin(what); };
+    hooks.done  = [&job]() { job.done(); };
+
+    auto result = std::make_shared<master::Result>(
+        master::compute(mi, o, hooks));
+    r.spectra   = fromMaster(*result);
+    r.corrected = true;
+    r.lmax      = lmax;
+    r.fsky      = result->fsky;
+    r.condition = result->conditionNumber;
+    r.master    = std::move(result);
+    return r;
+}
 
 PowerSpectrumDock::PowerSpectrumDock(QWidget *parent)
     : QDockWidget("Power Spectrum", parent)
@@ -374,6 +505,101 @@ PowerSpectrumDock::initUI()
     options->addWidget(m_lmaxCombo);
     options->addStretch();
 
+    // --- Correction for the masks applied to the map (NaMaster) ---
+    m_maskGroup = new QGroupBox("Correct for the mask (NaMaster)");
+    m_maskGroup->setCheckable(true);
+    m_maskGroup->setToolTip(
+        "Apply the map's masks as weights and correct the spectra for them\n"
+        "(MASTER method: pseudo-C\u2113, mode-coupling matrix, bandpowers).\n"
+        "Without it the masks are ignored. Needs a mask in the Masks menu.");
+    m_apodCombo = new QComboBox();
+    m_apodCombo->addItem("No apodization", 0);
+    m_apodCombo->addItem("C1 apodization", 1);
+    m_apodCombo->addItem("C2 apodization", 2);
+    m_apodCombo->addItem("Smooth apodization", 3);
+    m_apodCombo->setToolTip(
+        "Smooths the mask's edge (a sharp edge leaks power between scales).\n"
+        "C1 / C2: a cosine ramp of the given width; Smooth: Gaussian.\n"
+        "Slow for large nside. Needed for purification.");
+    m_apodScale = new QDoubleSpinBox();
+    m_apodScale->setRange(0.1, 30.0);
+    m_apodScale->setDecimals(1);
+    m_apodScale->setSingleStep(0.5);
+    m_apodScale->setSuffix(QString::fromUtf8("\u00b0"));
+    m_apodScale->setToolTip("Apodization scale (width of the ramp)");
+    m_bandwidthCombo = new QComboBox();
+    for (int w : {4, 8, 16, 32, 64})
+        m_bandwidthCombo->addItem(QString::fromUtf8("\u0394\u2113 = %1").arg(w), w);
+    m_bandwidthCombo->setToolTip(
+        "Multipoles per bandpower. Wider bands are less noisy and the\n"
+        "coupling matrix is easier to invert.");
+    m_purifyECheck = new QCheckBox("Purify E");
+    m_purifyBCheck = new QCheckBox("Purify B");
+    const QString purifyTip
+        = "Remove the leakage between E and B modes caused by the mask\n"
+          "(Smith & Zaldarriaga 2007). Needs Q and U maps and an apodized\n"
+          "mask. Costs more time and memory, and raises the E (or B) noise.";
+    m_purifyECheck->setToolTip(purifyTip);
+    m_purifyBCheck->setToolTip(purifyTip);
+    {
+        auto *maskLayout = new QVBoxLayout(m_maskGroup);
+        maskLayout->setContentsMargins(6, 6, 6, 6);
+        auto *r1 = new QHBoxLayout();
+        r1->addWidget(m_apodCombo);
+        r1->addWidget(m_apodScale);
+        r1->addStretch();
+        auto *r2 = new QHBoxLayout();
+        r2->addWidget(m_bandwidthCombo);
+        r2->addWidget(m_purifyECheck);
+        r2->addWidget(m_purifyBCheck);
+        r2->addStretch();
+        m_maskHint = new QLabel();
+        m_maskHint->setWordWrap(true);
+        maskLayout->addLayout(r1);
+        maskLayout->addLayout(r2);
+        maskLayout->addWidget(m_maskHint);
+    }
+    {
+        const QSettings settings;
+        const MaskCorrection d;
+        m_maskGroup->setChecked(
+            settings.value("powerspectrum/maskCorrect", true).toBool());
+        const int a = m_apodCombo->findData(
+            settings.value("powerspectrum/apodization", 2).toInt());
+        m_apodCombo->setCurrentIndex(a >= 0 ? a : 2);
+        m_apodScale->setValue(
+            settings.value("powerspectrum/apodScale", d.apodizationScale)
+                .toDouble());
+        const int b = m_bandwidthCombo->findData(
+            settings.value("powerspectrum/bandwidth", d.bandwidth).toInt());
+        m_bandwidthCombo->setCurrentIndex(b >= 0 ? b : 2);
+        m_purifyECheck->setChecked(
+            settings.value("powerspectrum/purifyE", false).toBool());
+        m_purifyBCheck->setChecked(
+            settings.value("powerspectrum/purifyB", false).toBool());
+    }
+    auto onMaskOption = [this]()
+    {
+        QSettings settings;
+        settings.setValue("powerspectrum/maskCorrect",
+                          m_maskGroup->isChecked());
+        settings.setValue("powerspectrum/apodization",
+                          m_apodCombo->currentData());
+        settings.setValue("powerspectrum/apodScale", m_apodScale->value());
+        settings.setValue("powerspectrum/bandwidth",
+                          m_bandwidthCombo->currentData());
+        settings.setValue("powerspectrum/purifyE", m_purifyECheck->isChecked());
+        settings.setValue("powerspectrum/purifyB", m_purifyBCheck->isChecked());
+        refresh();
+    };
+    connect(m_maskGroup, &QGroupBox::toggled, this, onMaskOption);
+    connect(m_apodCombo, &QComboBox::currentIndexChanged, this, onMaskOption);
+    connect(m_apodScale, &QDoubleSpinBox::editingFinished, this, onMaskOption);
+    connect(m_bandwidthCombo, &QComboBox::currentIndexChanged, this,
+            onMaskOption);
+    connect(m_purifyECheck, &QCheckBox::toggled, this, onMaskOption);
+    connect(m_purifyBCheck, &QCheckBox::toggled, this, onMaskOption);
+
     // What the plot shows: the quantity, the axis scales, and export
     m_quantityCombo = new QComboBox();
     m_quantityCombo->addItem("D\u2113 = \u2113(\u2113+1) C\u2113 / 2\u03c0", 0);
@@ -456,6 +682,18 @@ PowerSpectrumDock::initUI()
     connect(m_modeCombo, &QComboBox::currentIndexChanged, this,
             [this]() { replot(); });
     m_theoryOn = QSettings().value("powerspectrum/theory", false).toBool();
+    m_binTheoryCheck = new QCheckBox("Bin theory");
+    m_binTheoryCheck->setToolTip(
+        "Show the theory spectrum convolved with the bandpower windows of\n"
+        "the mask-corrected spectrum (what the bandpowers should match),\n"
+        "instead of the unbinned curve. Only for mask-corrected spectra.");
+    m_binTheoryCheck->setChecked(
+        QSettings().value("powerspectrum/binTheory", true).toBool());
+    connect(m_binTheoryCheck, &QCheckBox::toggled, this, [this](bool on)
+    {
+        QSettings().setValue("powerspectrum/binTheory", on);
+        replot(true);
+    });
     m_commonCheck = new QCheckBox("Common \u2113 range");
     m_commonCheck->setToolTip(
         "Show every curve only up to the highest multipole they all have.\n"
@@ -483,6 +721,7 @@ PowerSpectrumDock::initUI()
     compareOptions->addWidget(m_compareButton);
     compareOptions->addWidget(m_modeCombo);
     compareOptions->addWidget(m_commonCheck);
+    compareOptions->addWidget(m_binTheoryCheck);
     compareOptions->addStretch();
 
     // Below the plot: what it shows and the axis scales
@@ -504,6 +743,7 @@ PowerSpectrumDock::initUI()
     top->addWidget(m_spectrumCombo, 1);
 
     layout->addLayout(options);
+    layout->addWidget(m_maskGroup);
     layout->addLayout(top);
     layout->addWidget(m_computeButton); // its own row, the full width
     layout->addWidget(m_warningLabel);
@@ -516,6 +756,19 @@ PowerSpectrumDock::initUI()
     layout->addWidget(m_chartContainer, 1);
     layout->addWidget(axisRow);
     setWidget(content);
+}
+
+MaskCorrection
+PowerSpectrumDock::currentCorrection() const
+{
+    MaskCorrection c;
+    c.enabled          = m_maskGroup->isChecked();
+    c.apodization      = m_apodCombo->currentData().toInt();
+    c.apodizationScale = m_apodScale->value();
+    c.bandwidth        = m_bandwidthCombo->currentData().toInt();
+    c.purifyE          = m_purifyECheck->isChecked();
+    c.purifyB          = m_purifyBCheck->isChecked();
+    return c;
 }
 
 void
@@ -575,11 +828,28 @@ PowerSpectrumDock::refresh()
     const auto it    = m_results.constFind(view);
     const bool done  = have && it != m_results.constEnd();
 
+    bool masksNow = false;
+    if (view)
+        for (int i = 0; i < view->glWidget()->maskCount(); ++i)
+            masksNow |= view->glWidget()->maskEnabled(i);
+
     m_computeButton->setEnabled(have);
     m_computeButton->setText(busy ? "Cancel" : done ? "Recompute" : "Compute");
 
     m_accuracyCombo->setEnabled(!busy);
     m_lmaxCombo->setEnabled(!busy);
+    // The correction options apply when the map has a mask; purification also
+    // needs an apodized mask
+    m_maskGroup->setEnabled(have && !busy);
+    m_apodScale->setEnabled(m_apodCombo->currentData().toInt() != 0);
+    const bool canPurify = m_apodCombo->currentData().toInt() != 0;
+    m_purifyECheck->setEnabled(canPurify);
+    m_purifyBCheck->setEnabled(canPurify);
+    m_maskHint->setText(masksNow ? QString()
+                                 : "No mask is enabled on this map (Masks "
+                                   "menu), so there is nothing to correct "
+                                   "for.");
+    m_maskHint->setVisible(!masksNow);
     m_infoLabel->setVisible(false);
 
     m_progressBar->setVisible(busy);
@@ -619,30 +889,68 @@ PowerSpectrumDock::refresh()
 
     // What the result is based on, and whether it still matches the view
     QStringList notes;
-    if (it->maskActive)
-        notes << "\u26a0 A mask was applied to this map. The spectra are "
+    if (it->maskActive && !it->corrected)
+        notes << "\u26a0 A mask was applied to this map, but the spectra were "
                  "computed from the unmasked map and are not corrected for "
-                 "the mask, so they may be wrong.";
-    if (it->unseen)
+                 "the mask, so they may be wrong. Turn on \"Correct for the "
+                 "mask\" and press Recompute.";
+    if (it->unseen && !it->corrected)
         notes << "\u26a0 The map has unseen pixels, which are set to zero. "
                  "The spectra are not corrected for them and may be wrong.";
+    if (it->corrected)
+    {
+        for (const QString &n : it->notes)
+            notes << "\u2139 " + n;
+        if (it->condition > 1e7)
+            notes << QString("\u26a0 The mode-coupling matrix is "
+                             "ill-conditioned (condition number %1): the "
+                             "bandpowers amplify noise. Use wider bandpowers "
+                             "or a larger mask.")
+                         .arg(it->condition, 0, 'g', 3);
+    }
 
-    bool masksNow = false;
-    for (int i = 0; i < view->glWidget()->maskCount(); ++i)
-        masksNow |= view->glWidget()->maskEnabled(i);
     if (it->hdu != view->hdu() || it->column != view->column()
         || it->maskActive != masksNow)
         notes << "The map's HDU, column or masks changed since this was "
                  "computed. Press Recompute to update it.";
+    else
+    {
+        const MaskCorrection now = currentCorrection();
+        const bool wantCorrected = now.enabled && masksNow;
+        if (it->corrected != wantCorrected
+            || (it->corrected && !(it->correction == now)))
+            notes << "The mask correction settings changed since this was "
+                     "computed. Press Recompute to apply them.";
+    }
 
-    m_infoLabel->setText(QString("lmax = %1, %2 refinement round(s)")
-                             .arg(it->lmax)
-                             .arg(it->iterations));
+    QString info = QString("lmax = %1, %2 refinement round(s)")
+                       .arg(it->lmax)
+                       .arg(it->iterations);
+    if (it->corrected)
+    {
+        static const char *const apod[] = {"no apodization", "C1", "C2",
+                                           "Smooth"};
+        info += QString::fromUtf8(", \u0394\u2113 = %1, f_sky = %2")
+                    .arg(it->correction.bandwidth)
+                    .arg(it->fsky, 0, 'f', 3);
+        info += QString(", %1").arg(apod[it->correction.apodization]);
+        if (it->correction.apodization != 0)
+            info += QString::fromUtf8(" %1\u00b0")
+                        .arg(it->correction.apodizationScale, 0, 'f', 1);
+        if (it->master && (it->master->purifyE || it->master->purifyB))
+            info += QString(", purified %1%2")
+                        .arg(it->master->purifyE ? "E" : "",
+                             it->master->purifyB ? "B" : "");
+    }
+    m_infoLabel->setText(info);
+    m_infoLabel->setWordWrap(true);
     m_infoLabel->setVisible(true);
     if (it->iterations != m_accuracyCombo->currentData().toInt()
-        || it->lmax != lmaxFor(it->nside, m_lmaxCombo->currentData().toInt()))
+        || it->lmaxWanted
+               != lmaxFor(it->nside, m_lmaxCombo->currentData().toInt()))
         notes << "The accuracy or lmax setting changed since this was "
                  "computed. Press Recompute to apply it.";
+    m_binTheoryCheck->setEnabled(it->corrected);
 
     m_warningLabel->setText(notes.join("\n"));
     m_warningLabel->setVisible(!notes.isEmpty());
@@ -693,6 +1001,17 @@ PowerSpectrumDock::compute()
     input.map  = std::make_shared<Healpix_Map<float>>(*gl->healpixMap());
     for (int i = 0; i < gl->maskCount(); ++i)
         input.maskActive |= gl->maskEnabled(i);
+    input.correction = currentCorrection();
+    if (input.correction.enabled && input.maskActive)
+    {
+        auto weights = std::make_shared<std::vector<float>>(gl->maskWeights());
+        if (weights->empty())
+            input.correction.enabled = false;
+        else
+            input.weights = std::move(weights);
+    }
+    else
+        input.correction.enabled = false;
     const int column = view->column();
 
     const int iterations = m_accuracyCombo->currentData().toInt();
@@ -732,8 +1051,11 @@ PowerSpectrumDock::compute()
             if (m_view.data() == guard.data())
             {
                 refresh();
-                m_statusLabel->setText("Failed to compute the power "
-                                       "spectrum.");
+                m_statusLabel->setText(
+                    r.error.isEmpty()
+                        ? QString("Failed to compute the power spectrum.")
+                        : QString("Failed to compute the power spectrum: %1")
+                              .arg(r.error));
                 m_statusLabel->show();
             }
             return;
@@ -747,8 +1069,15 @@ PowerSpectrumDock::compute()
         res.column     = column;
         res.iterations = iterations;
         res.lmaxMode   = lmaxMode;
-        res.lmax       = r_lmax;
+        res.lmax       = r.lmax;
+        res.lmaxWanted = r_lmax;
         res.nside      = int(input.map->Nside());
+        res.corrected  = r.corrected;
+        res.correction = input.correction;
+        res.fsky       = r.fsky;
+        res.condition  = r.condition;
+        res.notes      = r.notes;
+        res.master     = r.master;
         m_results.insert(guard.data(), res);
         if (m_view.data() == guard.data())
             refresh();
@@ -769,9 +1098,13 @@ PowerSpectrumDock::compute()
             }
             job->done();
             const int lmax = lmaxFor(st.T.Nside(), lmaxMode);
+            if (input.correction.enabled && input.weights
+                && !input.weights->empty())
+                return computeMasked(input, st, lmax, *job);
             CalcResult r;
             r.spectra = fromPowSpec(computeCl(st, lmax, *job));
             r.unseen  = st.unseen;
+            r.lmax    = lmax;
             return r;
         }
         catch (const PowerSpectrumJob::Cancelled &)
@@ -780,9 +1113,11 @@ PowerSpectrumDock::compute()
             r.cancelled = true;
             return r;
         }
-        catch (const std::exception &)
+        catch (const std::exception &e)
         {
-            return {};
+            CalcResult r;
+            r.error = QString::fromUtf8(e.what());
+            return r;
         }
     }));
 }
@@ -950,25 +1285,78 @@ PowerSpectrumDock::replot(bool keepRange)
         updatePlot(it->spectra, keepRange);
 }
 
-// One curve of values for l = 2.. from C_l, as the plot wants them
+// A spectrum as the plot wants it: values at multipoles. Either a C_l for
+// every multipole (ell null), or bandpowers at their effective multipoles.
+struct Series
+{
+    const std::vector<double> *values = nullptr;
+    const std::vector<double> *ell    = nullptr;
+
+    bool binned() const
+    {
+        return ell && !ell->empty();
+    }
+    size_t size() const
+    {
+        return values ? values->size() : 0;
+    }
+    double ellAt(size_t i) const
+    {
+        return binned() ? (*ell)[i] : double(i);
+    }
+    double lastEll() const
+    {
+        return size() ? ellAt(size() - 1) : 0.0;
+    }
+    // The value at multipole l (interpolated between bandpowers); NaN outside
+    double at(double l) const
+    {
+        const double nan = std::nan("");
+        if (!values || values->empty())
+            return nan;
+        if (!binned())
+        {
+            const long i = std::lround(l);
+            return (i >= 0 && size_t(i) < values->size()) ? (*values)[size_t(i)]
+                                                          : nan;
+        }
+        const std::vector<double> &e = *ell;
+        if (l < e.front() || l > e.back())
+            return nan;
+        const size_t j = size_t(std::upper_bound(e.begin(), e.end(), l)
+                                - e.begin());
+        if (j == 0)
+            return (*values)[0];
+        if (j >= e.size())
+            return values->back();
+        const double t = (l - e[j - 1]) / (e[j] - e[j - 1]);
+        return (*values)[j - 1] * (1.0 - t) + (*values)[j] * t;
+    }
+};
+
+// One curve of values for l = 2.. from C_l (or bandpowers), as the plot wants
+// them. mode: 0 values, 1 ratio to `ref`, 2 difference from it.
 static QVariantMap
-makeCurve(const QString &name, const QColor &color,
-          const std::vector<double> &values, const std::vector<double> *ref,
-          int mode, int quantity, size_t maxEll)
+makeCurve(const QString &name, const QColor &color, const Series &cur,
+          const Series *ref, int mode, int quantity, double maxEll)
 {
     QVariantList ell, y;
-    size_t n = ref ? std::min(values.size(), ref->size()) : values.size();
-    n        = std::min(n, maxEll + 1);
-    for (size_t l = 2; l < n; ++l)
+    for (size_t i = cur.binned() ? 0 : 2; i < cur.size(); ++i)
     {
-        const double ll = double(l);
-        const double c  = values[l];
+        const double ll = cur.ellAt(i);
+        if (ll > maxEll)
+            break;
+        const double c = (*cur.values)[i];
         double v;
         if (mode == 1) // ratio to the reference
-            v = ((*ref)[l] != 0.0) ? c / (*ref)[l] : std::nan("");
+        {
+            const double r = ref->at(ll);
+            v              = (std::isfinite(r) && r != 0.0) ? c / r
+                                                            : std::nan("");
+        }
         else
         {
-            const double d = (mode == 2) ? c - (*ref)[l] : c;
+            const double d = (mode == 2) ? c - ref->at(ll) : c;
             v              = quantity == 0 ? ll * (ll + 1.0) * d / (2.0 * M_PI)
                              : quantity == 1 ? d
                                              : ll * ll * d;
@@ -995,13 +1383,19 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
     const int quantity = m_quantityCombo->currentData().toInt();
     int mode           = m_modeCombo->currentData().toInt();
 
-    const std::vector<double> &current = *spectrumByName(spectra, name);
+    const Series current{spectrumByName(spectra, name),
+                         spectra.ell.empty() ? nullptr : &spectra.ell};
 
     // The spectrum of every map / curve to compare, under the same name
     struct Other
     {
         QString name;
-        const std::vector<double> *data;
+        Series data;
+    };
+    auto seriesOf = [&name](const Spectra &sp)
+    {
+        return Series{spectrumByName(sp, name),
+                      sp.ell.empty() ? nullptr : &sp.ell};
     };
     QList<Other> others;
     for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
@@ -1012,24 +1406,50 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
         const auto r = m_results.constFind(m.view.data());
         if (r == m_results.constEnd())
             continue;
-        const std::vector<double> *d = spectrumByName(r->spectra, name);
-        if (!d->empty())
+        const Series d = seriesOf(r->spectra);
+        if (!d.values->empty())
             others.append({m.title, d});
     }
     for (const External &e : m_external)
         if (e.enabled)
         {
-            const std::vector<double> *d = spectrumByName(e.spectra, name);
-            if (!d->empty())
+            const Series d = seriesOf(e.spectra);
+            if (!d.values->empty())
                 others.append({e.name, d});
         }
 
+    // The theory spectrum; for a mask-corrected spectrum optionally through
+    // the bandpower windows, so that it is what the bandpowers estimate
+    Spectra binnedTheory;
     if (m_theoryOn)
         if (const Spectra *t = theorySpectra())
         {
-            const std::vector<double> *d = spectrumByName(*t, name);
-            if (!d->empty())
-                others.append({m_theoryName, d});
+            const Spectra *use = t;
+            QString label      = m_theoryName;
+            const auto res     = m_results.constFind(m_view.data());
+            if (m_binTheoryCheck->isChecked() && !spectra.ell.empty()
+                && res != m_results.constEnd() && res->master)
+            {
+                auto finite = [](std::vector<double> v)
+                {
+                    for (double &x : v)
+                        if (!std::isfinite(x))
+                            x = 0.0;
+                    return v;
+                };
+                master::TheoryCl th;
+                th.TT = finite(t->TT);
+                th.EE = finite(t->EE);
+                th.BB = finite(t->BB);
+                th.TE = finite(t->TE);
+                const master::Result b = master::binTheory(*res->master, th);
+                binnedTheory = fromMaster(b);
+                use          = &binnedTheory;
+                label += " (binned)";
+            }
+            const Series d = seriesOf(*use);
+            if (!d.values->empty())
+                others.append({label, d});
         }
 
     // Ratio and difference need something to compare with
@@ -1046,12 +1466,12 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
 
     // With "Common l range" every curve stops at the highest multipole all of
     // them have
-    size_t maxEll = std::numeric_limits<size_t>::max() - 1;
+    double maxEll = std::numeric_limits<double>::infinity();
     if (m_commonCheck->isChecked())
     {
-        maxEll = current.size() - 1;
+        maxEll = current.lastEll();
         for (const Other &o : others)
-            maxEll = std::min(maxEll, o.data->size() - 1);
+            maxEll = std::min(maxEll, o.data.lastEll());
     }
 
     if (mode == 0)
@@ -1064,7 +1484,7 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
         if (c == m_plotLine)
             c = QColor(palette[next++ % palette.size()]);
         curves.append(
-            makeCurve(o.name, c, *o.data, &current, mode, quantity, maxEll));
+            makeCurve(o.name, c, o.data, &current, mode, quantity, maxEll));
     }
 
     const QString symbol = quantity == 0   ? QString("D\u2113")
@@ -1397,6 +1817,60 @@ PowerSpectrumDock::exportCsv(const QString &givenPath)
             return;
         QSettings().setValue("general/lastDirectory",
                              QFileInfo(path).absolutePath());
+    }
+
+    // Bandpowers of a mask-corrected spectrum: one row per band, at its
+    // effective multipole. Comparison spectra have other multipoles, so they
+    // are not included.
+    if (!it->spectra.ell.empty())
+    {
+        QFile bandFile(path);
+        if (!bandFile.open(QIODevice::WriteOnly | QIODevice::Text))
+        {
+            QMessageBox::critical(this, "Export Spectra",
+                                  QString("Cannot write %1").arg(path));
+            return;
+        }
+        QTextStream out(&bandFile);
+        const Spectra &sp = it->spectra;
+        out << "# bandpowers corrected for the mask (MASTER), lmax = "
+            << it->lmax << ", nside = " << it->nside << ", bandwidth = "
+            << it->correction.bandwidth << ", f_sky = " << it->fsky
+            << ", apodization = " << it->correction.apodization << " ("
+            << it->correction.apodizationScale << " deg)"
+            << ", purified E = "
+            << (it->master && it->master->purifyE ? 1 : 0) << ", B = "
+            << (it->master && it->master->purifyB ? 1 : 0) << "\n"
+            << "# comparison spectra are not included\n";
+        struct Col
+        {
+            const char *name;
+            const std::vector<double> *data;
+        };
+        QList<Col> cols;
+        for (const Col &c :
+             {Col{"TT", &sp.TT}, Col{"EE", &sp.EE}, Col{"BB", &sp.BB},
+              Col{"TE", &sp.TE}, Col{"TB", &sp.TB}, Col{"EB", &sp.EB}})
+            if (!c.data->empty())
+                cols << c;
+        out << "ell_eff";
+        for (const Col &c : cols)
+            out << ",C_b_" << c.name;
+        for (const Col &c : cols)
+            out << ",D_b_" << c.name;
+        out << "\n";
+        out.setRealNumberPrecision(10);
+        for (size_t b = 0; b < sp.ell.size(); ++b)
+        {
+            const double l = sp.ell[b];
+            out << l;
+            for (const Col &c : cols)
+                out << ',' << (*c.data)[b];
+            for (const Col &c : cols)
+                out << ',' << (*c.data)[b] * l * (l + 1.0) / (2.0 * M_PI);
+            out << "\n";
+        }
+        return;
     }
 
     struct Source

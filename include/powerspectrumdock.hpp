@@ -9,11 +9,19 @@
 #include <QPointer>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <functional>
 #include <memory>
 #include <vector>
 
+namespace master
+{
+struct Result;
+}
+
 class QComboBox;
+class QDoubleSpinBox;
+class QGroupBox;
 class QLabel;
 class QPushButton;
 class QQuickView;
@@ -26,7 +34,23 @@ struct PowerSpectrumJob;
 
 struct Spectra
 {
+    // Effective multipoles when these are bandpowers (a mask-corrected
+    // spectrum); empty when the vectors hold C_l for l = 0, 1, 2, ...
+    std::vector<double> ell;
     std::vector<double> TT, EE, BB, TE, TB, EB;
+};
+
+// How to correct the spectra for the masks applied to the map
+struct MaskCorrection
+{
+    bool enabled     = false;
+    int apodization  = 0;    // 0 none, 1 C1, 2 C2, 3 Smooth
+    double apodizationScale = 2.0; // degrees
+    int bandwidth    = 16;   // multipoles per bandpower
+    bool purifyE     = false;
+    bool purifyB     = false;
+
+    bool operator==(const MaskCorrection &) const = default;
 };
 
 // What the computation needs to know about a map
@@ -36,6 +60,10 @@ struct PowerSpectrumInput
     int hdu = 0;  // 1-based HDU of the map; 0 = unknown
     std::shared_ptr<Healpix_Map<float>> map; // fallback / intensity-only map
     bool maskActive = false;                 // a mask is applied in the view
+    // The weight of every pixel (the enabled masks), in the map's pixel
+    // order; empty when no mask is applied
+    std::shared_ptr<const std::vector<float>> weights;
+    MaskCorrection correction;
 };
 
 // Dockable power spectrum plot. It follows the current tab: each map keeps its
@@ -81,10 +109,20 @@ private:
         int iterations  = 0; // refinement rounds used
         int lmaxMode    = 1; // the choice of the lmax combo (not the lmax)
         int lmax        = 0;
+        int lmaxWanted  = 0; // what the lmax combo asked for (lmax may be less)
         int nside       = 0;
+        // The mask correction that was applied (corrected == false: none)
+        bool corrected  = false;
+        MaskCorrection correction;
+        double fsky     = 0.0;
+        double condition = 1.0;
+        QStringList notes; // what was ignored or limited
+        // Bandpower windows, to bin a theory spectrum the same way
+        std::shared_ptr<const master::Result> master;
     };
 
     void initUI();
+    MaskCorrection currentCorrection() const;
     void compute();
     void cancel();
     void updateProgress();
@@ -140,6 +178,14 @@ private:
     QComboBox *m_spectrumCombo  = nullptr;
     QComboBox *m_accuracyCombo  = nullptr;
     QComboBox *m_lmaxCombo      = nullptr;
+    QGroupBox *m_maskGroup      = nullptr; // the mask correction options
+    QComboBox *m_apodCombo      = nullptr;
+    QDoubleSpinBox *m_apodScale = nullptr;
+    QComboBox *m_bandwidthCombo = nullptr;
+    QCheckBox *m_purifyECheck   = nullptr;
+    QCheckBox *m_purifyBCheck   = nullptr;
+    QCheckBox *m_binTheoryCheck = nullptr;
+    QLabel *m_maskHint          = nullptr;
     QLabel *m_infoLabel         = nullptr;
     QComboBox *m_quantityCombo  = nullptr; // what the y axis shows
     QCheckBox *m_logXCheck      = nullptr;

@@ -36,8 +36,10 @@ shader, so large maps (nside 2048 and above) stay responsive.
   start (can be turned off in the settings).
 - Operations on maps: add, subtract, multiply, divide or any expression of
   several maps, with the result opened as a new map and saved as FITS.
-- Map statistics, a FITS header viewer, power spectrum (via NaMaster) and
-  image export.
+- Map statistics, a FITS header viewer, power spectrum and image export.
+  The power spectrum is corrected for the masks on the map (MASTER method,
+  with NaMaster's coupling coefficients), with optional mask apodization,
+  bandpowers and E/B purification.
 - Settings dialog for the defaults of new maps.
 
 
@@ -95,6 +97,33 @@ Galactic.
 
 A `.npz` array that needs more than 4 GiB of memory (compressed archives can
 be tiny and still hold huge arrays) is only loaded after you confirm.
+
+## Power spectrum and masks
+
+The Power Spectrum dock computes the spectra of the map (TT, and TE, EE, BB,
+TB, EB when the HDU has Q and U columns). With a mask enabled on the map
+(Masks menu), "Correct for the mask" applies it as a weight and corrects the
+spectra for it with the MASTER method: the pseudo-C_l of the masked map are
+decoupled with the mode-coupling matrix of the mask, in bandpowers of
+Δℓ multipoles (shown at their effective multipole).
+
+- **Apodization** (C1, C2 or Smooth, with a scale in degrees) smooths the
+  edge of the mask, which reduces the leakage between scales. NaMaster's
+  apodization is slow for big maps: it is refused above nside 1024.
+- **Purify E / Purify B** remove the leakage of E modes into B (and the
+  reverse) caused by the mask (Smith & Zaldarriaga 2007). They need Q and U
+  and an apodized mask, cost more time and memory, and raise the noise of the
+  purified mode.
+- The coupling matrix grows with lmax²: with a mask, lmax is limited to 4096
+  (2048 with polarization), and nside to 2048.
+- "Bin theory" (Compare menu: Theory) draws the theory spectrum convolved with
+  the bandpower windows, which is what the bandpowers estimate; without it the
+  theory is drawn per multipole.
+- Unseen pixels get no weight, so they are corrected for like the mask.
+- The spectra can be exported to CSV (bandpowers at ℓ_eff when corrected).
+
+Without the correction the masks are ignored by the spectrum and the dock
+warns about it.
 
 ## Sessions
 

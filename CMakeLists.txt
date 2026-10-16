@@ -145,6 +145,7 @@ add_executable(${PROJECT_NAME}
     src/smoothdialog.cpp
     src/masksource.cpp
     src/fileexplorerdock.cpp
+    src/masterspectrum.cpp
     src/masksourcedialog.cpp
     src/downgradedialog.cpp
     src/exportdialog.cpp
@@ -203,6 +204,7 @@ add_executable(${PROJECT_NAME}
     include/powerspectrumdock.hpp
     include/statisticsdock.hpp
     include/fileexplorerdock.hpp
+    include/masterspectrum.hpp
 )
 
 # So the executable finds the vendored .so at runtime

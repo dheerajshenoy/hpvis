@@ -173,6 +173,21 @@ First development release.
 - Optional color bar (View > Color Bar) with tick marks and labels. The tick
   count adapts to the width, and labels use a compact or scientific format.
 
+### Power spectrum
+- Mask correction: the power spectrum dock can correct the spectra for the
+  masks on the map (MASTER method, NaMaster's coupling coefficients), with
+  C1 / C2 / Smooth apodization, bandpowers (Δℓ 4 to 64) shown at their
+  effective multipoles, and the f_sky and the condition of the coupling matrix
+  reported. TT, TE, EE, BB, TB and EB are corrected.
+- E/B purification (Purify E, Purify B) removes the E to B leakage caused by
+  the mask. Checked on simulations: a pure E sky gives BB bandpowers that are
+  1e-6 of the standard ones' scatter.
+- "Bin theory": the theory overlay can be convolved with the bandpower windows
+  of the corrected spectrum.
+- Fix: the README and the warning claimed the power spectrum used NaMaster; it
+  used HEALPix's map2alm and ignored the masks. It now warns when a mask is
+  applied but the correction is off.
+
 ### Interface
 - Sessions: the files open when the window closes (with their HDU / array and
   column / row, and which tab was current) are reopened at the next start,

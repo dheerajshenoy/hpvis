@@ -288,6 +288,11 @@ public:
     // no mask is enabled
     std::vector<uint8_t> keepMask() const;
 
+    // The same as a weight between 0 (masked) and 1 (kept) for every pixel:
+    // the product of the enabled masks, without the 0.5 threshold. Used to
+    // correct power spectra for the mask. Empty when no mask is enabled.
+    std::vector<float> maskWeights() const;
+
     inline int maskMode() const
     {
         return m_maskMode;

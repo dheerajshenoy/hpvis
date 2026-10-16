@@ -406,6 +406,37 @@ OpenGLWidget::keepMask() const
     return keep;
 }
 
+std::vector<float>
+OpenGLWidget::maskWeights() const
+{
+    const long npix = m_pendingMap.Npix();
+    struct Active
+    {
+        const uint8_t *data;
+        bool inverted;
+    };
+    std::vector<Active> active;
+    for (const MaskEntry &m : m_masks)
+        if (m.enabled && m.data.size() == size_t(npix))
+            active.push_back({m.data.data(), m.inverted});
+    if (active.empty())
+        return {};
+
+    std::vector<float> weights(size_t(npix), 1.0f);
+#pragma omp parallel for schedule(static)
+    for (long i = 0; i < npix; ++i)
+    {
+        float k = 1.0f; // the same product as keepMask() and the shader
+        for (const Active &m : active)
+        {
+            const float w = m.data[i] * (1.0f / 255.0f);
+            k *= m.inverted ? 1.0f - w : w;
+        }
+        weights[size_t(i)] = k;
+    }
+    return weights;
+}
+
 void
 OpenGLWidget::recomputeDataRange()
 {
