@@ -18,7 +18,6 @@ TabWidget::TabWidget(QWidget *parent) : QWidget(parent)
     setTabPosition(QTabWidget::TabPosition::North);
     // TabBar's own constructor already defaults to CloseButtonMode::All;
     // the real config value is applied afterward via setCloseButtonMode().
-    setAcceptDrops(true);
     setStyleSheet("border: 0");
     // Movable handling is done manually in TabBar
     // m_tab_bar->setElideMode(Qt::TextElideMode::ElideLeft);

@@ -9,6 +9,7 @@
 #include "powerspectrumdock.hpp"
 #include "recentfiles.hpp"
 #include "shortcuts.hpp"
+#include "fileexplorerdock.hpp"
 #include "statisticsdock.hpp"
 #include "statusbar.hpp"
 #include "tabwidget.hpp"
@@ -187,6 +188,7 @@ private:
     MapOperationDialog *m_operateDialog = nullptr;
     DowngradeDialog *m_downgradeDialog  = nullptr;
     SmoothDialog *m_smoothDialog        = nullptr;
+    FileExplorerDock *m_explorerDock    = nullptr;
     StatisticsDock *m_statsDock         = nullptr;
     PowerSpectrumDock *m_powerDock      = nullptr;
     StatusBar *m_statusBar              = nullptr;

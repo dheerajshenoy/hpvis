@@ -245,6 +245,25 @@ HpVis::initUI()
     m_tabWidget = new TabWidget();
     m_tabWidget->setContentsMargins(0, 0, 0, 0);
     m_toolBar   = new ViewToolBar();
+    m_explorerDock = new FileExplorerDock(this);
+    if (!QSettings().contains("fileExplorer/root"))
+        m_explorerDock->setRootPath(startDirectory());
+    // A file that is already open gets its tab back instead of a second one
+    connect(m_explorerDock, &FileExplorerDock::openRequested, this,
+            [this](const QString &path)
+    {
+        const QString wanted = QFileInfo(path).canonicalFilePath();
+        for (int i = 0; i < m_tabWidget->count(); ++i)
+            if (auto *v = qobject_cast<View *>(m_tabWidget->widget(i));
+                v && !v->filePath().isEmpty()
+                && QFileInfo(v->filePath()).canonicalFilePath() == wanted)
+            {
+                m_tabWidget->setCurrentIndex(i);
+                return;
+            }
+        rememberDirectory(path);
+        OpenFile(path);
+    });
     m_statsDock = new StatisticsDock(this);
     m_statsDock->setOpenMapsProvider([this]() { return openMaps(); });
     m_powerDock = new PowerSpectrumDock(this);
@@ -252,10 +271,12 @@ HpVis::initUI()
     m_statusBar = new StatusBar();
     m_toolBar->setEnabled(false);
     initMenubar();
+    setAcceptDrops(true);
     layout->addWidget(m_tabWidget);
     setCentralWidget(widget);
 
     addToolBar(Qt::TopToolBarArea, m_toolBar);
+    addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
     addDockWidget(Qt::RightDockWidgetArea, m_statsDock);
     addDockWidget(Qt::RightDockWidgetArea, m_powerDock);
     m_statsDock->hide();
@@ -385,6 +406,10 @@ HpVis::initMenubar()
         statusBar()->showMessage("Image copied to clipboard", 3000);
     });
     m_viewMenu = menuBar->addMenu("&View");
+
+    m_viewMenu->addAction(m_explorerDock->toggleViewAction());
+    m_explorerDock->toggleViewAction()->setText("File &Explorer");
+    m_viewMenu->addSeparator();
 
     m_viewMinimapAction
         = m_viewMenu->addAction("&Minimap", this, &HpVis::onMinimapToggled);
@@ -1078,6 +1103,7 @@ HpVis::onTabChanged(int index)
     {
         m_viewMinimapAction->setChecked(m_view->glWidget()->minimapEnabled());
         m_viewColorBarAction->setChecked(m_view->glWidget()->colorBarVisible());
+        m_explorerDock->revealFile(m_view->filePath());
     }
 }
 
@@ -1506,23 +1532,47 @@ HpVis::onGraticuleToggled(bool enabled)
         m_view->glWidget()->setGraticuleEnabled(enabled);
 }
 
+// Files from a file manager or from the file explorer dock
 void
 HpVis::dragEnterEvent(QDragEnterEvent *event)
 {
-    event->acceptProposedAction();
+    if (!event->mimeData()->hasUrls())
+        return;
+    for (const QUrl &url : event->mimeData()->urls())
+        if (url.isLocalFile())
+        {
+            event->acceptProposedAction();
+            return;
+        }
 }
 
+// Files open in new tabs; a folder becomes the root of the file explorer
 void
 HpVis::dropEvent(QDropEvent *event)
 {
-    const QMimeData *mimeData = event->mimeData();
-    if (mimeData->hasUrls())
+    bool any = false;
+    for (const QUrl &url : event->mimeData()->urls())
     {
-        for (const QUrl &url : mimeData->urls())
+        if (!url.isLocalFile())
+            continue;
+        const QString path = url.toLocalFile();
+        const QFileInfo info(path);
+        if (info.isDir())
         {
-            OpenFile(url.toLocalFile());
+            m_explorerDock->setRootPath(path);
+            m_explorerDock->show();
         }
+        else if (info.isFile())
+        {
+            rememberDirectory(path);
+            OpenFile(path);
+        }
+        else
+            continue;
+        any = true;
     }
+    if (any)
+        event->acceptProposedAction();
 }
 
 void

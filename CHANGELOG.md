@@ -174,6 +174,14 @@ First development release.
   count adapts to the width, and labels use a compact or scientific format.
 
 ### Interface
+- File explorer: a dock on the left (View > File Explorer) lists the folders and
+  the map files (FITS, `.npy`, `.npz`) under a root folder, with a path bar, a
+  parent-folder button and a "Show all files" option. Double-click or Enter
+  opens a file in a new tab (or switches to its tab if it is already open);
+  the right-click menu can set a folder as the root, open the containing
+  folder and copy a path. The explorer follows the current tab.
+- Drag and drop: map files dragged onto the window from the explorer or from a
+  file manager open in new tabs; a dropped folder becomes the explorer's root.
 - Custom keyboard shortcuts: Settings > Shortcuts lists every menu command and
   the viewer's region keys (finish polygon, cancel selection) and lets you bind
   any key or key chord to them. Binding a key that another command already
