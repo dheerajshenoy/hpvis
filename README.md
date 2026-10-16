@@ -25,8 +25,15 @@ shader, so large maps (nside 2048 and above) stay responsive.
   color bar.
 - Masks: load several, toggle, invert, and hide or dim the masked pixels.
 - Graticule, minimap, zoom, pan and touchpad gestures.
+- FITS, NumPy `.npy` and `.npz` files. The toolbar chooses the HDU and
+  column of a FITS file, or the array and row of a `.npz` (a `.npy` has just
+  the row).
 - Several maps open at once in tabs, with a toolbar for HDU, column,
   projection and colormap.
+- A file explorer dock on the left (View > File Explorer) to browse folders
+  and open maps, and drag and drop of files onto the window.
+- Sessions: the files that were open when you quit come back at the next
+  start (can be turned off in the settings).
 - Operations on maps: add, subtract, multiply, divide or any expression of
   several maps, with the result opened as a new map and saved as FITS.
 - Map statistics, a FITS header viewer, power spectrum (via NaMaster) and
@@ -47,8 +54,8 @@ hpvis [options] [FILE...]
 
 | Option | Description |
 | --- | --- |
-| `-H, --hdu N` | HDU to show (1-based, default: first map HDU) |
-| `-c, --column N\|NAME` | Column to show, by number (1-based) or name such as `TT` (default: first) |
+| `-H, --hdu N` | HDU to show (1-based, default: first map HDU); for a `.npz`, the array number listed by `--info` |
+| `-c, --column N\|NAME` | Column to show, by number (1-based) or name such as `TT` (default: first); for a 2-D `.npy` / `.npz` array, the row number |
 | `-m, --colormap NAME` | e.g. `viridis`, `inferno`, `jet`, a custom colormap name, or a colormap file |
 | `-r, --reverse` | Reverse the colormap |
 | `-s, --scale linear\|log` | Color scale |
@@ -59,7 +66,7 @@ hpvis [options] [FILE...]
 | `-g, --graticule` | Show the coordinate grid |
 | `--mask FILE` | Apply a mask (repeatable) |
 | `-e, --export FILE` | Save the view as an image and exit |
-| `-i, --info` | List HDUs and columns and exit (no window) |
+| `-i, --info` | List HDUs and columns (for a `.npz`, the arrays and rows) and exit (no window) |
 | `--stats` | Print min, max, mean, rms and std and exit (no window) |
 
 Examples:
@@ -69,9 +76,34 @@ hpvis samples/wmap_W_iqu_nside32.fits
 hpvis -p orthographic -m inferno -g map.fits
 hpvis --mask mask.fits --export out.png map.fits
 hpvis --info map.fits
+hpvis --hdu 2 --column 3 maps.npz
 ```
 
-Files can also be opened from File > Open or by dropping them on the window.
+Files can also be opened from File > Open, from the file explorer dock, or
+by dropping them on the window. Without files on the command line, the
+files of the last session are reopened (see Sessions below).
+
+## NumPy files
+
+A `.npy` holds one array and a `.npz` is an archive of arrays. An array is a
+map when it is 1-D with `12 * nside^2` values or 2-D with one such map per
+row (`float` and integer types, little-endian). In a `.npz`, only the arrays
+that hold a map are listed in the toolbar's Array chooser (named by their
+key); the Row chooser picks a row of a 2-D array. Masks and map operations
+read them too. NumPy files have no header, so the frame is assumed to be
+Galactic.
+
+A `.npz` array that needs more than 4 GiB of memory (compressed archives can
+be tiny and still hold huge arrays) is only loaded after you confirm.
+
+## Sessions
+
+When the window closes, the files in the open tabs are remembered with their
+HDU / array and column / row and the current tab. At the next start without
+files on the command line they are reopened in the same order; files that no
+longer exist are skipped. Turn this off in Settings > Files, or reopen the
+last session on demand with File > Reopen Last Session. Computed maps and
+per-map view options (colormap, range, ...) are not part of the session.
 
 ## Controls
 
@@ -86,6 +118,7 @@ Files can also be opened from File > Open or by dropping them on the window.
 | Toggle minimap | `M` |
 | Toggle color bar | `C` |
 | Open / close tab | `Ctrl+O` / `Ctrl+W` |
+| Open a file from the explorer | Double-click or Enter; or drag it onto the window |
 
 ## Custom colormaps
 
@@ -134,7 +167,8 @@ synthetic maps at nside 32 up to 8192).
 ## Settings
 
 Preferences are stored with `QSettings` (on Linux, under `~/.config`), and
-the recent files list under `~/.local/share/hpvis/`.
+the recent files list under `~/.local/share/hpvis/`. The last session and the
+file explorer's folder are stored with the preferences.
 
 ## Caveats
 
