@@ -4,6 +4,7 @@
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
 #include "mapexpression.hpp"
+#include "npyreader.hpp"
 #include "view.hpp"
 
 #include <QComboBox>
@@ -138,6 +139,7 @@ MapOperationDialog::initUI()
             = QSettings().value("general/lastDirectory").toString();
         const QStringList files = QFileDialog::getOpenFileNames(
             this, "Add Maps", dir.isEmpty() ? QDir::homePath() : dir,
+            "Map Files (*.fits *.fit *.fts *.npy *.npz);;"
             "FITS Files (*.fits *.fit *.fts);;All Files (*)");
         for (const QString &f : files)
             addFile(f);
@@ -261,14 +263,19 @@ MapOperationDialog::addFile(const QString &path)
     }
     try
     {
-        fitshandle file;
-        file.open(path.toStdString());
-        row.info = scanFits(file);
+        if (isNumpyPath(path.toStdString()))
+            row.info = scanNumpy(path.toStdString());
+        else
+        {
+            fitshandle file;
+            file.open(path.toStdString());
+            row.info = scanFits(file);
+        }
     }
     catch (const PlanckError &)
     {
         // HEALPix's own exception type, not derived from std::exception
-        showMessage(QString("%1 is not a readable FITS file.").arg(row.source),
+        showMessage(QString("%1 is not a readable map file.").arg(row.source),
                     true);
         return;
     }

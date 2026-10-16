@@ -34,6 +34,7 @@ set(CMAKE_AUTOUIC ON)
 # below (installing it would overwrite the system library).
 add_subdirectory(thirdparty/cfitsio EXCLUDE_FROM_ALL)
 pkg_check_modules(CFITSIO REQUIRED IMPORTED_TARGET cfitsio)
+pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 
 # --- HEALPix C++ (and libsharp) ----------------------------------------
 # Built from the vendored sources into the build tree (out of tree, so the
@@ -209,6 +210,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 target_link_libraries(${PROJECT_NAME} PRIVATE
     healpix_cxx
     PkgConfig::CFITSIO
+    PkgConfig::LIBZIP
     nmt
     OpenMP::OpenMP_CXX
     Qt6::Core

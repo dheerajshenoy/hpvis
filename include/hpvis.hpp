@@ -23,6 +23,7 @@
 
 class DowngradeDialog;
 class QSpinBox;
+class QDoubleSpinBox;
 class QPushButton;
 class SmoothDialog;
 class MapOperationDialog;
@@ -165,7 +166,8 @@ private:
     QAction *m_cellLabelsAction      = nullptr;
     QSpinBox *m_cellGridNsideSpin    = nullptr;
     QPushButton *m_cellGridColorButton = nullptr;
-    QMenu *m_graticuleStepMenu       = nullptr;
+    QDoubleSpinBox *m_graticuleStepSpin = nullptr;
+    QPushButton *m_graticuleColorButton = nullptr;
     QAction *m_reverseColormapAction = nullptr;
     QAction *m_scaleLinearAction     = nullptr;
     QAction *m_scaleLogAction        = nullptr;

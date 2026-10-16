@@ -9,6 +9,7 @@
 | Qt 6 (Core, Gui, Widgets, OpenGLWidgets, Concurrent, Graphs) | GUI |
 | OpenMP | parallel code |
 | **CFITSIO** | reading and writing FITS files (system package required) |
+| **libzip** | reading `.npz` files (system package required) |
 | autoconf, automake, libtool | building the vendored HEALPix, libsharp and NaMaster |
 | GSL, FFTW3 (with OpenMP support), a CBLAS implementation | NaMaster power spectra (`WITH_NAMASTER=ON`) |
 | `git` | fetching the submodules |
@@ -20,7 +21,7 @@ to install them.
 ### Arch Linux
 
 ```sh
-sudo pacman -S base-devel cmake git pkgconf qt6-base qt6-graphs cfitsio \
+sudo pacman -S base-devel cmake git pkgconf qt6-base qt6-graphs cfitsio libzip \
     gsl fftw cblas-openblas autoconf automake libtool pandoc
 ```
 
@@ -28,7 +29,7 @@ sudo pacman -S base-devel cmake git pkgconf qt6-base qt6-graphs cfitsio \
 
 ```sh
 sudo apt install build-essential cmake git pkg-config qt6-base-dev \
-    qt6-graphs-dev libgl-dev libcfitsio-dev libgsl-dev libfftw3-dev \
+    qt6-graphs-dev libgl-dev libcfitsio-dev libzip-dev libgsl-dev libfftw3-dev \
     libopenblas-dev autoconf automake libtool pandoc
 ```
 
@@ -36,7 +37,7 @@ sudo apt install build-essential cmake git pkg-config qt6-base-dev \
 
 ```sh
 sudo dnf install gcc-c++ cmake git pkgconf-pkg-config qt6-qtbase-devel \
-    qt6-qtgraphs-devel cfitsio-devel gsl-devel fftw-devel openblas-devel \
+    qt6-qtgraphs-devel cfitsio-devel libzip-devel gsl-devel fftw-devel openblas-devel \
     autoconf automake libtool pandoc
 ```
 

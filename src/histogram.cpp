@@ -52,8 +52,9 @@ readColumn(const QString &path, int hdu, int column)
                               .toStdString()
                               .c_str());
     std::shared_ptr<Healpix_Map<float>> map;
-    if (isNpyPath(path.toStdString()))
-        map = readNpyMap(path.toStdString(), column, kMaxSupportedNside);
+    if (isNumpyPath(path.toStdString()))
+        map = readNpyMap(path.toStdString(), column, kMaxSupportedNside,
+                         nullptr, hdu);
     else
     {
         fitshandle file;

@@ -16,18 +16,19 @@ void
 addArguments(argparse::ArgumentParser &parser)
 {
     parser.add_argument("files").remaining().metavar("FILE").help(
-        "FITS or .npy file(s) to open");
+        "FITS, .npy or .npz file(s) to open");
 
     // Data selection (1-based, as shown in the toolbar)
     parser.add_argument("-H", "--hdu")
         .metavar("HDU")
         .scan<'i', int>()
-        .help("HDU to visualize (default: first map HDU; ignored for .npy)");
+        .help("HDU to visualize (default: first map HDU; for a .npz, the "
+               "array number shown by --info; ignored for .npy)");
 
     parser.add_argument("-c", "--column")
         .metavar("COLUMN")
         .help("Column to visualize, by number or name such as TT (default: "
-              "first column; for a 2-D .npy, the row number)");
+              "first column; for a 2-D .npy / .npz array, the row number)");
 
     // Appearance
     parser.add_argument("-m", "--colormap")
@@ -99,11 +100,21 @@ addArguments(argparse::ArgumentParser &parser)
 static void
 printInfo(const QString &path)
 {
-    if (isNpyPath(path.toStdString()))
+    if (isNumpyPath(path.toStdString()))
     {
-        std::cout << path.toStdString()
-                  << ": .npy file, no HDUs to list (use --column for a 2-D "
-                     "array)\n";
+        const FitsInfo info = scanNumpy(path.toStdString());
+        const bool npz      = info.kind == MapFileKind::Npz;
+        std::cout << path.toStdString() << ": "
+                  << (npz ? ".npz file, " : ".npy file, ") << info.hdus.size()
+                  << (npz ? " array(s) with a map\n" : " map array\n");
+        for (const FitsHdu &h : info.hdus)
+        {
+            if (npz)
+                std::cout << "  array " << h.index << " ("
+                          << h.name.toStdString() << ")\n";
+            std::cout << "    " << h.columns.size() << " row(s)"
+                      << (npz ? ", use --hdu and --column to pick\n" : "\n");
+        }
         return;
     }
     fitshandle file;
@@ -129,14 +140,17 @@ static void
 printStats(const QString &path, int hdu, int column, const QString &columnName)
 {
     Healpix_Map<float> map;
-    if (isNpyPath(path.toStdString()))
+    if (isNumpyPath(path.toStdString()))
     {
         if (!columnName.isEmpty())
-            throw std::runtime_error(".npy columns have no names, give a "
-                                     "number");
+            throw std::runtime_error("rows of a NumPy array have no names, "
+                                     "give a number");
         column = std::max(column, 1);
-        map    = std::move(
-            *readNpyMap(path.toStdString(), column, kMaxSupportedNside));
+        // The user asked for this file on the command line: no size prompt
+        if (isNpzPath(path.toStdString()))
+            npzApproveLarge(path.toStdString());
+        map = std::move(*readNpyMap(path.toStdString(), column,
+                                    kMaxSupportedNside, nullptr, hdu));
     }
     else
     {
@@ -192,6 +206,9 @@ printStats(const QString &path, int hdu, int column, const QString &columnName)
     std::cout << path.toStdString();
     if (isNpyPath(path.toStdString()))
         std::cout << " (column " << column << ")\n";
+    else if (isNpzPath(path.toStdString()))
+        std::cout << " (array " << (hdu > 0 ? std::to_string(hdu) : "1st")
+                  << ", column " << column << ")\n";
     else
         std::cout << " (HDU " << hdu << ", column " << column << ")\n";
     std::cout << "  nside   " << map.Nside() << "\n"

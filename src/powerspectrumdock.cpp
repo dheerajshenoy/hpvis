@@ -469,17 +469,31 @@ PowerSpectrumDock::initUI()
         replot();
     });
 
-    auto *compareOptions = new QHBoxLayout();
+    // The plot's controls sit in rows that are shown with the plot
+    auto makeRow = [this](QWidget *&row)
+    {
+        row         = new QWidget();
+        auto *l     = new QHBoxLayout(row);
+        l->setContentsMargins(0, 0, 0, 0);
+        m_plotRows << row;
+        return l;
+    };
+    QWidget *compareRow = nullptr, *axisRow = nullptr, *plotRow = nullptr;
+    auto *compareOptions = makeRow(compareRow);
     compareOptions->addWidget(m_compareButton);
     compareOptions->addWidget(m_modeCombo);
     compareOptions->addWidget(m_commonCheck);
     compareOptions->addStretch();
 
-    auto *plotOptions = new QHBoxLayout();
-    plotOptions->addWidget(new QLabel("y:"));
-    plotOptions->addWidget(m_quantityCombo);
-    plotOptions->addWidget(m_logXCheck);
-    plotOptions->addWidget(m_logYCheck);
+    // Below the plot: what it shows and the axis scales
+    auto *axisOptions = makeRow(axisRow);
+    axisOptions->addWidget(new QLabel("y:"));
+    axisOptions->addWidget(m_quantityCombo);
+    axisOptions->addWidget(m_logXCheck);
+    axisOptions->addWidget(m_logYCheck);
+    axisOptions->addStretch();
+
+    auto *plotOptions = makeRow(plotRow);
     plotOptions->addStretch();
     plotOptions->addWidget(m_bgButton);
     plotOptions->addWidget(m_fgButton);
@@ -488,19 +502,19 @@ PowerSpectrumDock::initUI()
 
     auto *top = new QHBoxLayout();
     top->addWidget(m_spectrumCombo, 1);
-    top->addStretch();
-    top->addWidget(m_computeButton);
 
     layout->addLayout(options);
     layout->addLayout(top);
+    layout->addWidget(m_computeButton); // its own row, the full width
     layout->addWidget(m_warningLabel);
     layout->addWidget(m_infoLabel);
     layout->addWidget(m_progressBar);
     layout->addWidget(m_progressLabel);
     layout->addWidget(m_statusLabel);
-    layout->addLayout(compareOptions);
-    layout->addLayout(plotOptions);
+    layout->addWidget(compareRow);
+    layout->addWidget(plotRow);
     layout->addWidget(m_chartContainer, 1);
+    layout->addWidget(axisRow);
     setWidget(content);
 }
 
@@ -580,6 +594,8 @@ PowerSpectrumDock::refresh()
 
     m_statusLabel->setVisible(!done);
     m_chartContainer->setVisible(done);
+    for (QWidget *row : m_plotRows)
+        row->setVisible(done);
     m_spectrumCombo->setVisible(false);
     m_warningLabel->setVisible(false);
 

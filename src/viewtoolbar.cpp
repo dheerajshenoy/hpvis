@@ -30,8 +30,12 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
             QComboBox::AdjustToMinimumContentsLengthWithIcon);
         combo->setMinimumContentsLength(chars);
     }
-    addLabeled("HDU", m_hduCombo);
-    addLabeled("Column", m_columnCombo);
+    m_hduLabel       = new QLabel("HDU ");
+    m_columnLabel    = new QLabel("Column ");
+    m_hduLabelAction = addWidget(m_hduLabel);
+    m_hduComboAction = addWidget(m_hduCombo);
+    addWidget(m_columnLabel);
+    addWidget(m_columnCombo);
     addSeparator();
 
     // New HDU: list its columns and load its first one
@@ -78,9 +82,9 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
     // --- Orientation ---
     m_orientationCombo = new QComboBox();
     m_orientationCombo->addItems(
-        {"Free", "Galactic", "Ecliptic", "Equatorial"});
+        {"Default", "Galactic", "Ecliptic", "Equatorial"});
     m_orientationCombo->setToolTip(
-        "Free: the map's own frame, dragging also rolls the view.\n"
+        "Default: the map's own frame, dragging also rolls the view.\n"
         "Galactic, Ecliptic, Equatorial: show the sky in that frame, north "
         "up.");
     addLabeled("Orientation", m_orientationCombo);
@@ -145,6 +149,15 @@ ViewToolBar::setFitsInfo(const FitsInfo &info, int hdu, int column)
     QSignalBlocker b2(m_columnCombo);
 
     m_fitsInfo = info;
+
+    // FITS: HDU and column. .npz: array and row. .npy: just the row (a .npy
+    // holds a single array)
+    const bool numpy = info.kind != MapFileKind::Fits;
+    m_hduLabel->setText(numpy ? "Array " : "HDU ");
+    m_columnLabel->setText(numpy ? "Row " : "Column ");
+    m_hduLabelAction->setVisible(info.kind != MapFileKind::Npy);
+    m_hduComboAction->setVisible(info.kind != MapFileKind::Npy);
+
     m_hduCombo->clear();
     for (const FitsHdu &h : info.hdus)
     {

@@ -5,6 +5,7 @@
 #include "healpix_cxx/fitshandle.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "mapexpression.hpp"
+#include "npyreader.hpp"
 
 #include <QFileInfo>
 #include <algorithm>
@@ -39,6 +40,34 @@ load(const OperandSource &op)
                               .arg(op.name, file)
                               .toStdString()
                               .c_str());
+    if (isNumpyPath(op.path.toStdString()))
+    {
+        // .npy / .npz: no header, so the frame is the default (Galactic).
+        // hdu picks the array of a .npz, column the row.
+        try
+        {
+            out.map = readNpyMap(op.path.toStdString(), op.column,
+                                 kMaxSupportedNside, nullptr, op.hdu);
+        }
+        catch (const NpzTooLargeError &e)
+        {
+            throw PlanckError(
+                QString("%1: %2 (open it in its own tab first to confirm)")
+                    .arg(op.name, e.what())
+                    .toStdString()
+                    .c_str());
+        }
+        catch (const std::exception &e)
+        {
+            throw PlanckError(QString("%1: %2")
+                                  .arg(op.name, e.what())
+                                  .toStdString()
+                                  .c_str());
+        }
+        out.label = QString("%1 (%2)").arg(op.name, file);
+        return out;
+    }
+
     fitshandle fits;
     try
     {

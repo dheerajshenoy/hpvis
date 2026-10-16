@@ -4,6 +4,14 @@
 
 First development release.
 
+### NumPy files
+- `.npz` files open like FITS files. The toolbar shows an Array chooser (the
+  FITS HDU one) with the arrays that hold a map, and a Row chooser (the
+  column one) for 2-D arrays; for a `.npy` file only the Row chooser is shown.
+  Masks, map operations, `--info`, `--stats`, `--hdu` and `--column` work with
+  them too. Needs libzip.
+- Arrays of a `.npz` over 4 GiB are not loaded until you confirm.
+
 ### Rendering
 - Zoom out to 10%: the wheel, pinch and View > Zoom now go below 100%, which
   shrinks the map inside the window. View > Zoom levels set the zoom

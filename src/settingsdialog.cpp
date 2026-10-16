@@ -487,9 +487,9 @@ SettingsDialog::createAppearanceSettingsPage()
 
     m_orientationCombo = new QComboBox();
     m_orientationCombo->addItems(
-        {"Free", "Galactic", "Ecliptic", "Equatorial"});
+        {"Default", "Galactic", "Ecliptic", "Equatorial"});
     m_orientationCombo->setToolTip(
-        "Free: the map's own frame, dragging also rolls the view.\n"
+        "Default: the map's own frame, dragging also rolls the view.\n"
         "Galactic, Ecliptic, Equatorial: show the sky in that frame and keep "
         "its north up while dragging.");
     projForm->addRow("Orientation:", m_orientationCombo);

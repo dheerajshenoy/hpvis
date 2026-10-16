@@ -23,8 +23,19 @@ struct FitsHdu
     QList<FitsColumn> columns;
 };
 
+// What the "HDUs" and "columns" stand for: a FITS file has HDUs and table
+// columns; a .npz file has arrays (by name) and the rows of a 2-D array; a
+// .npy file is a single array, so only its rows can be chosen
+enum class MapFileKind
+{
+    Fits,
+    Npy,
+    Npz
+};
+
 struct FitsInfo
 {
+    MapFileKind kind = MapFileKind::Fits;
     int hduCount = 0; // all HDUs in the file, including the primary one
     QList<FitsHdu> hdus;
 

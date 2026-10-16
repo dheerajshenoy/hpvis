@@ -1007,12 +1007,21 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
                 Healpix_Map<float> mask;
                 if (src.map)
                     mask = *src.map;
-                else if (isNpyPath(file.toStdString()))
+                else if (isNumpyPath(file.toStdString()))
                 {
                     mask = std::move(*readNpyMap(file.toStdString(), src.column,
-                                                 kMaxSupportedNside));
-                    if (src.column > 0 && src.label.isEmpty())
-                        shown += QString(" [column %1]").arg(src.column);
+                                                 kMaxSupportedNside, nullptr,
+                                                 src.hdu));
+                    if (src.label.isEmpty())
+                    {
+                        if (isNpzPath(file.toStdString()) && src.hdu > 0)
+                            shown += QString(" [array %1").arg(src.hdu)
+                                     + (src.column > 0
+                                            ? QString(", row %1]").arg(src.column)
+                                            : QString("]"));
+                        else if (src.column > 0)
+                            shown += QString(" [column %1]").arg(src.column);
+                    }
                 }
                 else
                 {

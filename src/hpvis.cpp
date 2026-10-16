@@ -7,6 +7,7 @@
 #include "fitsheaderdialog.hpp"
 #include "masksourcedialog.hpp"
 #include "mapoperationdialog.hpp"
+#include "npyreader.hpp"
 #include "pixelordering.hpp"
 #include "powerspectrumdock.hpp"
 #include "settingsdialog.hpp"
@@ -351,10 +352,10 @@ HpVis::initMenubar()
                 "with File > Save Map As... to make a FITS file.");
             return;
         }
-        if (m_view->filePath().endsWith(".npy", Qt::CaseInsensitive))
+        if (isNumpyPath(m_view->filePath().toStdString()))
         {
             QMessageBox::information(this, "FITS Header",
-                                     ".npy files have no header.");
+                                     ".npy and .npz files have no header.");
             return;
         }
         FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
@@ -389,22 +390,13 @@ HpVis::initMenubar()
         = m_viewMenu->addAction("&Minimap", this, &HpVis::onMinimapToggled);
     m_viewMinimapAction->setCheckable(true);
 
-    m_viewColorBarAction
-        = m_viewMenu->addAction("&Color Bar", this, [this](bool state)
-    {
-        if (m_view)
-            m_view->glWidget()->setColorBarVisible(state);
-    });
-    m_viewColorBarAction->setCheckable(true);
-    m_viewColorBarAction->setChecked(true);
-
     m_viewMenu->addSeparator();
 
     // Orientation (radio items: Free / Galactic / Ecliptic / Equatorial)
     m_orientationMenu      = m_viewMenu->addMenu("&Orientation");
     auto *orientationGroup = new QActionGroup(this);
     const QStringList orientationNames
-        = {"&Free", "&Galactic", "&Ecliptic", "E&quatorial"};
+        = {"&Default", "&Galactic", "&Ecliptic", "E&quatorial"};
     const QStringList orientationTips
         = {"The map's own frame; dragging also rolls the view",
            "Show the sky in Galactic coordinates, north up",
@@ -489,29 +481,88 @@ HpVis::initMenubar()
     m_graticuleShowAction = m_graticuleMenu->addAction(
         "&Show Graticule", this, &HpVis::onGraticuleToggled);
     m_graticuleShowAction->setCheckable(true);
-    m_graticuleStepMenu = m_graticuleMenu->addMenu("&Spacing");
-    auto *stepGroup     = new QActionGroup(this);
-    for (double deg : {10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 90.0})
+    auto *stepWidget = new QWidget;
+    auto *stepLayout = new QHBoxLayout(stepWidget);
+    stepLayout->setContentsMargins(12, 2, 12, 2);
+    stepLayout->addWidget(new QLabel("Spacing:"));
+    m_graticuleStepSpin = new QDoubleSpinBox;
+    m_graticuleStepSpin->setRange(1.0, 90.0);
+    m_graticuleStepSpin->setDecimals(1);
+    m_graticuleStepSpin->setSingleStep(5.0);
+    m_graticuleStepSpin->setSuffix("°");
+    m_graticuleStepSpin->setValue(30.0);
+    m_graticuleStepSpin->setKeyboardTracking(false); // typed: apply on Enter
+    stepLayout->addWidget(m_graticuleStepSpin);
+    auto *stepAction = new QWidgetAction(this);
+    stepAction->setDefaultWidget(stepWidget);
+    m_graticuleMenu->addAction(stepAction);
+    connect(m_graticuleStepSpin, qOverload<double>(&QDoubleSpinBox::valueChanged),
+            this, [this](double deg)
     {
-        QAction *a = m_graticuleStepMenu->addAction(QString("%1°").arg(deg));
-        a->setCheckable(true);
-        a->setData(deg);
-        stepGroup->addAction(a);
-        connect(a, &QAction::triggered, this, [this, deg]()
-        {
-            if (m_view)
-                m_view->glWidget()->setGraticuleStep(deg);
-        });
-    }
-    m_graticuleMenu->addAction("&Color...", this, [this]()
-    {
-        if (!m_view)
-            return;
-        QColor c = QColorDialog::getColor(m_view->glWidget()->graticuleColor(),
-                                          this, "Select Graticule Color");
-        if (c.isValid())
-            m_view->glWidget()->setGraticuleColor(c);
+        if (m_view)
+            m_view->glWidget()->setGraticuleStep(deg);
     });
+
+    // A "Color:" row with a swatch that opens a color dialog changing the
+    // color live (Cancel restores the old one)
+    auto addColorRow
+        = [this](QMenu *menu, QPushButton *&button, bool alpha,
+                 std::function<QColor()> get,
+                 std::function<void(const QColor &)> set, const QString &title)
+    {
+        auto *widget = new QWidget;
+        auto *layout = new QHBoxLayout(widget);
+        layout->setContentsMargins(12, 2, 12, 2);
+        layout->addWidget(new QLabel("Color:"));
+        button = new QPushButton;
+        button->setFixedSize(48, 20);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setToolTip("Change the color");
+        setSwatchColor(button, QColor(128, 128, 128)); // set on tab switch
+        layout->addWidget(button);
+        auto *action = new QWidgetAction(this);
+        action->setDefaultWidget(widget);
+        menu->addAction(action);
+
+        QPushButton *btn = button;
+        connect(btn, &QPushButton::clicked, this,
+                [this, menu, btn, alpha, get, set, title]()
+        {
+            if (!m_view)
+                return;
+            // The dialog is a separate window: close the menu chain
+            for (QWidget *w = menu; w; w = w->parentWidget())
+                if (auto *m = qobject_cast<QMenu *>(w))
+                    m->close();
+
+            const QColor before = get();
+            auto *dlg           = new QColorDialog(before, this);
+            dlg->setWindowTitle(title);
+            if (alpha)
+                dlg->setOption(QColorDialog::ShowAlphaChannel);
+            dlg->setAttribute(Qt::WA_DeleteOnClose);
+            connect(dlg, &QColorDialog::currentColorChanged, this,
+                    [btn, set](const QColor &c)
+            {
+                set(c);
+                setSwatchColor(btn, c);
+            });
+            connect(dlg, &QColorDialog::rejected, this,
+                    [btn, set, before]()
+            {
+                set(before);
+                setSwatchColor(btn, before);
+            });
+            dlg->open();
+        });
+    };
+    addColorRow(m_graticuleMenu, m_graticuleColorButton, false,
+                [this]() { return m_view->glWidget()->graticuleColor(); },
+                [this](const QColor &c)
+    {
+        if (m_view)
+            m_view->glWidget()->setGraticuleColor(c);
+    }, "Select Graticule Color");
 
     // Pixel grid: the boundaries of the HEALPix pixels of any nside
     QMenu *cellMenu     = m_viewMenu->addMenu("&Pixel Grid");
@@ -558,47 +609,13 @@ HpVis::initMenubar()
         if (on && !m_view->glWidget()->cellGridEnabled())
             m_cellGridShowAction->setChecked(true);
     });
-    auto *colorWidget = new QWidget;
-    auto *colorLayout = new QHBoxLayout(colorWidget);
-    colorLayout->setContentsMargins(12, 2, 12, 2);
-    colorLayout->addWidget(new QLabel("Color:"));
-    m_cellGridColorButton = new QPushButton;
-    m_cellGridColorButton->setFixedSize(48, 20);
-    m_cellGridColorButton->setCursor(Qt::PointingHandCursor);
-    m_cellGridColorButton->setToolTip("Change the grid color");
-    setSwatchColor(m_cellGridColorButton, QColor(255, 220, 60, 200));
-    colorLayout->addWidget(m_cellGridColorButton);
-    auto *colorAction = new QWidgetAction(this);
-    colorAction->setDefaultWidget(colorWidget);
-    cellMenu->addAction(colorAction);
-    connect(m_cellGridColorButton, &QPushButton::clicked, this, [this, cellMenu]()
+    addColorRow(cellMenu, m_cellGridColorButton, true,
+                [this]() { return m_view->glWidget()->cellGridColor(); },
+                [this](const QColor &c)
     {
-        if (!m_view)
-            return;
-        cellMenu->close();
-        QMenu *parentMenu = m_viewMenu;
-        parentMenu->close();
-
-        auto *gl            = m_view->glWidget();
-        const QColor before = gl->cellGridColor();
-        auto *dlg           = new QColorDialog(before, this);
-        dlg->setWindowTitle("Select Pixel Grid Color");
-        dlg->setOption(QColorDialog::ShowAlphaChannel);
-        dlg->setAttribute(Qt::WA_DeleteOnClose);
-        // Live: the map follows the dialog; Cancel puts the old color back
-        connect(dlg, &QColorDialog::currentColorChanged, this,
-                [this, gl](const QColor &c)
-        {
-            gl->setCellGridColor(c);
-            setSwatchColor(m_cellGridColorButton, c);
-        });
-        connect(dlg, &QColorDialog::rejected, this, [this, gl, before]()
-        {
-            gl->setCellGridColor(before);
-            setSwatchColor(m_cellGridColorButton, before);
-        });
-        dlg->open();
-    });
+        if (m_view)
+            m_view->glWidget()->setCellGridColor(c);
+    }, "Select Pixel Grid Color");
 
     QMenu *customMenu = m_viewMenu->addMenu("Custom Colormaps");
     customMenu->addAction("&Load Colormap...", this,
@@ -613,11 +630,20 @@ HpVis::initMenubar()
         "Re&verse Colormap", this, &HpVis::onColormapInvertChanged);
     m_reverseColormapAction->setCheckable(true);
 
-    QMenu *scaleMenu    = m_viewMenu->addMenu("Color S&cale");
+    QMenu *colorBarMenu = m_viewMenu->addMenu("&Color Bar");
+    m_viewColorBarAction
+        = colorBarMenu->addAction("&Show Color Bar", this, [this](bool state)
+    {
+        if (m_view)
+            m_view->glWidget()->setColorBarVisible(state);
+    });
+    m_viewColorBarAction->setCheckable(true);
+    m_viewColorBarAction->setChecked(true);
+    colorBarMenu->addSeparator();
     auto *scaleGroup    = new QActionGroup(this);
-    m_scaleLinearAction = scaleMenu->addAction("&Linear");
-    m_scaleLogAction    = scaleMenu->addAction("L&ogarithmic");
-    m_scaleAsinhAction  = scaleMenu->addAction("&Asinh");
+    m_scaleLinearAction = colorBarMenu->addAction("&Linear");
+    m_scaleLogAction    = colorBarMenu->addAction("L&ogarithmic");
+    m_scaleAsinhAction  = colorBarMenu->addAction("&Asinh");
     for (QAction *a :
          {m_scaleLinearAction, m_scaleLogAction, m_scaleAsinhAction})
     {
@@ -645,8 +671,12 @@ HpVis::initMenubar()
     softLayout->addWidget(m_asinhSlider);
     auto *softAction = new QWidgetAction(this);
     softAction->setDefaultWidget(softWidget);
-    scaleMenu->addSeparator();
-    scaleMenu->addAction(softAction);
+    // Only the asinh scale has a softening
+    softWidget->setEnabled(false);
+    connect(m_scaleAsinhAction, &QAction::toggled, softWidget,
+            &QWidget::setEnabled);
+    colorBarMenu->addSeparator();
+    colorBarMenu->addAction(softAction);
     connect(m_asinhSlider, &QSlider::valueChanged, this, [this](int v)
     {
         if (m_view)
@@ -654,10 +684,11 @@ HpVis::initMenubar()
                 std::pow(10.0, -3.0 + 3.0 * v / 100.0));
     });
 
-    m_viewMenu->addAction("Color Bar &Range...", this,
-                          &HpVis::onColormapRangeActionTriggered);
-    m_viewMenu->addAction("Reset Color Bar Ran&ge", this,
-                          &HpVis::onColormapRangeResetRequested);
+    colorBarMenu->addSeparator();
+    colorBarMenu->addAction("&Range...", this,
+                            &HpVis::onColormapRangeActionTriggered);
+    colorBarMenu->addAction("Re&set Range", this,
+                            &HpVis::onColormapRangeResetRequested);
 
     m_viewMenu->addAction("Set &Rotation...", this,
                           &HpVis::onRotationActionTriggered);
@@ -822,8 +853,9 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column,
     {
         auto files = QFileDialog::getOpenFileNames(
             this, "Open FITS File", startDirectory(),
-            "Map Files (*.fits *.fit *.fts *.npy);;FITS Files (*.fits *.fit *.fts);;"
-            "NumPy Files (*.npy);;All Files (*)");
+            "Map Files (*.fits *.fit *.fts *.npy *.npz);;FITS Files (*.fits *.fit "
+            "*.fts);;"
+            "NumPy Files (*.npy *.npz);;All Files (*)");
 
         if (!files.isEmpty())
             rememberDirectory(files.first());
@@ -980,8 +1012,11 @@ HpVis::updateControlsFromView(const View *view)
     (gl->pixelOrdering() == PixelOrdering::NESTED ? m_nestedAction
                                                   : m_ringAction)
         ->setChecked(true);
-    for (QAction *a : m_graticuleStepMenu->actions())
-        a->setChecked(a->data().toDouble() == gl->graticuleStep());
+    {
+        const QSignalBlocker block(m_graticuleStepSpin);
+        m_graticuleStepSpin->setValue(gl->graticuleStep());
+    }
+    setSwatchColor(m_graticuleColorButton, gl->graticuleColor());
 
     updateMaskListFromView(view);
     updateDocks();
@@ -1071,8 +1106,9 @@ HpVis::buildMasksMenu(const View *view)
     QAction *add = m_masksMenu->addAction("&Add Mask...", this, [this]()
     {
         const auto files = QFileDialog::getOpenFileNames(
-            this, "Load Mask(s)", "", "Mask Files (*.fits *.npy);;FITS Files (*.fits);;"
-            "NumPy Files (*.npy);;All Files (*)");
+            this, "Load Mask(s)", "",
+            "Mask Files (*.fits *.npy *.npz);;FITS Files (*.fits);;"
+            "NumPy Files (*.npy *.npz);;All Files (*)");
         if (!files.isEmpty())
             onMaskFilesSelected(files);
     });

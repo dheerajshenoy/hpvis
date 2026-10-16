@@ -9,6 +9,7 @@
 
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QMessageBox>
 #include <QtConcurrent>
 #include <cmath>
 #include <memory>
@@ -39,6 +40,7 @@ struct LoadResult
     int column = 0;
     QString coordsys; // FITS COORDSYS, empty when absent
     QString error;
+    uint64_t tooLargeBytes = 0; // set when a .npz array needs approval
 };
 } // namespace
 
@@ -78,11 +80,32 @@ View::startLoad(int hdu, int column, const QString &columnName,
 
     auto *watcher = new QFutureWatcher<LoadResult>(this);
     connect(watcher, &QFutureWatcher<LoadResult>::finished, this,
-            [this, watcher, initial]()
+            [this, watcher, initial, hdu, column, columnName]()
     {
         LoadResult result = watcher->result();
         watcher->deleteLater();
         m_loading = false;
+
+        if (!result.map && result.tooLargeBytes)
+        {
+            // A big .npz array: load it only if the user agrees
+            const double gib = double(result.tooLargeBytes) / (1ull << 30);
+            const auto answer = QMessageBox::question(
+                this, "Large array",
+                QString("Loading this array needs about %1 GiB of memory "
+                        "(more than the %2 GiB limit for .npz files).\n\n"
+                        "Load it anyway?")
+                    .arg(gib, 0, 'f', 1)
+                    .arg(kNpzSizeCap >> 30),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (answer == QMessageBox::Yes)
+            {
+                npzApproveLarge(m_filePath.toStdString());
+                startLoad(hdu, column, columnName, initial);
+                return;
+            }
+            result.error = "Loading was cancelled (the array is too large).";
+        }
 
         if (!result.map)
         {
@@ -111,16 +134,23 @@ View::startLoad(int hdu, int column, const QString &columnName,
         LoadResult result;
         try
         {
-            if (isNpyPath(filename.toStdString()))
+            if (isNumpyPath(filename.toStdString()))
             {
                 if (!columnName.isEmpty())
-                    throw PlanckError(".npy columns have no names, give a "
-                                      "number");
-                auto map = readNpyMap(filename.toStdString(), column,
-                                      kMaxSupportedNside);
+                    throw PlanckError("rows of a NumPy array have no names, "
+                                      "give a number");
+                const std::string path = filename.toStdString();
+                result.info            = scanNumpy(path);
+                // Without a choice: the first array that holds a map (or let
+                // readNpyMap say why there is none)
+                int useHdu = hdu;
+                if (useHdu <= 0 && !result.info.hdus.isEmpty())
+                    useHdu = result.info.hdus.first().index;
+                auto map = readNpyMap(path, column, kMaxSupportedNside,
+                                      nullptr, useHdu);
                 markBinaryMaskUnseen(*map);
                 result.map    = std::move(map);
-                result.hdu    = 0;
+                result.hdu    = useHdu > 0 ? useHdu : 1;
                 result.column = column <= 0 ? 1 : column;
                 return result;
             }
@@ -182,6 +212,11 @@ View::startLoad(int hdu, int column, const QString &columnName,
         catch (const PlanckError &e)
         {
             result.error = e.what();
+        }
+        catch (const NpzTooLargeError &e)
+        {
+            result.error         = e.what();
+            result.tooLargeBytes = e.bytes;
         }
         catch (const std::exception &e)
         {

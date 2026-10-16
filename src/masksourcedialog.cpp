@@ -97,20 +97,36 @@ MaskSourceDialog::addFile(const QString &path, const QString &title)
 
     try
     {
-        if (isNpyPath(path.toStdString()))
+        if (isNumpyPath(path.toStdString()))
         {
-            const int count = npyMapCount(path.toStdString());
-            for (int i = 1; i <= count; ++i)
+            // A .npz: file > array > row. A .npy is a single array.
+            const FitsInfo info = scanNumpy(path.toStdString());
+            if (info.hdus.isEmpty())
+                throw std::runtime_error("no HEALPix map found");
+            const bool npz = info.kind == MapFileKind::Npz;
+            for (const FitsHdu &h : info.hdus)
             {
-                MaskSource s;
-                s.path   = path;
-                s.column = i;
-                auto *item = new QTreeWidgetItem(top);
-                item->setText(0, QString("column %1").arg(i));
-                item->setText(1, count > 1 ? QString("row %1").arg(i - 1)
-                                           : QString());
-                item->setData(0, kSourceRole, int(m_sources.size()));
-                m_sources << s;
+                QTreeWidgetItem *parent = top;
+                if (npz)
+                {
+                    parent = new QTreeWidgetItem(top);
+                    parent->setText(0, QString("array %1").arg(h.index));
+                    parent->setText(1, h.name);
+                    parent->setFlags(Qt::ItemIsEnabled);
+                }
+                const int count = int(h.columns.size());
+                for (const FitsColumn &c : h.columns)
+                {
+                    MaskSource s;
+                    s.path   = path;
+                    s.hdu    = h.index;
+                    s.column = c.index;
+                    auto *item = new QTreeWidgetItem(parent);
+                    item->setText(0, count > 1 ? QString("row %1").arg(c.index)
+                                               : QString("the map"));
+                    item->setData(0, kSourceRole, int(m_sources.size()));
+                    m_sources << s;
+                }
             }
         }
         else
@@ -181,7 +197,7 @@ MaskSourceDialog::browse()
 {
     const auto files = QFileDialog::getOpenFileNames(
         this, "Add file", "",
-        "Map Files (*.fits *.fit *.fts *.npy);;All Files (*)");
+        "Map Files (*.fits *.fit *.fts *.npy *.npz);;All Files (*)");
     for (const QString &f : files)
         addFile(f, QString());
     m_tree->expandAll();

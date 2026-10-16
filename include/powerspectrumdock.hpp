@@ -131,6 +131,7 @@ private:
     // The running computation of each busy view (progress, cancel flag)
     QHash<const View *, std::shared_ptr<PowerSpectrumJob>> m_jobs;
     QTimer *m_progressTimer = nullptr;
+    QList<QWidget *> m_plotRows; // plot controls, shown with the plot
 
     QQuickView *m_chartView     = nullptr;
     QWidget *m_chartContainer   = nullptr;
