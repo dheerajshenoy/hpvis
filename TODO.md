@@ -2,7 +2,6 @@
 
 # High Priority
 
-- [ ] Healpix pixel number labels
 - [ ] Drag and drop map as images to other apps
 
 # Medium Priority

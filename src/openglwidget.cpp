@@ -18,8 +18,8 @@
 #include <QFutureWatcher>
 #include <QMessageBox>
 #include <QMouseEvent>
-#include <QOpenGLFramebufferObject>
 #include <QNativeGestureEvent>
+#include <QOpenGLFramebufferObject>
 #include <QPainter>
 #include <QPainterPath>
 #include <QVector3D>
@@ -816,8 +816,8 @@ OpenGLWidget::paintGL()
         glViewport(0, 0, qRound(width() * dpr), qRound(height() * dpr));
     }
 
-    if (!showMinimap && !m_isRegionSelecting
-        && !m_graticuleEnabled && !m_cellLabelsEnabled && !m_statsRegion.active)
+    if (!showMinimap && !m_isRegionSelecting && !m_graticuleEnabled
+        && !m_cellLabelsEnabled && !m_statsRegion.active)
         return;
 
     QPainter p(this);
@@ -2124,13 +2124,12 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
         return;
     }
 
-    // Rotate with the middle button or Ctrl + left drag; the globe-like
-    // projections rotate with a plain left drag (panning them is pointless)
+    // Rotate with the middle button; the globe-like projections rotate with a
+    // plain left drag (panning them is pointless)
     const bool disk = projectionmath::isDisk(m_projection);
     const bool wantsRotate
         = e->button() == Qt::MiddleButton
-          || (e->button() == Qt::LeftButton
-              && ((e->modifiers() & Qt::ControlModifier) || disk));
+          || (e->button() == Qt::LeftButton && disk);
     if (wantsRotate)
     {
         m_lastMousePos = e->pos();
@@ -2412,8 +2411,8 @@ OpenGLWidget::renderColorbarImage(const QImage &strip) const
 
     {
         QPainter p(&img);
-        p.fillRect(QRectF(0, 0, img.width() / dpr, img.height() / dpr),
-                   QColor(0, 0, 0, 140));
+        // p.fillRect(QRectF(0, 0, img.width() / dpr, img.height() / dpr),
+        //            QColor(0, 0, 0, 140));
     }
 
     // Gradient: one device pixel column at a time, interpolating the strip
@@ -2428,9 +2427,13 @@ OpenGLWidget::renderColorbarImage(const QImage &strip) const
             const int i    = std::min(int(f), last - 1);
             const double w = f - i;
             const QRgb a = strip.pixel(i, 0), b = strip.pixel(i + 1, 0);
-            auto mix = [w](int u, int v) { return qRound(u + (v - u) * w); };
-            const QRgb c = qRgb(mix(qRed(a), qRed(b)), mix(qGreen(a), qGreen(b)),
-                                mix(qBlue(a), qBlue(b)));
+            auto mix = [w](int u, int v)
+            {
+                return qRound(u + (v - u) * w);
+            };
+            const QRgb c
+                = qRgb(mix(qRed(a), qRed(b)), mix(qGreen(a), qGreen(b)),
+                       mix(qBlue(a), qBlue(b)));
             for (int y = 0; y < bh; ++y)
                 img.setPixel(x0 + x, y0 + y, c);
         }
@@ -2442,8 +2445,8 @@ OpenGLWidget::renderColorbarImage(const QImage &strip) const
     p.setPen(Qt::white);
 
     // Use as many ticks as fit without the labels touching (5 down to 2)
-    const double maxAbs = std::max(
-        {std::abs(double(m_vmin)), std::abs(double(m_vmax)), 1e-30});
+    const double maxAbs
+        = std::max({std::abs(double(m_vmin)), std::abs(double(m_vmax)), 1e-30});
     struct Tick
     {
         double x;

@@ -32,6 +32,7 @@
 #include <QGuiApplication>
 #include <QLabel>
 #include <QSlider>
+#include <QSpinBox>
 #include <QWidgetAction>
 #include <QLocale>
 #include <QMenuBar>
@@ -45,6 +46,37 @@
 #include <cmath>
 #include <iostream>
 #include <tuple>
+
+namespace
+{
+// Steps by powers of two: the pixel grid only takes power-of-two nsides
+class Pow2SpinBox : public QSpinBox
+{
+public:
+    using QSpinBox::QSpinBox;
+    void stepBy(int steps) override
+    {
+        int v = value();
+        for (int i = 0; i < std::abs(steps); ++i)
+            v = steps > 0 ? v * 2 : std::max(1, v / 2);
+        setValue(v);
+    }
+};
+
+void
+setSwatchColor(QPushButton *button, const QColor &c)
+{
+    if (!button)
+        return;
+    button->setStyleSheet(
+        QString("background-color: rgba(%1,%2,%3,%4); border: 1px solid "
+                "palette(mid); border-radius: 3px;")
+            .arg(c.red())
+            .arg(c.green())
+            .arg(c.blue())
+            .arg(c.alpha()));
+}
+} // namespace
 
 HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
     : QMainWindow(parent)
@@ -490,20 +522,30 @@ HpVis::initMenubar()
         if (m_view)
             m_view->glWidget()->setCellGridEnabled(on);
     });
-    cellMenu->addAction("&Nside...", this, [this]()
+    auto *nsideWidget = new QWidget;
+    auto *nsideLayout = new QHBoxLayout(nsideWidget);
+    nsideLayout->setContentsMargins(12, 2, 12, 2);
+    nsideLayout->addWidget(new QLabel("Nside:"));
+    m_cellGridNsideSpin = new Pow2SpinBox;
+    m_cellGridNsideSpin->setRange(1, 8192);
+    m_cellGridNsideSpin->setValue(4);
+    m_cellGridNsideSpin->setKeyboardTracking(false); // typed: apply on Enter
+    m_cellGridNsideSpin->setToolTip("Rounded to a power of two (1 - 8192)");
+    nsideLayout->addWidget(m_cellGridNsideSpin);
+    auto *nsideAction = new QWidgetAction(this);
+    nsideAction->setDefaultWidget(nsideWidget);
+    cellMenu->addAction(nsideAction);
+    connect(m_cellGridNsideSpin, &QSpinBox::valueChanged, this, [this](int n)
     {
         if (!m_view)
             return;
-        bool ok = false;
-        const int n = QInputDialog::getInt(
-            this, "Pixel Grid",
-            "Nside of the grid (rounded to a power of two, 1 - 8192):",
-            m_view->glWidget()->cellGridNside(), 1, 8192, 1, &ok);
-        if (!ok)
-            return;
-        m_view->glWidget()->setCellGridNside(n);
-        m_view->glWidget()->setCellGridEnabled(true);
+        auto *gl = m_view->glWidget();
+        gl->setCellGridNside(n);
+        gl->setCellGridEnabled(true);
         m_cellGridShowAction->setChecked(true);
+        // Show the nside actually used (a power of two)
+        const QSignalBlocker block(m_cellGridNsideSpin);
+        m_cellGridNsideSpin->setValue(gl->cellGridNside());
     });
     m_cellLabelsAction = cellMenu->addAction("Show Pixel &Numbers");
     m_cellLabelsAction->setCheckable(true);
@@ -516,15 +558,46 @@ HpVis::initMenubar()
         if (on && !m_view->glWidget()->cellGridEnabled())
             m_cellGridShowAction->setChecked(true);
     });
-    cellMenu->addAction("&Color...", this, [this]()
+    auto *colorWidget = new QWidget;
+    auto *colorLayout = new QHBoxLayout(colorWidget);
+    colorLayout->setContentsMargins(12, 2, 12, 2);
+    colorLayout->addWidget(new QLabel("Color:"));
+    m_cellGridColorButton = new QPushButton;
+    m_cellGridColorButton->setFixedSize(48, 20);
+    m_cellGridColorButton->setCursor(Qt::PointingHandCursor);
+    m_cellGridColorButton->setToolTip("Change the grid color");
+    setSwatchColor(m_cellGridColorButton, QColor(255, 220, 60, 200));
+    colorLayout->addWidget(m_cellGridColorButton);
+    auto *colorAction = new QWidgetAction(this);
+    colorAction->setDefaultWidget(colorWidget);
+    cellMenu->addAction(colorAction);
+    connect(m_cellGridColorButton, &QPushButton::clicked, this, [this, cellMenu]()
     {
         if (!m_view)
             return;
-        const QColor c = QColorDialog::getColor(
-            m_view->glWidget()->cellGridColor(), this,
-            "Select Pixel Grid Color", QColorDialog::ShowAlphaChannel);
-        if (c.isValid())
-            m_view->glWidget()->setCellGridColor(c);
+        cellMenu->close();
+        QMenu *parentMenu = m_viewMenu;
+        parentMenu->close();
+
+        auto *gl            = m_view->glWidget();
+        const QColor before = gl->cellGridColor();
+        auto *dlg           = new QColorDialog(before, this);
+        dlg->setWindowTitle("Select Pixel Grid Color");
+        dlg->setOption(QColorDialog::ShowAlphaChannel);
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        // Live: the map follows the dialog; Cancel puts the old color back
+        connect(dlg, &QColorDialog::currentColorChanged, this,
+                [this, gl](const QColor &c)
+        {
+            gl->setCellGridColor(c);
+            setSwatchColor(m_cellGridColorButton, c);
+        });
+        connect(dlg, &QColorDialog::rejected, this, [this, gl, before]()
+        {
+            gl->setCellGridColor(before);
+            setSwatchColor(m_cellGridColorButton, before);
+        });
+        dlg->open();
     });
 
     QMenu *customMenu = m_viewMenu->addMenu("Custom Colormaps");
@@ -891,6 +964,11 @@ HpVis::updateControlsFromView(const View *view)
         const QSignalBlocker block(m_cellLabelsAction);
         m_cellLabelsAction->setChecked(gl->cellLabelsEnabled());
     }
+    {
+        const QSignalBlocker block(m_cellGridNsideSpin);
+        m_cellGridNsideSpin->setValue(gl->cellGridNside());
+    }
+    setSwatchColor(m_cellGridColorButton, gl->cellGridColor());
     m_reverseColormapAction->setChecked(gl->colormapInvert());
     m_toolBar->setColormap(gl->colormap());
 
