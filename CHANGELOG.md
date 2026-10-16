@@ -174,6 +174,13 @@ First development release.
   count adapts to the width, and labels use a compact or scientific format.
 
 ### Interface
+- Sessions: the files open when the window closes (with their HDU / array and
+  column / row, and which tab was current) are reopened at the next start,
+  in the same order, when no file is given on the command line. Files that no
+  longer exist are skipped with a note in the status bar. Settings > Files >
+  "Reopen the files that were open when the program was closed" turns it off;
+  File > Reopen Last Session does it on demand.
+- Fix: starting hpvis without a file on the command line no longer throws.
 - File explorer: a dock on the left (View > File Explorer) lists the folders and
   the map files (FITS, `.npy`, `.npz`) under a root folder, with a path bar, a
   parent-folder button and a "Show all files" option. Double-click or Enter

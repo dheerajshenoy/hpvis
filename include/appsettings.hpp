@@ -15,6 +15,7 @@ struct AppSettings
     // General
     int recentFilesMax   = 10;
     bool rememberLastDir = true; // file dialogs start in the last used folder
+    bool restoreSession  = true; // reopen the last session's files at start
     bool showToolbar     = true;
     bool showStatusBar   = true;
     // Maps with a larger nside are streamed (coarse map + visible tiles)

@@ -17,6 +17,8 @@ AppSettings::load()
 
     a.rememberLastDir
         = s.value("general/rememberLastDir", d.rememberLastDir).toBool();
+    a.restoreSession
+        = s.value("general/restoreSession", d.restoreSession).toBool();
     a.showToolbar = s.value("general/showToolbar", d.showToolbar).toBool();
     a.showStatusBar
         = s.value("general/showStatusBar", d.showStatusBar).toBool();
@@ -111,6 +113,7 @@ AppSettings::save() const
     QSettings s;
     s.setValue("general/recentFilesMax", recentFilesMax);
     s.setValue("general/rememberLastDir", rememberLastDir);
+    s.setValue("general/restoreSession", restoreSession);
     s.setValue("general/showToolbar", showToolbar);
     s.setValue("general/showStatusBar", showStatusBar);
     s.setValue("general/streamingNside", streamingNside);

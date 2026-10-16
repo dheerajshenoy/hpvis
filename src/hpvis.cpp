@@ -85,6 +85,10 @@ HpVis::HpVis(const argparse::ArgumentParser &parser, QWidget *parent)
     m_recentFiles.setMaxCount(m_settings.recentFilesMax);
     initUI();
     parseArgs(parser);
+    // Files given on the command line replace the last session
+    if (m_settings.restoreSession
+        && !parser.is_used("files"))
+        restoreSession();
     initShortcuts();
     restoreState(QSettings().value("window/state").toByteArray());
     this->show();
@@ -179,7 +183,10 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
         }
     }
 
-    for (const auto &file : parser.get<std::vector<std::string>>("files"))
+    const auto cliFiles
+        = parser.present<std::vector<std::string>>("files").value_or(
+            std::vector<std::string>());
+    for (const auto &file : cliFiles)
     {
         const QString path = QString::fromStdString(file);
         m_cliPaths.insert(path);
@@ -354,6 +361,13 @@ HpVis::initMenubar()
 
     m_fileOpenRecentMenu = m_fileMenu->addMenu("&Open Recent");
     updateRecentMenu();
+
+    m_fileReopenSessionAction = m_fileMenu->addAction(
+        "Reopen &Last Session", this, &HpVis::restoreSession);
+    connect(m_fileMenu, &QMenu::aboutToShow, this, [this]()
+    {
+        m_fileReopenSessionAction->setEnabled(storedSessionSize() > 0);
+    });
 
     m_fileExportAction = m_fileMenu->addAction("&Export", this,
                                                &HpVis::onExportActionTriggered);
@@ -869,9 +883,124 @@ HpVis::updateRecentMenu()
     });
 }
 
+// --- Session: the files that were open when the program was closed ---
+
+// Called when the window closes
+void
+HpVis::saveSession() const
+{
+    QSettings s;
+    s.remove("session");
+    int n       = 0;
+    int current = -1;
+    s.beginWriteArray("session/tabs");
+    for (int i = 0; i < m_tabWidget->count(); ++i)
+    {
+        const auto *v = qobject_cast<View *>(m_tabWidget->widget(i));
+        // A computed map has no file to open again
+        if (!v || v->isComputed() || v->filePath().isEmpty())
+            continue;
+        s.setArrayIndex(n);
+        s.setValue("path", v->filePath());
+        s.setValue("hdu", v->hdu());
+        s.setValue("column", v->column());
+        if (v == m_view)
+            current = n;
+        ++n;
+    }
+    s.endArray();
+    s.setValue("session/current", current);
+}
+
+int
+HpVis::storedSessionSize() const
+{
+    return QSettings().beginReadArray("session/tabs");
+}
+
+void
+HpVis::restoreSession()
+{
+    if (!m_sessionQueue.isEmpty() && m_sessionPos < m_sessionQueue.size())
+        return; // already restoring
+
+    QSettings s;
+    const int n = s.beginReadArray("session/tabs");
+    m_sessionQueue.clear();
+    m_sessionMissing = 0;
+    for (int i = 0; i < n; ++i)
+    {
+        s.setArrayIndex(i);
+        SessionEntry e;
+        e.path   = s.value("path").toString();
+        e.hdu    = s.value("hdu").toInt();
+        e.column = s.value("column").toInt();
+        if (e.path.isEmpty())
+            continue;
+        if (!QFileInfo::exists(e.path))
+        {
+            ++m_sessionMissing;
+            continue;
+        }
+        m_sessionQueue << e;
+    }
+    s.endArray();
+
+    // Position of the current tab among the files that still exist
+    m_sessionCurrent = -1;
+    const int saved  = s.value("session/current", -1).toInt();
+    if (saved >= 0 && saved < n)
+    {
+        s.beginReadArray("session/tabs");
+        s.setArrayIndex(saved);
+        const QString path = s.value("path").toString();
+        s.endArray();
+        for (int i = 0; i < m_sessionQueue.size(); ++i)
+            if (m_sessionQueue[i].path == path)
+                m_sessionCurrent = i;
+    }
+
+    m_sessionPos = 0;
+    m_sessionCurrentView.clear();
+    if (m_sessionQueue.isEmpty() && m_sessionMissing > 0)
+        m_statusBar->showMessage(
+            QString("%1 file(s) from the last session were not found")
+                .arg(m_sessionMissing),
+            5000);
+    restoreNextSessionEntry();
+}
+
+// One at a time, so that the tabs come back in their order
+void
+HpVis::restoreNextSessionEntry()
+{
+    if (m_sessionPos >= m_sessionQueue.size())
+    {
+        m_sessionQueue.clear();
+        if (m_sessionCurrentView)
+            m_tabWidget->setCurrentIndex(
+                m_tabWidget->indexOf(m_sessionCurrentView));
+        if (m_sessionMissing > 0)
+            m_statusBar->showMessage(
+                QString("%1 file(s) from the last session were not found")
+                    .arg(m_sessionMissing),
+                5000);
+        return;
+    }
+    const int pos            = m_sessionPos++;
+    const SessionEntry entry = m_sessionQueue[pos];
+    OpenFile(entry.path, entry.hdu, entry.column, QString(),
+             [this, pos](View *view)
+    {
+        if (view && pos == m_sessionCurrent)
+            m_sessionCurrentView = view;
+        restoreNextSessionEntry();
+    });
+}
+
 void
 HpVis::OpenFile(const QString &filePath, int hdu, int column,
-                const QString &columnName)
+                const QString &columnName, std::function<void(View *)> onDone)
 {
     QString resolvedPath;
     if (filePath.isEmpty())
@@ -904,8 +1033,8 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column,
     view->hide();
 
     connect(view, &View::loadFinished, this,
-            [this, view, filename, resolvedPath, fromCli](bool ok,
-                                                          const QString &error)
+            [this, view, filename, resolvedPath, fromCli,
+             onDone](bool ok, const QString &error)
     {
         if (!ok)
         {
@@ -917,6 +1046,8 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column,
             m_statusBar->showMessage(QString("Failed to load %1").arg(filename),
                                      5000);
             view->deleteLater();
+            if (onDone)
+                onDone(nullptr);
             return;
         }
 
@@ -941,6 +1072,8 @@ HpVis::OpenFile(const QString &filePath, int hdu, int column,
         m_statusBar->showMessage(QString("Loaded %1").arg(filename), 3000);
 
         m_toolBar->setEnabled(true);
+        if (onDone)
+            onDone(view);
     });
 
     view->loadMap(resolvedPath, hdu, column, columnName);
@@ -1869,6 +2002,7 @@ HpVis::closeEvent(QCloseEvent *event)
 {
     // Remembers which tools are docked, floating or hidden
     QSettings().setValue("window/state", saveState());
+    saveSession();
     QMainWindow::closeEvent(event);
 }
 

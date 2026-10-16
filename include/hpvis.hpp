@@ -17,8 +17,10 @@
 #include "viewtoolbar.hpp"
 
 #include <QMainWindow>
+#include <QPointer>
 #include <QSet>
 #include <QTabWidget>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -36,9 +38,12 @@ public:
     explicit HpVis(const argparse::ArgumentParser &parser,
                    QWidget *parent = nullptr);
 
-    // hdu / column are 1-based; 0 picks the first map HDU / column
+    // hdu / column are 1-based; 0 picks the first map HDU / column.
+    // onDone (if given) runs when loading ended, with the new view or null
+    // when it failed.
     void OpenFile(const QString &filePath = QString(), int hdu = 0,
-                  int column = 0, const QString &columnName = QString());
+                  int column = 0, const QString &columnName = QString(),
+                  std::function<void(View *)> onDone = {});
 
 protected:
     void dragEnterEvent(QDragEnterEvent *event) override;
@@ -70,6 +75,10 @@ private:
     void initViewConnections(const View *view);
     void initMenubar();
     void updateRecentMenu();
+    void saveSession() const;
+    int storedSessionSize() const;
+    void restoreSession();
+    void restoreNextSessionEntry();
     void applyDefaults(View *view);
     void initCFITSIO();
     void updateStatusBarFromView(const View *view);
@@ -136,6 +145,20 @@ private:
     CliOptions m_cli;
     QSet<QString> m_cliPaths; // files opened from the command line
 
+    // The files of the last session, opened one after the other so that the
+    // tabs keep their order
+    struct SessionEntry
+    {
+        QString path;
+        int hdu    = 0;
+        int column = 0;
+    };
+    QList<SessionEntry> m_sessionQueue;
+    int m_sessionPos        = 0; // next entry to open
+    int m_sessionCurrent    = -1; // entry that was the current tab
+    int m_sessionMissing    = 0;
+    QPointer<View> m_sessionCurrentView;
+
     QMenu *m_editMenu                = nullptr;
     QAction *m_editCopyParamsAction  = nullptr;
     QAction *m_editPasteParamsAction = nullptr;
@@ -143,6 +166,7 @@ private:
     QMenu *m_fileMenu           = nullptr;
     QAction *m_fileOpenAction   = nullptr;
     QMenu *m_fileOpenRecentMenu = nullptr;
+    QAction *m_fileReopenSessionAction = nullptr;
     RecentFiles m_recentFiles;
     AppSettings m_settings        = AppSettings::load();
     QAction *m_fileSaveMapAction  = nullptr;

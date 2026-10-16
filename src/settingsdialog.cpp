@@ -165,7 +165,7 @@ SettingsDialog::initConnections()
     connect(m_graticuleStepCombo, &QComboBox::currentIndexChanged, this,
             changed);
     for (QCheckBox *box :
-         {m_rememberDirCheck, m_showToolbarCheck, m_showStatusBarCheck,
+         {m_rememberDirCheck, m_restoreSessionCheck, m_showToolbarCheck, m_showStatusBarCheck,
           m_reverseCheck, m_colorBarCheck, m_minimapCheck, m_graticuleCheck,
           m_globeShadowCheck, m_limbDarkeningCheck, m_animateCheck,
           m_animateProjectionCheck, m_hdrCheck})
@@ -248,6 +248,7 @@ SettingsDialog::currentSettings() const
     AppSettings a;
     a.recentFilesMax     = m_recentMaxSpin->value();
     a.rememberLastDir    = m_rememberDirCheck->isChecked();
+    a.restoreSession     = m_restoreSessionCheck->isChecked();
     a.showToolbar        = m_showToolbarCheck->isChecked();
     a.showStatusBar      = m_showStatusBarCheck->isChecked();
     a.streamingNside     = m_streamCombo->currentData().toInt();
@@ -308,6 +309,7 @@ SettingsDialog::loadSettings()
     m_recentMaxSpin->setValue(a.recentFilesMax);
 
     m_rememberDirCheck->setChecked(a.rememberLastDir);
+    m_restoreSessionCheck->setChecked(a.restoreSession);
     m_showToolbarCheck->setChecked(a.showToolbar);
     m_showStatusBarCheck->setChecked(a.showStatusBar);
     const int stream = m_streamCombo->findData(a.streamingNside);
@@ -410,6 +412,13 @@ SettingsDialog::createGeneralSettingsPage()
     m_rememberDirCheck = new QCheckBox("Open and export dialogs start in the "
                                        "last used folder");
     form->addRow(m_rememberDirCheck);
+
+    m_restoreSessionCheck = new QCheckBox("Reopen the files that were open "
+                                          "when the program was closed");
+    m_restoreSessionCheck->setToolTip(
+        "At start-up, when no file is given on the command line. File > "
+        "Reopen Last Session does it on demand.");
+    form->addRow(m_restoreSessionCheck);
     outer->addWidget(box);
 
     // --- Large maps ---
