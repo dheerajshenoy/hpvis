@@ -207,6 +207,12 @@ First development release.
   applied but the correction is off.
 
 ### Interface
+- `--export` (`-e`) is now `--output` (`-o`). `-o` used to be the short flag of
+  `--orientation`, which now has only its long form.
+- The colormap options of the command line have a `c` prefix, to show they are
+  for the colormap: `--creverse`, `--cscale`, `--cmin` and `--cmax` (were
+  `--reverse`, `--scale`, `--min` and `--max`), and `-r` and `-s` are removed.
+  `--cscale` now accepts `asinh`, as its help said.
 - Help > Usage (`F1`) opens the usage guide (`docs/USAGE.md`, embedded in the
   program): a section list, search that filters the sections, and the text on
   the right. It covers every menu, dock, tool and setting, the shortcuts, the
@@ -317,7 +323,7 @@ First development release.
 - Open files from the File menu, or from the command line (`hpvis
   file.fits ...`). Command-line options override the saved defaults: `--hdu`,
   `--column`, `--colormap`, `--reverse`, `--scale`, `--min`, `--max`,
-  `--projection`, `--graticule`, `--pixel-grid` and `--mask`. `--export FILE` saves the view as
+  `--projection`, `--graticule`, `--pixel-grid` and `--mask`. `--output FILE` saves the view as
   an image and exits, and `--info` / `--stats` print the HDUs and columns or
   the map statistics without opening a window.
 - Files are opened with `fitshandle`: every HDU that holds a HEALPix map (NSIDE and
@@ -363,6 +369,9 @@ First development release.
 ### Build and packaging
 - A man page is written in `docs/MAN.md` and converted with pandoc during the
   build; it is installed to `share/man/man1` when pandoc is found.
+- The man page was brought up to date (`--version`, `--pixel-grid`, the `asinh`
+  scale, `.npz` files, the files hpvis uses, more examples) and its footer now
+  shows the project version from CMake.
 - `INSTALLATION.md` lists the dependencies (CFITSIO, autotools, GSL, FFTW3,
   CBLAS, ...) with package commands for Arch, Debian/Ubuntu and Fedora, and
   the build and install steps.

@@ -67,7 +67,7 @@ private:
         bool graticule = false;
         std::optional<int> pixelGrid;
         QStringList masks;
-        QString exportPath;
+        QString outputPath;
     };
     void applyCliOptions(View *view);
 

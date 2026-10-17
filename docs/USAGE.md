@@ -190,7 +190,7 @@ colors.
   extreme pixels (the Galactic plane, bright point sources) do not wash out the
   CMB fluctuations. This is the usual "auto-range" for CMB maps.
 
-The command line has `--min` and `--max`.
+The command line has `--cmin` and `--cmax`.
 
 ### Color bar
 
@@ -445,7 +445,7 @@ UNSEEN pixels are taken as zero in the transform and restored afterwards.
   as a FITS file.
 - **File > FITS Header...:** shows the header of the current HDU (not for
   computed maps or NumPy files, which have none).
-- **Command line:** `hpvis --export out.png map.fits` saves the view and exits.
+- **Command line:** `hpvis --output out.png map.fits` saves the view and exits.
 
 ## 11. Settings
 
@@ -507,16 +507,16 @@ hpvis [options] [FILE...]
 | `-H, --hdu N` | HDU to show (1-based, default: first map HDU); for a `.npz`, the array number listed by `--info` |
 | `-c, --column N\|NAME` | Column to show, by number (1-based) or name such as `TT`; for a 2-D `.npy` / `.npz`, the row |
 | `-m, --colormap NAME` | e.g. `viridis`, `inferno`, a custom colormap name, or a colormap file |
-| `-r, --reverse` | Reverse the colormap |
-| `-s, --scale linear\|log\|asinh` | Color scale |
-| `--min V`, `--max V` | Color range |
+| `--creverse` | Reverse the colormap |
+| `--cscale linear\|log\|asinh` | Color scale |
+| `--cmin V`, `--cmax V` | Color range |
 | `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer` |
-| `-o, --orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial` |
+| `--orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial` |
 | `--view inside\|outside` | Perspective: the sky from the inside (default) or like a globe |
 | `-g, --graticule` | Show the coordinate grid |
 | `--pixel-grid NSIDE` | Overlay the pixel boundaries of this nside |
 | `--mask FILE` | Apply a mask (repeatable) |
-| `-e, --export FILE` | Save the view as an image and exit |
+| `-o, --output FILE` | Save the view as an image and exit |
 | `-i, --info` | List the HDUs and columns (for a `.npz`, arrays and rows) and exit |
 | `--stats` | Print min, max, mean, rms and std and exit |
 | `-v, --version` | Print the version |
@@ -527,7 +527,7 @@ Examples:
 ```sh
 hpvis map.fits
 hpvis -p orthographic -m inferno -g map.fits
-hpvis --mask mask.fits --export out.png map.fits
+hpvis --mask mask.fits --output out.png map.fits
 hpvis --info map.fits
 hpvis --hdu 2 --column 3 maps.npz
 hpvis --stats map.fits

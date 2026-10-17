@@ -67,15 +67,15 @@ hpvis [options] [FILE...]
 | `-H, --hdu N` | HDU to show (1-based, default: first map HDU); for a `.npz`, the array number listed by `--info` |
 | `-c, --column N\|NAME` | Column to show, by number (1-based) or name such as `TT` (default: first); for a 2-D `.npy` / `.npz` array, the row number |
 | `-m, --colormap NAME` | e.g. `viridis`, `inferno`, `jet`, a custom colormap name, or a colormap file |
-| `-r, --reverse` | Reverse the colormap |
-| `-s, --scale linear\|log` | Color scale |
-| `--min V`, `--max V` | Color range |
+| `--creverse` | Reverse the colormap |
+| `--cscale linear\|log\|asinh` | Color scale |
+| `--cmin V`, `--cmax V` | Color range |
 | `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer` |
-| `-o, --orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial`: the frame to show the sky in |
+| `--orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial`: the frame to show the sky in |
 | `--view inside\|outside` | Perspective: the sky seen from the inside (longitude increases to the left, the default) or from the outside like a globe (mirrored) |
 | `-g, --graticule` | Show the coordinate grid |
 | `--mask FILE` | Apply a mask (repeatable) |
-| `-e, --export FILE` | Save the view as an image and exit |
+| `-o, --output FILE` | Save the view as an image and exit |
 | `-i, --info` | List HDUs and columns (for a `.npz`, the arrays and rows) and exit (no window) |
 | `--stats` | Print min, max, mean, rms and std and exit (no window) |
 
@@ -84,7 +84,7 @@ Examples:
 ```sh
 hpvis samples/wmap_W_iqu_nside32.fits
 hpvis -p orthographic -m inferno -g map.fits
-hpvis --mask mask.fits --export out.png map.fits
+hpvis --mask mask.fits --output out.png map.fits
 hpvis --info map.fits
 hpvis --hdu 2 --column 3 maps.npz
 ```

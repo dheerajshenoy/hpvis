@@ -38,17 +38,17 @@ addArguments(argparse::ArgumentParser &parser)
         .metavar("COLORMAP")
         .help("Colormap, e.g. viridis, inferno, jet (default: from settings)");
 
-    parser.add_argument("-r", "--reverse").flag().help("Reverse the colormap");
+    parser.add_argument("--creverse").flag().help("Reverse the colormap");
 
-    parser.add_argument("-s", "--scale")
-        .choices("linear", "log")
+    parser.add_argument("--cscale")
+        .choices("linear", "log", "asinh")
         .metavar("SCALE")
         .help("Colormap scale: linear, log or asinh");
 
-    parser.add_argument("--min").metavar("VALUE").scan<'g', double>().help(
+    parser.add_argument("--cmin").metavar("VALUE").scan<'g', double>().help(
         "Lower end of the color range");
 
-    parser.add_argument("--max").metavar("VALUE").scan<'g', double>().help(
+    parser.add_argument("--cmax").metavar("VALUE").scan<'g', double>().help(
         "Upper end of the color range");
 
     parser.add_argument("-p", "--projection")
@@ -61,7 +61,7 @@ addArguments(argparse::ArgumentParser &parser)
               "azimuthal_equidistant, gnomonic, mercator, sinusoidal, "
               "lambert_cylindrical, gall_peters, stereographic or hammer");
 
-    parser.add_argument("-o", "--orientation")
+    parser.add_argument("--orientation")
         .choices("free", "galactic", "ecliptic", "equatorial")
         .metavar("ORIENTATION")
         .help("Frame to show the sky in: galactic, ecliptic or equatorial "
@@ -87,7 +87,7 @@ addArguments(argparse::ArgumentParser &parser)
         "Mask file to apply (can be given more than once)");
 
     // Non-interactive modes
-    parser.add_argument("-e", "--export")
+    parser.add_argument("-o", "--output")
         .metavar("FILENAME")
         .help("Save the view of the first file as an image and exit");
 

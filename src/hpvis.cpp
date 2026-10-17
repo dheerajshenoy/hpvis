@@ -128,7 +128,7 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
             m_cli.colormap = Colormap(id);
     }
 
-    if (auto scale = parser.present<std::string>("--scale"))
+    if (auto scale = parser.present<std::string>("--cscale"))
         m_cli.scale
             = (*scale == "log")     ? ColormapScale::LOG
               : (*scale == "asinh") ? ColormapScale::ASINH
@@ -158,9 +158,9 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
     if (auto view = parser.present<std::string>("--view"))
         m_cli.viewFromOutside = (*view == "outside");
 
-    m_cli.min       = parser.present<double>("--min");
-    m_cli.max       = parser.present<double>("--max");
-    m_cli.reverse   = parser.get<bool>("--reverse");
+    m_cli.min       = parser.present<double>("--cmin");
+    m_cli.max       = parser.present<double>("--cmax");
+    m_cli.reverse   = parser.get<bool>("--creverse");
     m_cli.graticule = parser.get<bool>("--graticule");
     m_cli.pixelGrid = parser.present<int>("--pixel-grid");
 
@@ -168,8 +168,8 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
         for (const auto &m : parser.get<std::vector<std::string>>("--mask"))
             m_cli.masks << QString::fromStdString(m);
 
-    if (auto out = parser.present<std::string>("--export"))
-        m_cli.exportPath = QString::fromStdString(*out);
+    if (auto out = parser.present<std::string>("--output"))
+        m_cli.outputPath = QString::fromStdString(*out);
 
     const int hdu    = parser.present<int>("--hdu").value_or(0);
     // --column takes a number or a column name (TT, QQ, ...)
@@ -198,7 +198,7 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
 }
 
 // Applies the command-line options on top of the defaults, then exports and
-// quits when --export was given
+// quits when --output was given
 void
 HpVis::applyCliOptions(View *view)
 {
@@ -230,10 +230,10 @@ HpVis::applyCliOptions(View *view)
     if (!m_cli.masks.isEmpty())
         gl->addMaskFiles(m_cli.masks);
 
-    if (!m_cli.exportPath.isEmpty())
+    if (!m_cli.outputPath.isEmpty())
     {
-        const QString out = m_cli.exportPath;
-        m_cli.exportPath.clear(); // only the first file
+        const QString out = m_cli.outputPath;
+        m_cli.outputPath.clear(); // only the first file
         // Give the GPU a moment to upload and draw the map (and masks)
         QTimer::singleShot(1000, this, [this, gl, out]()
         {

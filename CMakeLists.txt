@@ -275,16 +275,19 @@ include(GNUInstallDirs)
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# Man page: generated from docs/MAN.md with pandoc
+# Man page: generated from docs/MAN.md with pandoc (the version in the footer
+# comes from the project) and installed to man1
 find_program(PANDOC_EXECUTABLE pandoc)
 if(PANDOC_EXECUTABLE)
     set(HPVIS_MANPAGE ${CMAKE_BINARY_DIR}/hpvis.1)
     add_custom_command(
         OUTPUT ${HPVIS_MANPAGE}
-        COMMAND ${PANDOC_EXECUTABLE} -s -f markdown -t man
+        COMMAND ${PANDOC_EXECUTABLE} -s -f markdown-smart -t man
+                -M "footer=${PROJECT_NAME} ${PROJECT_VERSION}"
                 ${CMAKE_SOURCE_DIR}/docs/MAN.md -o ${HPVIS_MANPAGE}
         DEPENDS ${CMAKE_SOURCE_DIR}/docs/MAN.md
-        COMMENT "Generating man page")
+        COMMENT "Generating man page"
+        VERBATIM)
     add_custom_target(manpage ALL DEPENDS ${HPVIS_MANPAGE})
     install(FILES ${HPVIS_MANPAGE}
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
