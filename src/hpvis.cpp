@@ -1,4 +1,5 @@
 #include "hpvis.hpp"
+#include "aboutinfo.hpp"
 
 #include "colormapregistry.hpp"
 #include "downgradedialog.hpp"
@@ -848,10 +849,14 @@ HpVis::initMenubar()
 
     auto helpMenu = menuBar->addMenu("&Help");
 
-    helpMenu->addAction("&About", this, []()
+    helpMenu->addAction("&About", this, [this]()
     {
-        QMessageBox::about(nullptr, "About hpvis",
-                           "hpvis is a simple viewer for HEALPix maps.");
+        // Rich text, with clickable links (the settings page shows the same)
+        QMessageBox box(QMessageBox::NoIcon, "About hpvis", aboutHtml(),
+                        QMessageBox::Ok, this);
+        box.setTextFormat(Qt::RichText);
+        box.setTextInteractionFlags(Qt::TextBrowserInteraction);
+        box.exec();
     });
 }
 

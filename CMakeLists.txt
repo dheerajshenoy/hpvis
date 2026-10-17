@@ -171,6 +171,7 @@ add_executable(${PROJECT_NAME}
 
     include/npyreader.hpp
     include/settingsdialog.hpp
+    include/aboutinfo.hpp
     include/exportoptions.hpp
     include/view.hpp
     include/hpvis.hpp

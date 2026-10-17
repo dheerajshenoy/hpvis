@@ -1,4 +1,5 @@
 #include "settingsdialog.hpp"
+#include "aboutinfo.hpp"
 
 #include "colormapregistry.hpp"
 
@@ -815,24 +816,7 @@ SettingsDialog::createAboutPage()
     QVBoxLayout *layout = new QVBoxLayout(page);
     layout->addStretch();
 
-    QLabel *aboutLabel
-        = new QLabel("<h2>hpvis</h2>"
-                     "<p>Version: " PROJECT_VERSION "</p>"
-                     "<p>A healpix viewer.</p>"
-                     "<p>Developed by <a "
-                     "href=\"https://dheerajshenoy.github.io\">Dheeraj "
-                     "Vittal Shenoy</a>.</p>"
-                     "<p><a href=\"https://github.com/dheerajshenoy/hpvis\">"
-                     "GitHub repository</a></p>"
-                     "<p>Licensed under the AGPL-3.0 License.</p>"
-                     "<p>Support the development: "
-                     "<a href=\"https://ko-fi.com/dheerajshenoy\">Ko-fi</a>"
-                     " &middot; "
-                     "<a href=\"https://github.com/sponsors/dheerajshenoy\">"
-                     "GitHub Sponsors</a>"
-                     " &middot; "
-                     "<a href=\"https://liberapay.com/dheerajshenoy\">"
-                     "Liberapay</a></p>");
+    QLabel *aboutLabel = new QLabel(aboutHtml());
     aboutLabel->setTextFormat(Qt::RichText);
     aboutLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
     aboutLabel->setOpenExternalLinks(true);
