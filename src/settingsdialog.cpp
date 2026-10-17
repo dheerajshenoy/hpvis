@@ -55,7 +55,7 @@ SettingsDialog::initUI()
         "general files recent history list folder directory remember last "
         "interface toolbar status bar show hide hdr rendering float "
         "framebuffer banding",
-        "appearance power spectrum plot background foreground line colors new "
+        "appearance power spectrum plot background foreground line colors export svg pdf new "
         "maps defaults projection perspective inside outside sky globe mirror "
         "orientation free galactic ecliptic equatorial frame coordinates "
         "mollweide orthographic "
@@ -169,7 +169,7 @@ SettingsDialog::initConnections()
          {m_rememberDirCheck, m_restoreSessionCheck, m_showToolbarCheck, m_showStatusBarCheck,
           m_reverseCheck, m_colorBarCheck, m_minimapCheck, m_graticuleCheck,
           m_globeShadowCheck, m_limbDarkeningCheck, m_animateCheck,
-          m_animateProjectionCheck, m_hdrCheck})
+          m_animateProjectionCheck, m_hdrCheck, m_exportColorsCheck})
         connect(box, &QCheckBox::toggled, this, changed);
 }
 
@@ -279,6 +279,7 @@ SettingsDialog::currentSettings() const
     a.plotBackground     = m_plotBackground;
     a.plotForeground     = m_plotForeground;
     a.plotLine           = m_plotLine;
+    a.exportPlotColors   = m_exportColorsCheck->isChecked();
     // Only the keys that differ from the built-in ones are stored
     for (int i = 0; i < m_commands.size(); ++i)
     {
@@ -351,6 +352,7 @@ SettingsDialog::loadSettings()
     setColorButton(m_plotBgButton, m_plotBackground);
     setColorButton(m_plotFgButton, m_plotForeground);
     setColorButton(m_plotLineButton, m_plotLine);
+    m_exportColorsCheck->setChecked(a.exportPlotColors);
 
     for (int i = 0; i < m_commands.size(); ++i)
     {
@@ -571,6 +573,11 @@ SettingsDialog::createAppearanceSettingsPage()
     addPlotColor(m_plotFgButton, m_plotForeground,
                  "Foreground:", "Plot Foreground (text and axes)");
     addPlotColor(m_plotLineButton, m_plotLine, "Line:", "Plot Line");
+    m_exportColorsCheck = new QCheckBox("Keep the plot colors in SVG / PDF export");
+    m_exportColorsCheck->setToolTip(
+        "On: exported plots use the colors shown on screen.\n"
+        "Off: black on white, with the curve colors darkened for paper.");
+    plotForm->addRow(m_exportColorsCheck);
 
     outer->addWidget(orthoBox);
     outer->addWidget(animationBox);

@@ -84,6 +84,7 @@ AppSettings::load()
     a.plotBackground = color("plot/background", d.plotBackground);
     a.plotForeground = color("plot/foreground", d.plotForeground);
     a.plotLine       = color("plot/line", d.plotLine);
+    a.exportPlotColors = s.value("plot/exportColors", d.exportPlotColors).toBool();
     a.animateOrthoGlobe
         = s.value("view/animateOrthoGlobe", d.animateOrthoGlobe).toBool();
     a.animateProjection
@@ -144,6 +145,7 @@ AppSettings::save() const
     s.setValue("plot/background", plotBackground.name());
     s.setValue("plot/foreground", plotForeground.name());
     s.setValue("plot/line", plotLine.name());
+    s.setValue("plot/exportColors", exportPlotColors);
     s.setValue("theory/preset", theoryPreset);
     s.setValue("theory/file", theoryFile);
     s.setValue("theory/unit", theoryUnit);

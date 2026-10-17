@@ -1,6 +1,7 @@
 #include "statisticsdock.hpp"
 
 #include "appsettings.hpp"
+#include "plotrenderer.hpp"
 #include "view.hpp"
 
 #include <QCheckBox>
@@ -20,6 +21,7 @@
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QHeaderView>
+#include <QJSValue>
 #include <QQuickView>
 #include <QSettings>
 #include <QSpinBox>
@@ -735,16 +737,89 @@ startDirectory()
     return (!dir.isEmpty() && QDir(dir).exists()) ? dir : QDir::homePath();
 }
 
+// The histogram as the QML shows it now, as step curves (two points per bin)
+static bool
+currentHistogram(QQuickItem *root, plotrenderer::Plot &plot)
+{
+    if (!root)
+        return false;
+    QVariant curves = root->property("curves");
+    if (curves.canConvert<QJSValue>())
+        curves = curves.value<QJSValue>().toVariant();
+    const double lo    = root->property("lo").toDouble();
+    const double bw    = root->property("binWidth").toDouble();
+    const int bins     = root->property("bins").toInt();
+    plot.logY          = root->property("logY").toBool();
+    const double floor = root->property("floorValue").toDouble();
+    for (const QVariant &cv : curves.toList())
+    {
+        const QVariantMap m = cv.toMap();
+        const QVariantList values = m.value("values").toList();
+        plotrenderer::Curve c;
+        c.name  = m.value("name").toString();
+        c.color = QColor(m.value("color").toString());
+        for (int i = 0; i < bins && i < values.size(); ++i)
+        {
+            double y = values[i].toDouble();
+            // As on screen: an empty bin sits on the floor of a log axis
+            if (std::isfinite(y) && plot.logY && y <= 0)
+                y = floor;
+            c.ell << lo + i * bw << lo + (i + 1) * bw;
+            c.values << y << y;
+        }
+        plot.curves.append(c);
+    }
+    plot.xMin   = root->property("xMin").toDouble();
+    plot.xMax   = root->property("xMax").toDouble();
+    plot.yMin   = root->property("yMin").toDouble();
+    plot.yMax   = root->property("yMax").toDouble();
+    plot.xTitle = root->property("xTitle").toString();
+    plot.yTitle = root->property("yTitle").toString();
+    return !plot.curves.isEmpty() && bins > 0;
+}
+
 void
 StatisticsDock::exportImage()
 {
-    const QString path = QFileDialog::getSaveFileName(
+    QString filter;
+    QString path = QFileDialog::getSaveFileName(
         this, "Export Histogram", startDirectory() + "/histogram.png",
-        "PNG Files (*.png);;All Files (*)");
+        "PNG Files (*.png);;SVG Files (*.svg);;PDF Files (*.pdf);;All Files "
+        "(*)",
+        &filter);
     if (path.isEmpty())
         return;
     QSettings().setValue("general/lastDirectory",
                          QFileInfo(path).absolutePath());
+
+    // The chosen filter decides the format when the name has no extension
+    QString ext = QFileInfo(path).suffix().toLower();
+    if (ext.isEmpty())
+    {
+        ext = filter.startsWith("SVG") ? "svg"
+              : filter.startsWith("PDF") ? "pdf"
+                                         : "png";
+        path += "." + ext;
+    }
+
+    if (ext == "svg" || ext == "pdf")
+    {
+        plotrenderer::Plot plot;
+        if (!currentHistogram(m_histView->rootObject(), plot))
+        {
+            QMessageBox::information(this, "Export Histogram",
+                                     "There is no histogram to export.");
+            return;
+        }
+        plot.screenColors = AppSettings::load().exportPlotColors;
+        plot.background   = m_plotBackground;
+        plot.foreground   = m_plotForeground;
+        QString error;
+        if (!plotrenderer::writeVector(path, plot, m_histView->size(), &error))
+            QMessageBox::critical(this, "Export Histogram", error);
+        return;
+    }
+
     const QImage image = m_histView->grabWindow();
     if (image.isNull() || !image.save(path))
         QMessageBox::critical(this, "Export Histogram",

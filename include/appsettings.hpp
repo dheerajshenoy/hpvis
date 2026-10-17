@@ -46,6 +46,9 @@ struct AppSettings
     QColor plotBackground   = QColor(0x12, 0x12, 0x17);
     QColor plotForeground   = QColor(0xe6, 0xe6, 0xe6);
     QColor plotLine         = QColor(0x7f, 0xd1, 0xff);
+    // SVG / PDF export of the plots: the colors on screen (else black on
+    // white)
+    bool exportPlotColors   = true;
     bool animateOrthoGlobe  = true; // orthographic globe rotation animation
     bool animateProjection  = true; // fade between projections
     // Theoretical CMB spectrum overplotted on the power spectrum

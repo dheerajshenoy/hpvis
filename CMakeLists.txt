@@ -21,7 +21,7 @@ endif()
 
 set(HEALPIX_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/healpix)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Concurrent Graphs)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Concurrent Graphs Svg)
 find_package(OpenMP REQUIRED)
 find_package(PkgConfig REQUIRED)
 
@@ -166,6 +166,7 @@ add_executable(${PROJECT_NAME}
     src/aboutcontent.cpp
     src/usagedialog.cpp
     src/powerspectrumdock.cpp
+    src/plotrenderer.cpp
     src/statisticsdock.cpp
 
     src/qml/powerspectrumplot.qml
@@ -215,6 +216,7 @@ add_executable(${PROJECT_NAME}
     include/fitsheaderdialog.hpp
     include/statusbar.hpp
     include/powerspectrumdock.hpp
+    include/plotrenderer.hpp
     include/statisticsdock.hpp
     include/fileexplorerdock.hpp
     include/masterspectrum.hpp
@@ -236,6 +238,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::OpenGLWidgets
     Qt6::Concurrent
     Qt6::Graphs
+    Qt6::Svg
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE

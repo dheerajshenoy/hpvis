@@ -90,6 +90,7 @@ private:
     QPushButton *m_plotBgButton   = nullptr;
     QPushButton *m_plotFgButton   = nullptr;
     QPushButton *m_plotLineButton = nullptr;
+    QCheckBox *m_exportColorsCheck = nullptr;
     QColor m_plotBackground;
     QColor m_plotForeground;
     QColor m_plotLine;

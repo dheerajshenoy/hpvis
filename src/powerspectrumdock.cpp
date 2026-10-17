@@ -14,6 +14,7 @@
 #include "masterspectrum.hpp"
 #include "crossspectrum.hpp"
 #include "openglwidget.hpp"
+#include "plotrenderer.hpp"
 #include "theoryspectrum.hpp"
 #include "view.hpp"
 
@@ -33,6 +34,7 @@
 #include <QLineSeries>
 #include <QMenu>
 #include <QMessageBox>
+#include <QJSValue>
 #include <QPointer>
 #include <QProgressBar>
 #include <QPushButton>
@@ -1858,16 +1860,79 @@ exportStartDir()
     return (!dir.isEmpty() && QDir(dir).exists()) ? dir : QDir::homePath();
 }
 
+// The plot as the QML shows it now: curves, visible range, scales, y title
+static bool
+currentPlot(QQuickItem *root, plotrenderer::Plot &plot)
+{
+    if (!root)
+        return false;
+    QVariant curves = root->property("curves");
+    if (curves.canConvert<QJSValue>())
+        curves = curves.value<QJSValue>().toVariant();
+    for (const QVariant &cv : curves.toList())
+    {
+        const QVariantMap m = cv.toMap();
+        plotrenderer::Curve c;
+        c.name  = m.value("name").toString();
+        c.color = QColor(m.value("color").toString());
+        for (const QVariant &v : m.value("ell").toList())
+            c.ell.append(v.toDouble());
+        for (const QVariant &v : m.value("values").toList())
+            c.values.append(v.toDouble());
+        plot.curves.append(c);
+    }
+    plot.xMin   = root->property("xMin").toDouble();
+    plot.xMax   = root->property("xMax").toDouble();
+    plot.yMin   = root->property("yMin").toDouble();
+    plot.yMax   = root->property("yMax").toDouble();
+    plot.logX   = root->property("logX").toBool();
+    plot.logY   = root->property("logY").toBool();
+    plot.yTitle = root->property("yTitle").toString();
+    plot.xTitle = QString::fromUtf8("Multipole \u2113");
+    return !plot.curves.isEmpty();
+}
+
 void
 PowerSpectrumDock::exportImage()
 {
-    const QString path = QFileDialog::getSaveFileName(
+    QString filter;
+    QString path = QFileDialog::getSaveFileName(
         this, "Export Plot", exportStartDir() + "/power_spectrum.png",
-        "PNG Files (*.png);;All Files (*)");
+        "PNG Files (*.png);;SVG Files (*.svg);;PDF Files (*.pdf);;All Files "
+        "(*)",
+        &filter);
     if (path.isEmpty())
         return;
     QSettings().setValue("general/lastDirectory",
                          QFileInfo(path).absolutePath());
+
+    // The chosen filter decides the format when the name has no extension
+    QString ext = QFileInfo(path).suffix().toLower();
+    if (ext.isEmpty())
+    {
+        ext = filter.startsWith("SVG") ? "svg"
+              : filter.startsWith("PDF") ? "pdf"
+                                         : "png";
+        path += "." + ext;
+    }
+
+    if (ext == "svg" || ext == "pdf")
+    {
+        plotrenderer::Plot plot;
+        if (!currentPlot(m_chartView->rootObject(), plot))
+        {
+            QMessageBox::information(this, "Export Plot",
+                                     "There is no spectrum to export.");
+            return;
+        }
+        plot.screenColors = AppSettings::load().exportPlotColors;
+        plot.background   = m_plotBackground;
+        plot.foreground   = m_plotForeground;
+        QString error;
+        if (!plotrenderer::writeVector(path, plot, m_chartView->size(), &error))
+            QMessageBox::critical(this, "Export Plot", error);
+        return;
+    }
 
     const QImage image = m_chartView->grabWindow();
     if (image.isNull() || !image.save(path))
