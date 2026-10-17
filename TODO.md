@@ -22,5 +22,3 @@
 - [ ] Text annotations
 - [ ] Polarization display (Q/U → amplitude, vectors)
 - [ ] Side-by-side / linked views (synced zoom, rotation, color range)
-- [ ] Publication-quality export: vector output (SVG or PDF) with axes, a labeled color bar and a title.
-- [ ] Session and state saving: restore open files, view, colormap and masks. A command-line --session would help scripting.
