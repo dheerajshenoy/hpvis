@@ -95,6 +95,7 @@ enum class Command
     ToolsOperate,
     ToolsResolution,
     ToolsSmooth,
+    ToolsMultipoleFilter,
     ToolsHarmonic,
     ToolsUnits,
     ToolsRandomMap,
@@ -219,6 +220,7 @@ storedName(Command c)
     case Command::ToolsOperate: return "tools/operate-on-maps";
     case Command::ToolsResolution: return "tools/change-resolution";
     case Command::ToolsSmooth: return "tools/beam-smoothing";
+    case Command::ToolsMultipoleFilter: return "tools/multipole-filter";
     case Command::ToolsHarmonic: return "tools/derivatives-and-e-b-maps";
     case Command::ToolsUnits: return "tools/maps/convert-units";
     case Command::ToolsRandomMap: return "tools/maps/generate-random-map";

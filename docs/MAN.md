@@ -20,7 +20,7 @@ background, stored in FITS, NumPy (*.npy*) or NumPy archive (*.npz*) files. It
 shows them in fourteen projections, applies masks, computes map statistics,
 histograms and power spectra (corrected for masks with the MASTER method),
 and opens the results of operations on maps (arithmetic, resolution changes,
-beam smoothing, derivatives, E and B maps, unit conversion, random maps)
+beam smoothing, multipole filtering, derivatives, E and B maps, unit conversion, random maps)
 in new tabs. The view is saved as
 an image, and the power spectrum and histogram plots as PNG, SVG or PDF.
 

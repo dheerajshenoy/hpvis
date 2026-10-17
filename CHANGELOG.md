@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.1.1
+
+### Multipole filter
+- Tools > Maps > Multipole Filter keeps or removes a range of multipoles
+  (low-pass, high-pass, band-pass, band-stop) with a sharp, cosine or Gaussian
+  edge, for T or for T, Q and U, with a plot of the window f(l).
+
 ## 0.1.0
 
 First development release.

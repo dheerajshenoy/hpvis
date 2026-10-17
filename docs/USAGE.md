@@ -438,6 +438,26 @@ blurring), through the harmonics.
 
 The dialog estimates the memory needed; above nside 1024 it can take long.
 
+### Multipole Filter
+
+**Tools > Maps > Multipole Filter...** keeps or removes a range of multipoles
+(angular scales, roughly θ ≈ 180°/ℓ) through the harmonics: a_ℓm are multiplied
+by a window f(ℓ). The result opens as a new tab.
+
+- **Filter:** low-pass (keep ℓ ≤ ℓ max), high-pass (keep ℓ ≥ ℓ min; ℓ min = 2
+  removes the monopole and dipole), band-pass or band-stop.
+- **Edge:** a **Cosine** or **Gaussian** ramp of the given **width** (in
+  multipoles, centred on the cut) or a **Sharp** step, which makes ringing in the
+  map.
+- The plot shows f(ℓ) from ℓ = 0 to the analysis ℓ max and follows the controls.
+- **Also filter Q and U** (when the HDU has them): opens three maps; T, E and B
+  get the same window.
+- **Iterations**, **Analysis l max** and **Keep UNSEEN pixels UNSEEN** work as in
+  Beam Smoothing. Power above the analysis ℓ max is dropped.
+
+On a masked map the filter leaks power across the edge of the mask, since UNSEEN
+pixels are taken as zero.
+
 ### Derivatives and E/B Maps
 
 **Tools > Maps > Derivatives and E/B Maps...** works through the spherical harmonics:

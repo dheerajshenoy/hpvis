@@ -30,6 +30,7 @@ class QSpinBox;
 class QDoubleSpinBox;
 class QPushButton;
 class SmoothDialog;
+class MultipoleFilterDialog;
 class HarmonicDialog;
 class UsageDialog;
 class MapOperationDialog;
@@ -138,6 +139,7 @@ private slots:
     void onOperateTriggered();
     void onDowngradeTriggered();
     void onSmoothTriggered();
+    void onMultipoleFilterTriggered();
     void onHarmonicTriggered();
     void onUnitsTriggered();
     void onRandomMapTriggered();
@@ -229,6 +231,7 @@ private:
     bool m_lockRollOnRecenter           = false;
     DowngradeDialog *m_downgradeDialog  = nullptr;
     SmoothDialog *m_smoothDialog        = nullptr;
+    MultipoleFilterDialog *m_multipoleDialog = nullptr;
     HarmonicDialog *m_harmonicDialog    = nullptr;
     UsageDialog *m_usageDialog          = nullptr;
     FileExplorerDock *m_explorerDock    = nullptr;

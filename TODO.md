@@ -3,7 +3,6 @@
 # High Priority
 
 - [ ] Interactive Mask builder (threshold, galactic cut, disc) with f_sky readout
-- [ ] Multipole filtering: low-pass, high-pass, band-pass or notch in l (isolate the quadrupole or any l range)
 
 # Medium Priority
 

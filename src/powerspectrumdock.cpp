@@ -562,6 +562,11 @@ PowerSpectrumDock::initUI()
     {
         auto *maskLayout = new QVBoxLayout(m_maskGroup);
         maskLayout->setContentsMargins(6, 6, 6, 6);
+        // The options are hidden until the correction is turned on
+        m_maskOptions = new QWidget();
+        auto *optionsLayout = new QVBoxLayout(m_maskOptions);
+        optionsLayout->setContentsMargins(0, 0, 0, 0);
+        maskLayout->addWidget(m_maskOptions);
         auto *r1 = new QHBoxLayout();
         r1->addWidget(m_apodCombo);
         r1->addWidget(m_apodScale);
@@ -573,15 +578,16 @@ PowerSpectrumDock::initUI()
         r2->addStretch();
         m_maskHint = new QLabel();
         m_maskHint->setWordWrap(true);
-        maskLayout->addLayout(r1);
-        maskLayout->addLayout(r2);
-        maskLayout->addWidget(m_maskHint);
+        optionsLayout->addLayout(r1);
+        optionsLayout->addLayout(r2);
+        optionsLayout->addWidget(m_maskHint);
     }
     {
         const QSettings settings;
         const MaskCorrection d;
         m_maskGroup->setChecked(
-            settings.value("powerspectrum/maskCorrect", true).toBool());
+            settings.value("powerspectrum/maskCorrect", false).toBool());
+        m_maskOptions->setVisible(m_maskGroup->isChecked());
         const int a = m_apodCombo->findData(
             settings.value("powerspectrum/apodization", 2).toInt());
         m_apodCombo->setCurrentIndex(a >= 0 ? a : 2);
@@ -610,6 +616,8 @@ PowerSpectrumDock::initUI()
         settings.setValue("powerspectrum/purifyB", m_purifyBCheck->isChecked());
         refresh();
     };
+    connect(m_maskGroup, &QGroupBox::toggled, m_maskOptions,
+            &QWidget::setVisible);
     connect(m_maskGroup, &QGroupBox::toggled, this, onMaskOption);
     connect(m_apodCombo, &QComboBox::currentIndexChanged, this, onMaskOption);
     connect(m_apodScale, &QDoubleSpinBox::editingFinished, this, onMaskOption);
@@ -850,6 +858,9 @@ PowerSpectrumDock::refresh()
     if (view)
         for (int i = 0; i < view->glWidget()->maskCount(); ++i)
             masksNow |= view->glWidget()->maskEnabled(i);
+
+    // Bin theory only concerns mask-corrected spectra
+    m_binTheoryCheck->setVisible(m_maskGroup->isChecked());
 
     m_computeButton->setEnabled(have);
     m_computeButton->setText(busy ? "Cancel" : done ? "Recompute" : "Compute");

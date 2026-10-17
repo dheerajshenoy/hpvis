@@ -181,6 +181,7 @@ private:
     QComboBox *m_accuracyCombo  = nullptr;
     QComboBox *m_lmaxCombo      = nullptr;
     QGroupBox *m_maskGroup      = nullptr; // the mask correction options
+    QWidget *m_maskOptions      = nullptr; // its contents, shown when checked
     QComboBox *m_apodCombo      = nullptr;
     QDoubleSpinBox *m_apodScale = nullptr;
     QComboBox *m_bandwidthCombo = nullptr;

@@ -7,6 +7,7 @@
 #include "downgradedialog.hpp"
 #include "exportdialog.hpp"
 #include "smoothdialog.hpp"
+#include "multipolefilterdialog.hpp"
 #include "harmonicdialog.hpp"
 #include "fitsheaderdialog.hpp"
 #include "masksourcedialog.hpp"
@@ -982,6 +983,9 @@ HpVis::initMenubar()
                            &HpVis::onDowngradeTriggered), Command::ToolsResolution);
     tag(mapsMenu->addAction("&Beam Smoothing...", this,
                            &HpVis::onSmoothTriggered), Command::ToolsSmooth);
+    tag(mapsMenu->addAction("&Multipole Filter...", this,
+                           &HpVis::onMultipoleFilterTriggered),
+        Command::ToolsMultipoleFilter);
     tag(mapsMenu->addAction("&Derivatives and E/B Maps...", this,
                            &HpVis::onHarmonicTriggered), Command::ToolsHarmonic);
     mapsMenu->addSeparator();
@@ -2222,6 +2226,23 @@ HpVis::onSmoothTriggered()
     m_smoothDialog->show();
     m_smoothDialog->raise();
     m_smoothDialog->activateWindow();
+}
+
+// The Multipole Filter dialog: works on the current tab
+void
+HpVis::onMultipoleFilterTriggered()
+{
+    if (!m_multipoleDialog)
+    {
+        m_multipoleDialog
+            = new MultipoleFilterDialog([this]() { return m_view; }, this);
+        connect(m_multipoleDialog, &MultipoleFilterDialog::mapReady, this,
+                &HpVis::openComputedMap);
+    }
+    m_multipoleDialog->refresh();
+    m_multipoleDialog->show();
+    m_multipoleDialog->raise();
+    m_multipoleDialog->activateWindow();
 }
 
 // Opens a map that was computed from other maps as a new tab

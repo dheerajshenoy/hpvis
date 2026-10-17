@@ -143,6 +143,8 @@ add_executable(${PROJECT_NAME}
     src/theoryspectrum.cpp
     src/smoothing.cpp
     src/smoothdialog.cpp
+    src/multipolefilter.cpp
+    src/multipolefilterdialog.cpp
     src/harmonicmaps.cpp
     src/crossspectrum.cpp
     src/harmonicdialog.cpp
@@ -197,6 +199,8 @@ add_executable(${PROJECT_NAME}
     include/theoryspectrum.hpp
     include/smoothing.hpp
     include/smoothdialog.hpp
+    include/multipolefilter.hpp
+    include/multipolefilterdialog.hpp
     include/harmonicmaps.hpp
     include/crossspectrum.hpp
     include/harmonicdialog.hpp
