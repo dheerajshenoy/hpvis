@@ -1,5 +1,6 @@
 #include "argparse.hpp"
 #include "unseen.hpp"
+#include "parallel.hpp"
 #include "fitsinfo.hpp"
 #include "hpvis.hpp"
 #include "npyreader.hpp"
@@ -12,6 +13,7 @@
 #include <healpix_map.h>
 #include <healpix_map_fitsio.h>
 #include <iostream>
+#include <limits>
 
 void
 addArguments(argparse::ArgumentParser &parser)
@@ -182,21 +184,41 @@ printStats(const QString &path, int hdu, int column, const QString &columnName)
         read_Healpix_map_from_fits(file, map, column);
     }
 
-    double sum = 0, sum2 = 0, min = 0, max = 0;
-    long n = 0;
-    for (long i = 0; i < map.Npix(); ++i)
+    struct Acc
     {
-        const float v = map[i];
-        if (!isSeen(v))
-            continue;
-        if (n == 0)
-            min = max = v;
-        min = std::min<double>(min, v);
-        max = std::max<double>(max, v);
-        sum += v;
-        sum2 += double(v) * v;
-        ++n;
-    }
+        double sum = 0, sum2 = 0;
+        double min = std::numeric_limits<double>::max();
+        double max = std::numeric_limits<double>::lowest();
+        long n     = 0;
+    };
+    const Acc acc = parallel::reduceRange<Acc>(
+        map.Npix(),
+        [&](long begin, long end)
+    {
+        Acc a;
+        for (long i = begin; i < end; ++i)
+        {
+            const float v = map[i];
+            if (!isSeen(v))
+                continue;
+            a.min = std::min<double>(a.min, v);
+            a.max = std::max<double>(a.max, v);
+            a.sum += v;
+            a.sum2 += double(v) * v;
+            ++a.n;
+        }
+        return a;
+    }, [](Acc &t, const Acc &p)
+    {
+        t.min = std::min(t.min, p.min);
+        t.max = std::max(t.max, p.max);
+        t.sum += p.sum;
+        t.sum2 += p.sum2;
+        t.n += p.n;
+    });
+    const double sum = acc.sum, sum2 = acc.sum2;
+    const double min = acc.min, max = acc.max;
+    const long n     = acc.n;
     if (n == 0)
         throw std::runtime_error("map has no valid pixels");
 

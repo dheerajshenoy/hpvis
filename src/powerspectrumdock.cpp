@@ -1,5 +1,6 @@
 #include "powerspectrumdock.hpp"
 #include "unseen.hpp"
+#include "parallel.hpp"
 
 #include "alm.h"
 #include "alm_healpix_tools.h"
@@ -75,12 +76,20 @@ static Healpix_Map<double>
 toDouble(const Healpix_Map<float> &map, bool &unseen)
 {
     Healpix_Map<double> m(map.Nside(), map.Scheme(), SET_NSIDE);
-    for (long i = 0; i < map.Npix(); ++i)
+    const bool any = parallel::reduceRange<bool>(
+        map.Npix(),
+        [&](long begin, long end)
     {
-        const bool good = isSeen(map[i]);
-        unseen |= !good;
-        m[i] = good ? map[i] : 0.0;
-    }
+        bool bad = false;
+        for (long i = begin; i < end; ++i)
+        {
+            const bool good = isSeen(map[i]);
+            bad |= !good;
+            m[i] = good ? map[i] : 0.0;
+        }
+        return bad;
+    }, [](bool &total, const bool &part) { total = total || part; });
+    unseen |= any;
     // map2alm expects RING ordering
     if (m.Scheme() == NEST)
         m.swap_scheme();
@@ -372,11 +381,14 @@ computeMasked(const PowerSpectrumInput &in, Stokes &st, int wanted,
         const Healpix_Map<float> &map = *in.map;
         Healpix_Map<double> w(map.Nside(), map.Scheme(), SET_NSIDE);
         const std::vector<float> &weights = *in.weights;
-        for (long i = 0; i < map.Npix(); ++i)
+        parallel::forRange(map.Npix(), [&](long begin, long end)
         {
-            const bool good = isSeen(map[i]);
-            w[i]            = good ? double(weights[size_t(i)]) : 0.0;
-        }
+            for (long i = begin; i < end; ++i)
+            {
+                const bool good = isSeen(map[i]);
+                w[i]            = good ? double(weights[size_t(i)]) : 0.0;
+            }
+        });
         if (w.Scheme() == NEST)
             w.swap_scheme();
         mi.weights = std::move(w);

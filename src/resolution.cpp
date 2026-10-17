@@ -1,5 +1,6 @@
 #include "resolution.hpp"
 #include "unseen.hpp"
+#include "parallel.hpp"
 
 #include "alm.h"
 #include "healpix_cxx/fitshandle.h"
@@ -31,15 +32,24 @@ pixelDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
     // Non-finite values count as UNSEEN
     const Healpix_Map<float> *src = &in;
     Healpix_Map<float> cleaned;
-    bool bad = false;
-    for (long i = 0; i < in.Npix() && !bad; ++i)
-        bad = !std::isfinite(in[i]);
+    const bool bad = parallel::reduceRange<bool>(
+        in.Npix(),
+        [&](long begin, long end)
+    {
+        for (long i = begin; i < end; ++i)
+            if (!std::isfinite(in[i]))
+                return true;
+        return false;
+    }, [](bool &total, const bool &part) { total = total || part; });
     if (bad)
     {
         cleaned = in;
-        for (long i = 0; i < cleaned.Npix(); ++i)
-            if (!std::isfinite(cleaned[i]))
-                cleaned[i] = UNSEEN;
+        parallel::forRange(cleaned.Npix(), [&](long begin, long end)
+        {
+            for (long i = begin; i < end; ++i)
+                if (!std::isfinite(cleaned[i]))
+                    cleaned[i] = UNSEEN;
+        });
         src = &cleaned;
     }
     out->Import_degrade(*src, o.pessimistic);
@@ -63,13 +73,19 @@ harmonicDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
 
     // double precision RING copy; UNSEEN / NaN pixels become zero
     Healpix_Map<double> map(nsideIn, in.Scheme(), SET_NSIDE);
-    long unseen = 0;
-    for (long i = 0; i < in.Npix(); ++i)
+    const long unseen = parallel::reduceRange<long>(
+        in.Npix(),
+        [&](long begin, long end)
     {
-        const bool good = isSeen(in[i]);
-        unseen += !good;
-        map[i] = good ? double(in[i]) : 0.0;
-    }
+        long bad = 0;
+        for (long i = begin; i < end; ++i)
+        {
+            const bool good = isSeen(in[i]);
+            bad += !good;
+            map[i] = good ? double(in[i]) : 0.0;
+        }
+        return bad;
+    }, [](long &total, const long &part) { total += part; });
     if (map.Scheme() == NEST)
         map.swap_scheme();
 
@@ -122,23 +138,32 @@ harmonicDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
 
     auto out = std::make_shared<Healpix_Map<float>>(o.nsideOut, RING,
                                                     SET_NSIDE);
-    for (long i = 0; i < out->Npix(); ++i)
-        (*out)[i] = float(down[i]);
+    parallel::forRange(out->Npix(), [&](long begin, long end)
+    {
+        for (long i = begin; i < end; ++i)
+            (*out)[i] = float(down[i]);
+    });
 
     // Pixels that were mostly UNSEEN stay UNSEEN: the fraction of valid
     // sub-pixels of each output pixel decides
     if (unseen > 0 && o.keepUnseen)
     {
         Healpix_Map<float> valid(nsideIn, in.Scheme(), SET_NSIDE);
-        for (long i = 0; i < in.Npix(); ++i)
-            valid[i] = isSeen(in[i]) ? 1.0f : 0.0f;
+        parallel::forRange(in.Npix(), [&](long begin, long end)
+        {
+            for (long i = begin; i < end; ++i)
+                valid[i] = isSeen(in[i]) ? 1.0f : 0.0f;
+        });
         Healpix_Map<float> frac(o.nsideOut, in.Scheme(), SET_NSIDE);
         frac.Import_degrade(valid, false); // mean of 1 / 0 = valid fraction
         if (frac.Scheme() == NEST)
             frac.swap_scheme();
-        for (long i = 0; i < out->Npix(); ++i)
-            if (frac[i] < 0.5f)
-                (*out)[i] = UNSEEN;
+        parallel::forRange(out->Npix(), [&](long begin, long end)
+        {
+            for (long i = begin; i < end; ++i)
+                if (frac[i] < 0.5f)
+                    (*out)[i] = UNSEEN;
+        });
     }
 
     if (in.Scheme() == NEST)

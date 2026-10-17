@@ -1,5 +1,6 @@
 #include "smoothing.hpp"
 #include "unseen.hpp"
+#include "parallel.hpp"
 
 #include "alm.h"
 #include "alm_healpix_tools.h"
@@ -19,12 +20,19 @@ Healpix_Map<double>
 toDouble(const Healpix_Map<float> &in, long &unseen)
 {
     Healpix_Map<double> m(in.Nside(), in.Scheme(), SET_NSIDE);
-    for (long i = 0; i < in.Npix(); ++i)
+    unseen += parallel::reduceRange<long>(
+        in.Npix(),
+        [&](long begin, long end)
     {
-        const bool good = isSeen(in[i]);
-        unseen += !good;
-        m[i] = good ? double(in[i]) : 0.0;
-    }
+        long bad = 0;
+        for (long i = begin; i < end; ++i)
+        {
+            const bool good = isSeen(in[i]);
+            bad += !good;
+            m[i] = good ? double(in[i]) : 0.0;
+        }
+        return bad;
+    }, [](long &total, const long &part) { total += part; });
     if (m.Scheme() == NEST)
         m.swap_scheme();
     return m;
@@ -35,14 +43,27 @@ toFloat(const Healpix_Map<double> &m, const Healpix_Map<float> &in,
         bool keepUnseen)
 {
     auto out = std::make_shared<Healpix_Map<float>>(m.Nside(), RING, SET_NSIDE);
-    for (long i = 0; i < out->Npix(); ++i)
-        (*out)[i] = float(m[i]);
-    if (in.Scheme() == NEST)
+    // `out` is RING here; with a RING input the UNSEEN pixels are applied in
+    // the same pass, else after the swap to the input's ordering
+    const bool sameOrder = in.Scheme() == RING;
+    parallel::forRange(out->Npix(), [&](long begin, long end)
+    {
+        for (long i = begin; i < end; ++i)
+            (*out)[i] = (keepUnseen && sameOrder && !isSeen(in[i]))
+                            ? UNSEEN
+                            : float(m[i]);
+    });
+    if (!sameOrder)
+    {
         out->swap_scheme();
-    if (keepUnseen)
-        for (long i = 0; i < out->Npix(); ++i)
-            if (!isSeen(in[i]))
-                (*out)[i] = UNSEEN;
+        if (keepUnseen)
+            parallel::forRange(out->Npix(), [&](long begin, long end)
+            {
+                for (long i = begin; i < end; ++i)
+                    if (!isSeen(in[i]))
+                        (*out)[i] = UNSEEN;
+            });
+    }
     return out;
 }
 

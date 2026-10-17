@@ -479,23 +479,26 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     hooks.total(stageCount(options, pol));
 
     // --- The weights ---
-    Healpix_Map<double> w = input.weights;
+    // Apodizing makes a new map; without it the input weights are used as is
+    Healpix_Map<double> apodized;
+    const Healpix_Map<double> *weights = &input.weights;
     if (options.apodization != Apodization::None)
     {
         hooks.stage("Apodizing the mask");
         checkApodization(npix, options.apodization,
                          options.apodizationScale);
-        Healpix_Map<double> apodized(nside, RING, SET_NSIDE);
+        apodized = Healpix_Map<double>(nside, RING, SET_NSIDE);
         char type[8];
         std::strcpy(type, options.apodization == Apodization::C1   ? "C1"
                           : options.apodization == Apodization::C2 ? "C2"
                                                                    : "Smooth");
-        nmt_apodize_mask(nside, const_cast<double *>(w.Map().begin()),
+        nmt_apodize_mask(nside, const_cast<double *>(input.weights.Map().begin()),
                          const_cast<double *>(apodized.Map().begin()),
                          options.apodizationScale, type);
-        w.swap(apodized);
+        weights = &apodized;
         hooks.done();
     }
+    const Healpix_Map<double> &w = *weights;
 
     Result result;
     result.lmax      = lmax;
@@ -525,20 +528,22 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     hooks.done();
 
     // --- The weighted fields ---
-    auto weigh = [&](Healpix_Map<double> &map)
+    // map * w in a single pass (no copy of the input first)
+    auto weighted = [&](const Healpix_Map<double> &map)
     {
+        Healpix_Map<double> out(map.Nside(), map.Scheme(), SET_NSIDE);
         parallel::forRange(npix, [&](long b, long e)
         {
             for (long p = b; p < e; ++p)
-                map[p] *= w[p];
+                out[p] = map[p] * w[p];
         });
+        return out;
     };
 
     hooks.stage("Transform of the temperature");
     AlmD aT(lmax, lmax);
     {
-        Healpix_Map<double> t = input.T;
-        weigh(t);
+        const Healpix_Map<double> t = weighted(input.T);
         scalarToAlm(t, aT, options.iterations);
     }
     hooks.done();
@@ -548,9 +553,8 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     {
         hooks.stage("Transform of Q and U");
         {
-            Healpix_Map<double> q = input.Q, u = input.U;
-            weigh(q);
-            weigh(u);
+            const Healpix_Map<double> q = weighted(input.Q),
+                                      u = weighted(input.U);
             spinToAlm(q, u, aE, aB, 2, options.iterations);
         }
         hooks.done();
