@@ -209,6 +209,12 @@ file explorer's folder are stored with the preferences.
   2048) stays on the GPU and the full-resolution tiles on screen are loaded as
   you zoom and pan, which needs only a few hundred MB whatever the nside. The
   map is also held in RAM in full (3.2 GB at nside 8192).
+- Maps are stored and displayed as 32-bit floats (`Healpix_Map<float>`), also
+  when the file holds 64-bit values, which are rounded on load. Double
+  precision would double the memory use (6.4 GB at nside 8192) and the GPU
+  upload is 32-bit anyway. Spherical harmonic transforms (smoothing,
+  resolution changes, power spectra) and sums for statistics are computed in
+  double precision.
 - While streaming, zooming in shows the coarse map for a moment until the
   tiles arrive, and masks are applied at the coarse resolution.
 - The GPU's maximum texture size (usually 16384) also caps nside when not
