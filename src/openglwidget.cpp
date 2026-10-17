@@ -2062,10 +2062,10 @@ OpenGLWidget::stopGlobeAnimation()
 
 // Eases to `target`, or jumps there when animation is off
 void
-OpenGLWidget::rotateTo(const QQuaternion &target)
+OpenGLWidget::rotateTo(const QQuaternion &target, bool anyProjection)
 {
     stopGlobeAnimation();
-    if (!globeAnimates())
+    if (!(anyProjection ? m_animateGlobe : globeAnimates()))
     {
         setRotation(target);
         return;
@@ -2085,7 +2085,9 @@ OpenGLWidget::tickGlobeAnimation()
         constexpr double kDurationMs = 450.0;
         const double t = std::min(1.0, m_globeClock.elapsed() / kDurationMs);
         const float e  = float(1.0 - std::pow(1.0 - t, 3.0)); // ease out
-        setRotation(QQuaternion::slerp(m_glideFrom, m_glideTo, e).normalized());
+        const QQuaternion q
+            = QQuaternion::slerp(m_glideFrom, m_glideTo, e).normalized();
+        setRotation(orientationLocked() ? withoutRoll(q) : q);
         if (t >= 1.0)
             stopGlobeAnimation();
         return;
@@ -2127,17 +2129,67 @@ OpenGLWidget::resetRotation()
     rotateTo(QQuaternion());
 }
 
-void
-OpenGLWidget::setRotationAngles(double lonDeg, double latDeg, double rollDeg)
+QQuaternion
+OpenGLWidget::rotationFromAngles(double lonDeg, double latDeg, double rollDeg)
 {
-    stopGlobeAnimation();
     const QQuaternion rz
         = QQuaternion::fromAxisAndAngle(0, 0, 1, float(lonDeg));
     const QQuaternion ry
         = QQuaternion::fromAxisAndAngle(0, 1, 0, float(-latDeg));
     const QQuaternion rx
         = QQuaternion::fromAxisAndAngle(1, 0, 0, float(rollDeg));
-    setRotation((rz * ry * rx).normalized());
+    return (rz * ry * rx).normalized();
+}
+
+void
+OpenGLWidget::setRotationAngles(double lonDeg, double latDeg, double rollDeg)
+{
+    stopGlobeAnimation();
+    setRotation(rotationFromAngles(lonDeg, latDeg, rollDeg));
+}
+
+void
+OpenGLWidget::centerOn(double lonDeg, double latDeg, bool keepRoll)
+{
+    double lon, lat, roll = 0.0;
+    if (keepRoll)
+        rotationAngles(lon, lat, roll);
+    rotateTo(rotationFromAngles(lonDeg, latDeg, orientationLocked() ? 0.0 : roll),
+             true);
+}
+
+// Glides the sky point under `pos` to the center of the view, along the great
+// circle through the old center and that point
+void
+OpenGLWidget::recenterAt(const QPointF &pos)
+{
+    QVector3D v;
+    if (!viewDirectionAt(pos, v))
+        return; // outside the shape
+
+    // The direction at the middle of the view now (a pan moves the middle
+    // away from the projection's center)
+    QVector3D w(1, 0, 0);
+    double colat, phi;
+    if (projectionmath::inverse(m_projection, m_camera->panOffset, colat, phi,
+                                m_viewOutside))
+        w = directionFromAngles(colat, phi);
+
+    QQuaternion target
+        = (m_rotation * QQuaternion::rotationTo(w, v)).normalized();
+    if (orientationLocked())
+        target = withoutRoll(target);
+    else if (m_lockRollOnRecenter)
+    {
+        double lon, lat, roll;
+        rotationAngles(lon, lat, roll);
+        const QVector3D c = target.rotatedVector(QVector3D(1, 0, 0));
+        target            = rotationFromAngles(
+            qRadiansToDegrees(std::atan2(double(c.y()), double(c.x()))),
+            qRadiansToDegrees(std::asin(std::clamp(double(c.z()), -1.0, 1.0))),
+            roll);
+    }
+    rotateTo(target, true);
 }
 
 void
@@ -2171,7 +2223,7 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
 
     // Region Selection: Shift + Left drag, or the next drag after
     // View > Zoom > Zoom To Region, zooms. Ctrl + Shift + Left drag, or the
-    // next drag after View > Select Statistics Region, picks the region the
+    // next drag after View > Statistics Region, picks the region the
     // statistics are computed over.
     if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
     {
@@ -2186,6 +2238,16 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
         }
         m_cursorPos = e->position();
         update();
+        e->accept();
+        return;
+    }
+
+    // A right click recenters the view on the point (unless a region
+    // selection is waiting for its drag, when the right button is not used)
+    if (e->button() == Qt::RightButton && m_recenterOnRightClick
+        && !m_statsRegionArmed && !m_zoomRegionArmed)
+    {
+        recenterAt(e->position());
         e->accept();
         return;
     }

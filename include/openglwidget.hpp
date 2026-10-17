@@ -396,6 +396,22 @@ public:
     void setRotationAngles(double lonDeg, double latDeg, double rollDeg);
     void rotationAngles(double &lonDeg, double &latDeg, double &rollDeg) const;
 
+    // Glides to center the view on a point (degrees, in the frame shown),
+    // with no roll, or the current roll when keepRoll is set
+    void centerOn(double lonDeg, double latDeg, bool keepRoll = false);
+
+    // A right click glides the clicked point to the center along the great
+    // circle. In a frame the north pole stays up; in the free orientation the
+    // roll is kept when lockRoll is set.
+    void setRecenterOnRightClick(bool enabled)
+    {
+        m_recenterOnRightClick = enabled;
+    }
+    void setLockRollOnRecenter(bool enabled)
+    {
+        m_lockRollOnRecenter = enabled;
+    }
+
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -457,7 +473,12 @@ private:
     QQuaternion withoutRoll(const QQuaternion &q) const;
     bool globeAnimates() const;
     void stopGlobeAnimation();
-    void rotateTo(const QQuaternion &target);
+    // Eases to `target` (or jumps): only the orthographic globe eases, unless
+    // `anyProjection` is set
+    void rotateTo(const QQuaternion &target, bool anyProjection = false);
+    void recenterAt(const QPointF &pos);
+    static QQuaternion rotationFromAngles(double lonDeg, double latDeg,
+                                          double rollDeg);
     void tickGlobeAnimation();
     void uploadColormapLut();
     // Colorbar: the colormap is baked on the GPU into a 256x1 strip, drawn
@@ -641,6 +662,8 @@ private:
         Glide
     };
     bool m_animateGlobe   = true;
+    bool m_recenterOnRightClick = true;
+    bool m_lockRollOnRecenter   = false;
     bool m_animateProjection = true;
     GlobeAnim m_globeAnim = GlobeAnim::None;
     QTimer m_globeTimer;

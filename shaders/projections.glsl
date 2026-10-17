@@ -9,6 +9,9 @@ const int PROJ_LAMBERT_CYLINDRICAL = 7;
 const int PROJ_GALL_PETERS = 8;
 const int PROJ_STEREOGRAPHIC = 9;
 const int PROJ_HAMMER = 10;
+const int PROJ_AITOFF = 11;
+const int PROJ_WERNER = 12;
+const int PROJ_LAMBERT_AZIMUTHAL = 13;
 
 uniform mat3 globe_rotation;
 uniform int projection_type;
@@ -249,6 +252,94 @@ bool inverseHammer(
     return true;
 }
 
+// Aitoff: the azimuthal equidistant map of the hemisphere around the center
+// with longitudes halved and x doubled, so the distance from the center is
+// the angle c (up to 90 degrees) and the outline is the same ellipse as
+// Hammer's.
+bool inverseAitoff(
+    vec2 uv,
+    out float colat,
+    out float phi
+) {
+    float px = (uv.x - 0.5) * 2.0;
+    float py = (uv.y - 0.5) * 2.0;
+
+    colat = 0.0;
+    phi = 0.0;
+
+    float r = length(vec2(px, py));
+    if (r > 1.0)
+        return false;
+
+    float c = r * PI / 2.0;
+    float s = (c > 1e-6) ? sin(c) / c : 1.0;
+    float sinLat = clamp(py * PI / 2.0 * s, -1.0, 1.0);
+    float lon = 2.0 * atan(-px * PI / 2.0 * s, cos(c));
+
+    colat = PI / 2.0 - asin(sinLat);
+    phi = mod(lon, 2.0 * PI);
+
+    return true;
+}
+
+// Werner: a heart-shaped equal-area map with the north pole at the cleft.
+// The plane is the heart's bounding box (half sizes and vertical center in
+// the projection's own units: the pole is at the origin).
+bool inverseWerner(
+    vec2 uv,
+    out float colat,
+    out float phi
+) {
+    float x = -(uv.x - 0.5) * 2.0 * 2.021610497;
+    float y = (uv.y - 0.5) * 2.0 * 2.029609241 - 1.111983413;
+
+    colat = 0.0;
+    phi = 0.0;
+
+    float rho = length(vec2(x, y)); // the colatitude
+    if (rho > PI)
+        return false;
+
+    float e = atan(x, -y);
+    float s = sin(rho);
+    float lon = (s > 1e-6) ? e * rho / s : 0.0;
+    if (abs(lon) > PI)
+        return false; // outside the heart
+
+    colat = rho;
+    phi = mod(lon, 2.0 * PI);
+
+    return true;
+}
+
+// Equal-area azimuthal map of the whole sphere in a disk around the center
+// (rotate to look elsewhere): the plane radius is sin(c / 2) for an angle c
+// from the center.
+bool inverseLambertAzimuthal(
+    vec2 uv,
+    out float colat,
+    out float phi
+) {
+    float x = (uv.x - 0.5) * 2.0;
+    float y = (uv.y - 0.5) * 2.0;
+
+    colat = 0.0;
+    phi = 0.0;
+
+    float r = length(vec2(x, y));
+    if (r > 1.0)
+        return false;
+
+    float c = 2.0 * asin(r);
+    vec2 d = (r > 1e-9) ? vec2(x, y) / r : vec2(0.0);
+
+    vec3 dir = vec3(cos(c), -sin(c) * d.x, sin(c) * d.y);
+    colat = atan(length(dir.xy), dir.z);
+    phi = mod(atan(dir.y, dir.x), 2.0 * PI);
+
+    return true;
+}
+
 bool inverseProjection(
     vec2 uv,
     out float colat,
@@ -290,6 +381,15 @@ bool inverseProjection(
 
     if (projection_type == PROJ_HAMMER)
         return inverseHammer(uv, colat, phi);
+
+    if (projection_type == PROJ_AITOFF)
+        return inverseAitoff(uv, colat, phi);
+
+    if (projection_type == PROJ_WERNER)
+        return inverseWerner(uv, colat, phi);
+
+    if (projection_type == PROJ_LAMBERT_AZIMUTHAL)
+        return inverseLambertAzimuthal(uv, colat, phi);
 
     return false;
 }

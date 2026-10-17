@@ -56,6 +56,11 @@ enum class Command
     ViewPanDown,
     ViewSetRotation,
     ViewResetRotation,
+    ViewCenterNorthPole,
+    ViewCenterSouthPole,
+    ViewCenterEquator,
+    ViewRecenterRightClick,
+    ViewLockRoll,
     ViewResetView,
     ViewBackgroundColor,
     ViewUnseenColor,
@@ -91,6 +96,8 @@ enum class Command
     ToolsResolution,
     ToolsSmooth,
     ToolsHarmonic,
+    ToolsUnits,
+    ToolsRandomMap,
     ToolsPowerSpectrum,
     ToolsStatistics,
     ToolsSettings,
@@ -164,6 +171,15 @@ storedName(Command c)
     case Command::ViewPanDown: return "view/pan/down";
     case Command::ViewSetRotation: return "view/set-rotation";
     case Command::ViewResetRotation: return "view/reset-rotation";
+    case Command::ViewCenterNorthPole:
+        return "view/rotation/center-on/north-pole";
+    case Command::ViewCenterSouthPole:
+        return "view/rotation/center-on/south-pole";
+    case Command::ViewCenterEquator:
+        return "view/rotation/center-on/equator";
+    case Command::ViewRecenterRightClick:
+        return "view/rotation/recenter-on-right-click";
+    case Command::ViewLockRoll: return "view/rotation/lock-roll-when-recentering";
     case Command::ViewResetView: return "view/reset-view";
     case Command::ViewBackgroundColor: return "view/background-color";
     case Command::ViewUnseenColor: return "view/unseen-pixel-color";
@@ -204,6 +220,8 @@ storedName(Command c)
     case Command::ToolsResolution: return "tools/change-resolution";
     case Command::ToolsSmooth: return "tools/beam-smoothing";
     case Command::ToolsHarmonic: return "tools/derivatives-and-e-b-maps";
+    case Command::ToolsUnits: return "tools/maps/convert-units";
+    case Command::ToolsRandomMap: return "tools/maps/generate-random-map";
     case Command::ToolsPowerSpectrum: return "tools/analysis/power-spectrum";
     case Command::ToolsStatistics: return "tools/analysis/statistics";
     case Command::ToolsSettings: return "tools/settings";

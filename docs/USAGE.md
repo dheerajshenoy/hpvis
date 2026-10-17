@@ -93,7 +93,8 @@ session on demand with **File > Reopen Last Session**. Maps that were computed
 | --- | --- |
 | Zoom | Mouse wheel, pinch, or Ctrl + scroll (toward the cursor) |
 | Pan | Left-drag, or two-finger scroll |
-| Rotate the sky | Middle-drag. In the Orthographic, Azimuthal equidistant, Gnomonic and Stereographic projections plain left-drag rotates |
+| Rotate the sky | Middle-drag. In the Orthographic, Azimuthal equidistant, Lambert azimuthal, Gnomonic and Stereographic projections plain left-drag rotates |
+| Center on a point | Right-click: the point glides to the center of the view along the shortest path (see **View > Rotation**) |
 | Zoom to a region | Shift + left-drag a rectangle |
 | Statistics of a region | Ctrl + Shift + left-drag a rectangle |
 | Reset the view | Double-click, or `0` |
@@ -104,23 +105,37 @@ session on demand with **File > Reopen Last Session**. Maps that were computed
   Out**, **Zoom To Region** (then drag a rectangle) and **Reset Zoom**.
 - **View > Pan:** Left, Right, Up and Down. They have no keys by default;
   assign some in **Tools > Settings > Shortcuts**.
-- **View > Rotation > Set Rotation...:** type the longitude and latitude of the center
-  and the roll, in degrees. **Reset Rotation** goes back.
+- **View > Rotation > Set Rotation...:** a small window with sliders and
+  boxes for the longitude and latitude of the center and the roll, in degrees.
+  It stays open next to the map, applies changes at once and follows the
+  rotation you do with the mouse. **Reset** goes back.
+- **View > Rotation > Center On:** **North Pole**, **South Pole** or
+  **Equator** (longitude 0, latitude 0), in the frame being shown. The view
+  glides there.
+- **View > Rotation > Recenter on Right Click** (on by default): a right
+  click on the map glides the point under it to the center of the view, along
+  the great circle from the old center. When a frame is chosen the north pole
+  stays up; in the Default (free) orientation **Lock Roll When Recentering**
+  keeps the roll of the view instead of the one the path would give.
 - **View > Reset View:** zoom and rotation together (`0`).
 - **View > Minimap** (`M`): a small overview of the whole sky showing where
   the zoomed view is.
 
 ### Projections
 
-Pick one in the toolbar. Eleven are available:
+Pick one in the toolbar. Fourteen are available:
 
-- **Mollweide**, **Hammer**, **Sinusoidal**, **Lambert cylindrical**,
-  **Gall-Peters**: whole-sky ovals and cylinders. Mollweide and Hammer keep
-  areas equal (the usual choice for CMB maps).
+- **Mollweide**, **Hammer**, **Aitoff**, **Sinusoidal**, **Lambert
+  cylindrical**, **Gall-Peters**, **Werner**: whole-sky ovals, cylinders and
+  the heart-shaped Werner map. Mollweide, Hammer, Sinusoidal, Werner and the
+  cylindrical equal-area maps keep areas equal; Hammer and Aitoff have the
+  same outline, and Aitoff compromises between area and angles.
 - **Equirectangular**, **Mercator**: rectangles; Mercator stretches the poles.
-- **Orthographic**, **Azimuthal equidistant**, **Gnomonic**,
-  **Stereographic**: views of part of the sphere, good for zooming into a
-  region. The globe can spin after you drag it (see Settings).
+- **Orthographic**, **Azimuthal equidistant**, **Lambert azimuthal**,
+  **Gnomonic**, **Stereographic**: views of part of the sphere (Azimuthal
+  equidistant and Lambert azimuthal show all of it in a disk), good for
+  zooming into a region. Lambert azimuthal keeps areas equal. The globe can
+  spin after you drag it (see Settings).
 
 ### Orientation (the coordinate frame)
 
@@ -439,6 +454,45 @@ The dialog estimates the memory needed; above nside 1024 it can take long.
 
 UNSEEN pixels are taken as zero in the transform and restored afterwards.
 
+### Convert Units
+
+**Tools > Maps > Convert Units...** multiplies the current map by the factor
+between two units and opens the result as a new tab.
+
+- **Units:** temperatures in K, mK or μK, either thermodynamic (**_CMB**: the
+  temperature of a blackbody at 2.7255 K that gives the same change in
+  brightness, the usual unit of CMB maps) or Rayleigh-Jeans (**_RJ**), and
+  the brightness in **Jy/sr** and **MJy/sr**.
+- **From** is read from the file's `TUNIT` keyword when it is there ("K", "uK",
+  "muK", "K_CMB", "K_RJ", "MJy/sr", ...). A plain K, mK or μK is taken as a
+  CMB temperature, as in the Planck files. Choose it by hand when it is
+  missing or not recognized.
+- **Frequency** is needed for anything that involves Rayleigh-Jeans or
+  Jy/sr. The conversion is exact at that single frequency; it is not
+  integrated over a detector bandpass, so it differs a little from the
+  coefficients quoted for a real instrument band. Converting between K, mK
+  and μK of the same kind needs no frequency.
+- UNSEEN and NaN pixels stay as they are. The new tab remembers its unit.
+
+### Generate Random Map
+
+**Tools > Maps > Generate Random Map...** makes a map from scratch.
+
+- **Gaussian noise** (mean and sigma) and **Uniform noise** (minimum and
+  maximum): every pixel is an independent number.
+- **CMB temperature**, or **temperature and polarization (T, Q, U)**: a
+  Gaussian random sky drawn from the theory spectrum chosen in **Tools >
+  Settings > Theory** (like HEALPix's `synfast`), in the **unit** you pick
+  (μK, mK or K; the theory is in μK² and is scaled), optionally smoothed with
+  a Gaussian **beam** (FWHM in arcminutes). It reaches l = 3 nside − 1 or the
+  end of the spectrum, whichever is lower. Polarization opens three tabs
+  (T, Q, U), and needs TT and EE columns in the theory file.
+- **nside** from 1 to 8192, and the **seed**: leave it random, or set it to
+  get the same map again (the seed is in the tab's name). The same seed
+  gives the same map whatever the number of CPU cores.
+
+CMB maps are Galactic, and their tabs know their unit (K_CMB family).
+
 ## 10. Saving and exporting
 
 - **File > Export Image:** saves the view as an image (PNG, JPEG or BMP). Choose the
@@ -488,9 +542,12 @@ extension (or the file type chosen in the dialog when you type none).
   graticule (show, spacing, color); the masks (mode, dim strength).
 - **Theory:** the theoretical spectrum for **Compare > Theory**: the bundled
   Planck 2018 best fit, or your own text file with ℓ, TT, TE, EE, BB in
-  D_ℓ = ℓ(ℓ+1) C_ℓ / 2π in μK² (as CAMB and CLASS write it). The **map unit**
-  (μK, mK or K) tells hpvis the unit of your maps so the theory is scaled to
-  match.
+  D_ℓ = ℓ(ℓ+1) C_ℓ / 2π in μK² (as CAMB and CLASS write it). The **default
+  map unit** (μK, mK or K) is the unit of your maps when the file does not
+  say: the unit in the FITS `TUNIT` keyword of the column being analysed
+  takes precedence (when it is a CMB temperature), so the theory is scaled to
+  the map you are looking at. The curve's name in the legend says when the
+  unit came from the map.
 - **Shortcuts:** see the next section.
 - **About:** version, libraries and license.
 
@@ -533,7 +590,7 @@ hpvis [options] [FILE...]
 | `--creverse` | Reverse the colormap |
 | `--cscale linear\|log\|asinh` | Color scale |
 | `--cmin V`, `--cmax V` | Color range |
-| `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer` |
+| `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer`, `aitoff`, `werner`, `lambert_azimuthal` |
 | `--orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial` |
 | `--view inside\|outside` | Perspective: the sky from the inside (default) or like a globe |
 | `-g, --graticule` | Show the coordinate grid |

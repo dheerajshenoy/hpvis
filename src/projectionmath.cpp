@@ -9,6 +9,13 @@ namespace
 {
 constexpr double kSqrt2 = 1.41421356237309504880;
 
+// Werner (Bonne with the pole as standard parallel) is a heart shape; the
+// plane [-1, 1]^2 is its bounding box: half sizes and the vertical center, in
+// the projection's own units (the north pole is at the origin)
+constexpr double kWernerHalfX = 2.021610497074358;
+constexpr double kWernerHalfY = 2.029609241037196;
+constexpr double kWernerCenterY = -1.111983412552597;
+
 double
 wrapPi(double lon) // (-pi, pi]
 {
@@ -32,6 +39,7 @@ isDisk(Projection projection)
         case Projection::AZIMUTHAL_EQUIDISTANT:
         case Projection::GNOMONIC:
         case Projection::STEREOGRAPHIC:
+        case Projection::LAMBERT_AZIMUTHAL:
             return true;
         default:
             return false;
@@ -55,7 +63,12 @@ aspect(Projection projection)
             return 1.0;
         case Projection::SINUSOIDAL:
         case Projection::HAMMER:
+        case Projection::AITOFF:
             return 2.0;
+        case Projection::WERNER:
+            return kWernerHalfX / kWernerHalfY;
+        case Projection::LAMBERT_AZIMUTHAL:
+            return 1.0;
         case Projection::LAMBERT_CYLINDRICAL:
             return M_PI;
         case Projection::GALL_PETERS:
@@ -188,6 +201,57 @@ inverse(Projection projection, QVector2D plane, double &colat, double &phi,
             phi   = wrap2Pi(lon);
             return true;
         }
+
+        case Projection::AITOFF:
+        {
+            // The azimuthal equidistant map of the hemisphere around the
+            // center, with longitudes halved and x doubled: the distance
+            // from the center is the angle c, up to 90 degrees
+            const double r = std::hypot(px, py);
+            if (r > 1.0)
+                return false;
+            const double c = r * M_PI / 2.0;
+            const double s = c > 1e-6 ? std::sin(c) / c : 1.0;
+            const double sinLat = std::clamp(py * M_PI / 2.0 * s, -1.0, 1.0);
+            const double lon
+                = 2.0 * std::atan2(-px * M_PI / 2.0 * s, std::cos(c));
+            colat = M_PI / 2.0 - std::asin(sinLat);
+            phi   = wrap2Pi(lon);
+            return true;
+        }
+
+        case Projection::WERNER:
+        {
+            const double x   = -px * kWernerHalfX; // longitude increases left
+            const double y   = py * kWernerHalfY + kWernerCenterY;
+            const double rho = std::hypot(x, y); // colatitude
+            if (rho > M_PI)
+                return false;
+            const double e = std::atan2(x, -y);
+            const double s = std::sin(rho);
+            const double lon = s > 1e-6 ? e * rho / s : 0.0;
+            if (std::abs(lon) > M_PI)
+                return false; // outside the heart
+            colat = rho;
+            phi   = wrap2Pi(lon);
+            return true;
+        }
+
+        case Projection::LAMBERT_AZIMUTHAL:
+        {
+            // Plane radius sin(c / 2): the whole sphere fits the unit circle
+            const double r = std::hypot(px, py);
+            if (r > 1.0)
+                return false;
+            const double c  = 2.0 * std::asin(r);
+            const double ux = r > 1e-9 ? px / r : 0.0;
+            const double uy = r > 1e-9 ? py / r : 0.0;
+            const double dx = std::cos(c), dy = -std::sin(c) * ux,
+                         dz = std::sin(c) * uy;
+            colat = std::atan2(std::hypot(dx, dy), dz);
+            phi   = wrap2Pi(std::atan2(dy, dx));
+            return true;
+        }
     }
     return false;
 }
@@ -286,6 +350,43 @@ forwardInside(Projection projection, double lat, double lon, QVector2D &plane)
                               float(std::sin(lat) / d));
             return true;
         }
+
+        case Projection::AITOFF:
+        {
+            const double l = wrapPi(lon);
+            const double a
+                = std::acos(std::clamp(std::cos(lat) * std::cos(l / 2.0),
+                                       -1.0, 1.0));
+            const double k = a > 1e-6 ? a / std::sin(a) : 1.0;
+            // x / pi and y / (pi / 2)
+            plane = QVector2D(
+                float(-2.0 * std::cos(lat) * std::sin(l / 2.0) * k / M_PI),
+                float(std::sin(lat) * k / (M_PI / 2.0)));
+            return true;
+        }
+
+        case Projection::WERNER:
+        {
+            const double l   = wrapPi(lon);
+            const double rho = M_PI / 2.0 - lat;
+            const double e   = rho > 1e-9 ? l * std::cos(lat) / rho : 0.0;
+            const double x   = rho * std::sin(e);
+            const double y   = -rho * std::cos(e);
+            plane = QVector2D(float(-x / kWernerHalfX),
+                              float((y - kWernerCenterY) / kWernerHalfY));
+            return true;
+        }
+
+        case Projection::LAMBERT_AZIMUTHAL:
+        {
+            const double z = std::cos(lat) * std::cos(lon);
+            if (z <= -1.0 + 1e-9)
+                return false; // the antipode: a whole circle
+            const double k = 1.0 / std::sqrt(2.0 * (1.0 + z));
+            plane = QVector2D(float(-std::cos(lat) * std::sin(lon) * k),
+                              float(std::sin(lat) * k));
+            return true;
+        }
     }
     return false;
 }
@@ -331,7 +432,11 @@ labelMeridianInside(Projection projection)
         case Projection::LAMBERT_CYLINDRICAL:
         case Projection::GALL_PETERS:
         case Projection::HAMMER:
+        case Projection::AITOFF:
+        case Projection::WERNER:
             return M_PI; // the left edge
+        case Projection::LAMBERT_AZIMUTHAL:
+            return M_PI / 2.0; // the left side of the disk
         case Projection::STEREOGRAPHIC:
             return 60.0 * M_PI / 180.0; // left part of the visible area
     }

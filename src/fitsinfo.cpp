@@ -65,8 +65,16 @@ scanFits(fitshandle &file)
                 // A map column holds exactly one value per pixel
                 if (file.nelems(c) != npix)
                     continue;
-                entry.columns.append(
-                    {c, QString::fromStdString(file.colname(c))});
+                FitsColumn column;
+                column.index = c;
+                column.name  = QString::fromStdString(file.colname(c));
+                // Check first: a failed get_key() prints an error to stderr
+                const std::string key = "TUNIT" + std::to_string(c);
+                if (file.key_present(key))
+                    column.unit = QString::fromStdString(
+                                      file.get_key<std::string>(key))
+                                      .trimmed();
+                entry.columns.append(column);
             }
         }
         catch (const PlanckError &)

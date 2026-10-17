@@ -57,6 +57,14 @@ public:
     // Name for the tab and status bar: the file name, or the computed map's
     QString displayName() const;
 
+    // The unit of the map (FITS TUNITn of the column, or what the map was
+    // converted to); empty when unknown
+    QString unit() const;
+    void setUnit(const QString &unit)
+    {
+        m_unit = unit;
+    }
+
     // Writes the map to a new FITS file (HDU 2, one float column)
     bool saveMap(const QString &path, QString *error) const;
 
@@ -108,6 +116,7 @@ private:
     OpenGLWidget *m_glWidget = nullptr;
     QString m_filePath;
     QString m_title; // of a computed map
+    QString m_unit;  // of a computed map
     bool m_computed = false;
     FitsInfo m_fitsInfo;
     int m_hdu      = 0;

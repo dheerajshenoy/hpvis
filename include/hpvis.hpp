@@ -33,6 +33,9 @@ class SmoothDialog;
 class HarmonicDialog;
 class UsageDialog;
 class MapOperationDialog;
+class RotationDialog;
+class UnitsDialog;
+class RandomMapDialog;
 
 class HpVis : public QMainWindow
 {
@@ -136,6 +139,8 @@ private slots:
     void onDowngradeTriggered();
     void onSmoothTriggered();
     void onHarmonicTriggered();
+    void onUnitsTriggered();
+    void onRandomMapTriggered();
     QList<OpenMap> openMaps() const;
     void onSaveMapTriggered();
     void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
@@ -217,6 +222,11 @@ private:
     TabWidget *m_tabWidget              = nullptr;
     ViewToolBar *m_toolBar              = nullptr;
     MapOperationDialog *m_operateDialog = nullptr;
+    RotationDialog *m_rotationDialog    = nullptr;
+    UnitsDialog *m_unitsDialog          = nullptr;
+    RandomMapDialog *m_randomDialog     = nullptr;
+    bool m_recenterOnRightClick         = true;
+    bool m_lockRollOnRecenter           = false;
     DowngradeDialog *m_downgradeDialog  = nullptr;
     SmoothDialog *m_smoothDialog        = nullptr;
     HarmonicDialog *m_harmonicDialog    = nullptr;

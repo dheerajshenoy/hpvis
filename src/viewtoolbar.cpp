@@ -77,6 +77,13 @@ ViewToolBar::ViewToolBar(QWidget *parent) : QToolBar("View", parent)
                                static_cast<int>(Projection::STEREOGRAPHIC));
     m_projectionCombo->addItem("Hammer",
                                static_cast<int>(Projection::HAMMER));
+    m_projectionCombo->addItem("Aitoff",
+                               static_cast<int>(Projection::AITOFF));
+    m_projectionCombo->addItem("Werner",
+                               static_cast<int>(Projection::WERNER));
+    m_projectionCombo->addItem(
+        "Lambert Azimuthal",
+        static_cast<int>(Projection::LAMBERT_AZIMUTHAL));
     addLabeled("Projection", m_projectionCombo);
 
     // --- Orientation ---

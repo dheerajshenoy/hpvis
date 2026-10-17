@@ -12,5 +12,8 @@ enum class Projection
     LAMBERT_CYLINDRICAL,
     GALL_PETERS,
     STEREOGRAPHIC,
-    HAMMER // keep last: the settings range check uses it
+    HAMMER,
+    AITOFF,
+    WERNER,
+    LAMBERT_AZIMUTHAL // keep last: the settings range check uses it
 };

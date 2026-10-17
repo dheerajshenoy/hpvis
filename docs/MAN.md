@@ -17,10 +17,11 @@ hpvis - viewer and analysis tool for HEALPix maps
 
 **hpvis** displays HEALPix maps, such as maps of the cosmic microwave
 background, stored in FITS, NumPy (*.npy*) or NumPy archive (*.npz*) files. It
-shows them in eleven projections, applies masks, computes map statistics,
+shows them in fourteen projections, applies masks, computes map statistics,
 histograms and power spectra (corrected for masks with the MASTER method),
 and opens the results of operations on maps (arithmetic, resolution changes,
-beam smoothing, derivatives, E and B maps) in new tabs. The view is saved as
+beam smoothing, derivatives, E and B maps, unit conversion, random maps)
+in new tabs. The view is saved as
 an image, and the power spectrum and histogram plots as PNG, SVG or PDF.
 
 Without **--output**, **--info**, **--stats**, **--help** or **--version** it
@@ -59,7 +60,8 @@ the files of the last session.
 **-p**, **--projection** *PROJECTION*
 :   One of *mollweide*, *equirectangular*, *orthographic*,
     *azimuthal_equidistant*, *gnomonic*, *mercator*, *sinusoidal*,
-    *lambert_cylindrical*, *gall_peters*, *stereographic*, *hammer*.
+    *lambert_cylindrical*, *gall_peters*, *stereographic*, *hammer*,
+    *aitoff*, *werner*, *lambert_azimuthal*.
 
 **--orientation** *ORIENTATION*
 :   Frame to show the sky in: *galactic*, *ecliptic* or *equatorial* (north

@@ -14,6 +14,9 @@
 #include "npyreader.hpp"
 #include "pixelordering.hpp"
 #include "powerspectrumdock.hpp"
+#include "randommapdialog.hpp"
+#include "rotationdialog.hpp"
+#include "unitsdialog.hpp"
 #include "settingsdialog.hpp"
 #include "statisticsdock.hpp"
 #include "view.hpp"
@@ -161,7 +164,7 @@ HpVis::parseArgs(const argparse::ArgumentParser &parser)
             = {"mollweide", "equirectangular", "orthographic",
                "azimuthal_equidistant", "gnomonic", "mercator", "sinusoidal",
                "lambert_cylindrical", "gall_peters", "stereographic",
-               "hammer"};
+               "hammer", "aitoff", "werner", "lambert_azimuthal"};
         const int i = names.indexOf(QString::fromStdString(*proj));
         if (i >= 0)
             m_cli.projection = Projection(i);
@@ -622,6 +625,66 @@ HpVis::initMenubar()
             m_view->glWidget()->resetRotation();
     }), Command::ViewResetRotation);
 
+    // Where to look: the poles and the center of the frame shown
+    rotationMenu->addSeparator();
+    QMenu *centerMenu = rotationMenu->addMenu("&Center On");
+    const std::tuple<const char *, double, double, Command> centers[]
+        = {{"&North Pole", 90.0, 0.0, Command::ViewCenterNorthPole},
+           {"&South Pole", -90.0, 0.0, Command::ViewCenterSouthPole},
+           {"&Equator (0\u00b0, 0\u00b0)", 0.0, 0.0, Command::ViewCenterEquator}};
+    for (const auto &[name, lat, lon, command] : centers)
+        tag(centerMenu->addAction(QString::fromUtf8(name), this,
+                                  [this, lat = lat, lon = lon]()
+        {
+            if (!m_view)
+                return;
+            // At a pole keep the longitude, so the picture does not spin
+            double lo, la, ro;
+            m_view->glWidget()->rotationAngles(lo, la, ro);
+            m_view->glWidget()->centerOn(std::abs(lat) > 89.0 ? lo : lon, lat);
+        }), command);
+
+    // A right click glides the point under it to the center
+    rotationMenu->addSeparator();
+    QSettings viewSettings;
+    m_recenterOnRightClick
+        = viewSettings.value("view/recenterOnRightClick", true).toBool();
+    m_lockRollOnRecenter
+        = viewSettings.value("view/lockRollOnRecenter", false).toBool();
+    auto applyRecenter = [this]()
+    {
+        QSettings s;
+        s.setValue("view/recenterOnRightClick", m_recenterOnRightClick);
+        s.setValue("view/lockRollOnRecenter", m_lockRollOnRecenter);
+        for (int i = 0; i < m_tabWidget->count(); ++i)
+            if (auto *view = qobject_cast<View *>(m_tabWidget->widget(i)))
+            {
+                view->glWidget()->setRecenterOnRightClick(
+                    m_recenterOnRightClick);
+                view->glWidget()->setLockRollOnRecenter(m_lockRollOnRecenter);
+            }
+    };
+    QAction *recenter = tag(rotationMenu->addAction(
+        "Recenter on &Right Click", this, [this, applyRecenter](bool on)
+    {
+        m_recenterOnRightClick = on;
+        applyRecenter();
+    }), Command::ViewRecenterRightClick);
+    recenter->setCheckable(true);
+    recenter->setChecked(m_recenterOnRightClick);
+    recenter->setStatusTip(
+        "A right click glides the point under it to the center of the view");
+    QAction *lockRoll = tag(rotationMenu->addAction(
+        "&Lock Roll When Recentering", this, [this, applyRecenter](bool on)
+    {
+        m_lockRollOnRecenter = on;
+        applyRecenter();
+    }), Command::ViewLockRoll);
+    lockRoll->setCheckable(true);
+    lockRoll->setChecked(m_lockRollOnRecenter);
+    lockRoll->setStatusTip("In the free orientation, keep the roll of the "
+                           "view when recentering (a frame keeps north up)");
+
     m_viewResetViewAction = tag(m_viewMenu->addAction("&Reset View", this, [this]()
     {
         if (m_view)
@@ -921,6 +984,12 @@ HpVis::initMenubar()
                            &HpVis::onSmoothTriggered), Command::ToolsSmooth);
     tag(mapsMenu->addAction("&Derivatives and E/B Maps...", this,
                            &HpVis::onHarmonicTriggered), Command::ToolsHarmonic);
+    mapsMenu->addSeparator();
+    tag(mapsMenu->addAction("Convert &Units...", this,
+                            &HpVis::onUnitsTriggered), Command::ToolsUnits);
+    tag(mapsMenu->addAction("&Generate Random Map...", this,
+                            &HpVis::onRandomMapTriggered),
+        Command::ToolsRandomMap);
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
@@ -1360,6 +1429,8 @@ HpVis::onTabChanged(int index)
         m_viewColorBarAction->setChecked(m_view->glWidget()->colorBarVisible());
         m_explorerDock->revealFile(m_view->filePath());
     }
+    if (m_rotationDialog)
+        m_rotationDialog->setTarget(m_view ? m_view->glWidget() : nullptr);
 }
 
 void
@@ -1801,6 +1872,8 @@ HpVis::applyDefaults(View *view)
     gl->setOrientation(m_settings.orientation);
     gl->setAnimateGlobe(m_settings.animateOrthoGlobe);
     gl->setAnimateProjection(m_settings.animateProjection);
+    gl->setRecenterOnRightClick(m_recenterOnRightClick);
+    gl->setLockRollOnRecenter(m_lockRollOnRecenter);
     gl->setGraticuleColor(m_settings.graticuleColor);
     gl->setMaskMode(m_settings.maskMode);
     gl->setMaskOpacity(m_settings.maskOpacityPercent / 100.0f);
@@ -1998,59 +2071,12 @@ HpVis::applyShortcuts()
 void
 HpVis::onRotationActionTriggered()
 {
-    if (!m_view)
-        return;
-    OpenGLWidget *gl = m_view->glWidget();
-
-    QDialog dialog(this);
-    dialog.setWindowTitle("Rotation");
-    auto *layout = new QFormLayout(&dialog);
-
-    double lon, lat, roll;
-    gl->rotationAngles(lon, lat, roll);
-
-    auto makeSpin = [](double min, double max, double value, bool wrap)
-    {
-        auto *spin = new QDoubleSpinBox();
-        spin->setRange(min, max);
-        spin->setDecimals(2);
-        spin->setSingleStep(1.0);
-        spin->setSuffix(QString::fromUtf8("\u00b0"));
-        spin->setWrapping(wrap);
-        spin->setValue(value);
-        return spin;
-    };
-    auto *lonSpin  = makeSpin(-180.0, 180.0, lon, true);
-    auto *latSpin  = makeSpin(-90.0, 90.0, lat, false);
-    auto *rollSpin = makeSpin(-180.0, 180.0, roll, true);
-    layout->addRow("Center longitude:", lonSpin);
-    layout->addRow("Center latitude:", latSpin);
-    layout->addRow("Roll:", rollSpin);
-    rollSpin->setEnabled(!gl->orientationLocked()); // north stays up
-
-    // Applied live
-    for (auto *spin : {lonSpin, latSpin, rollSpin})
-        connect(spin, &QDoubleSpinBox::valueChanged, &dialog, [=](double)
-        {
-            gl->setRotationAngles(lonSpin->value(), latSpin->value(),
-                                  rollSpin->value());
-        });
-
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
-    auto *reset   = buttons->addButton("Reset", QDialogButtonBox::ResetRole);
-    connect(reset, &QPushButton::clicked, &dialog, [=]()
-    {
-        gl->resetRotation();
-        double a, b, c;
-        gl->rotationAngles(a, b, c);
-        QSignalBlocker b1(lonSpin), b2(latSpin), b3(rollSpin);
-        lonSpin->setValue(a);
-        latSpin->setValue(b);
-        rollSpin->setValue(c);
-    });
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    layout->addRow(buttons);
-    dialog.exec();
+    if (!m_rotationDialog)
+        m_rotationDialog = new RotationDialog(this);
+    m_rotationDialog->setTarget(m_view ? m_view->glWidget() : nullptr);
+    m_rotationDialog->show();
+    m_rotationDialog->raise();
+    m_rotationDialog->activateWindow();
 }
 
 void
@@ -2214,6 +2240,49 @@ HpVis::onHarmonicTriggered()
     m_harmonicDialog->show();
     m_harmonicDialog->raise();
     m_harmonicDialog->activateWindow();
+}
+
+// The Convert Units dialog: works on the current tab
+void
+HpVis::onUnitsTriggered()
+{
+    if (!m_unitsDialog)
+    {
+        m_unitsDialog = new UnitsDialog([this]() { return m_view; }, this);
+        connect(m_unitsDialog, &UnitsDialog::mapReady, this,
+                [this](std::shared_ptr<Healpix_Map<float>> map,
+                       const QString &title, SkyFrame frame, const QString &unit)
+        {
+            openComputedMap(map, title, frame);
+            if (m_view && m_view->isComputed())
+                m_view->setUnit(unit);
+        });
+    }
+    m_unitsDialog->refresh();
+    m_unitsDialog->show();
+    m_unitsDialog->raise();
+    m_unitsDialog->activateWindow();
+}
+
+// The Generate Random Map dialog
+void
+HpVis::onRandomMapTriggered()
+{
+    if (!m_randomDialog)
+    {
+        m_randomDialog = new RandomMapDialog(this);
+        connect(m_randomDialog, &RandomMapDialog::mapReady, this,
+                [this](std::shared_ptr<Healpix_Map<float>> map,
+                       const QString &title, SkyFrame frame, const QString &unit)
+        {
+            openComputedMap(map, title, frame);
+            if (m_view && m_view->isComputed())
+                m_view->setUnit(unit);
+        });
+    }
+    m_randomDialog->show();
+    m_randomDialog->raise();
+    m_randomDialog->activateWindow();
 }
 
 void

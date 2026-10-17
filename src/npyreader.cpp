@@ -358,7 +358,7 @@ hduOf(int index, const QString &name, const Header &h)
     hdu.index = index;
     hdu.name  = name;
     for (int r = 1; r <= rowsOf(h); ++r)
-        hdu.columns.append({r, QString()});
+        hdu.columns.append({r, QString(), QString()});
     return hdu;
 }
 } // namespace

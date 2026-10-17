@@ -151,6 +151,11 @@ add_executable(${PROJECT_NAME}
     src/masterspectrum.cpp
     src/masksourcedialog.cpp
     src/downgradedialog.cpp
+    src/rotationdialog.cpp
+    src/unitsdialog.cpp
+    src/randommap.cpp
+    src/randommapdialog.cpp
+    src/units.cpp
     src/exportdialog.cpp
     src/fitsheaderdialog.cpp
     src/openglwidget.cpp
@@ -198,6 +203,11 @@ add_executable(${PROJECT_NAME}
     include/masksource.hpp
     include/masksourcedialog.hpp
     include/downgradedialog.hpp
+    include/rotationdialog.hpp
+    include/unitsdialog.hpp
+    include/randommap.hpp
+    include/randommapdialog.hpp
+    include/units.hpp
     include/exportdialog.hpp
     include/openglwidget.hpp
     include/tilecache.hpp

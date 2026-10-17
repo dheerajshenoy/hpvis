@@ -55,11 +55,12 @@ addArguments(argparse::ArgumentParser &parser)
         .choices("mollweide", "equirectangular", "orthographic",
                  "azimuthal_equidistant", "gnomonic", "mercator", "sinusoidal",
                  "lambert_cylindrical", "gall_peters", "stereographic",
-                 "hammer")
+                 "hammer", "aitoff", "werner", "lambert_azimuthal")
         .metavar("PROJECTION")
         .help("Projection: mollweide, equirectangular, orthographic, "
               "azimuthal_equidistant, gnomonic, mercator, sinusoidal, "
-              "lambert_cylindrical, gall_peters, stereographic or hammer");
+              "lambert_cylindrical, gall_peters, stereographic, hammer, "
+              "aitoff, werner or lambert_azimuthal");
 
     parser.add_argument("--orientation")
         .choices("free", "galactic", "ecliptic", "equatorial")

@@ -11,6 +11,7 @@ struct FitsColumn
 {
     int index = 1;
     QString name;
+    QString unit; // TUNITn, may be empty
 };
 
 // One HDU of a FITS file (index is 1-based, as fitshandle::goto_hdu expects).

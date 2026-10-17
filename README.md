@@ -16,10 +16,11 @@ shader, so large maps (nside 2048 and above) stay responsive.
 
 - Galactic, Ecliptic and Equatorial orientations (converted on the GPU from
   the map's own `COORDSYS`), or a free trackball.
-- Eleven projections: Mollweide, Hammer, Equirectangular, Mercator, Sinusoidal,
-  Lambert cylindrical, Gall-Peters, Orthographic, Azimuthal equidistant,
-  Gnomonic and Stereographic, with interactive sky rotation, seen from the
-  inside (the sky) or the outside (like a globe).
+- Fourteen projections: Mollweide, Hammer, Aitoff, Equirectangular, Mercator,
+  Sinusoidal, Lambert cylindrical, Gall-Peters, Werner, Orthographic,
+  Azimuthal equidistant, Lambert azimuthal, Gnomonic and Stereographic, with
+  interactive sky rotation (sliders, poles, right-click to recenter), seen
+  from the inside (the sky) or the outside (like a globe).
 - RING and NESTED pixel ordering.
 - 15 colormaps plus your own (CSV or JSON), linear and logarithmic scales, an adjustable color range and a
   color bar.
@@ -46,6 +47,11 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Tools > Maps > Derivatives and E/B Maps: Laplacian, gradient magnitude, and E and B
   maps of a polarized map, as new tabs.
 - Colormap > Color Bar > Percentile Range: auto-range that clips the extreme pixels.
+- Tools > Maps > Convert Units: K, mK and uK (CMB or Rayleigh-Jeans) and Jy/sr,
+  MJy/sr, with the unit read from the file's `TUNIT`, which also sets the
+  scaling of the theory curve of the power spectrum.
+- Tools > Maps > Generate Random Map: Gaussian or uniform noise, or a CMB
+  realization (T, or T, Q, U) from the theory spectrum.
 - Settings dialog for the defaults of new maps.
 - Menus grouped by topic (View, Colormap, Masks, Tools), with icons, and a key
   binding for almost every command (Tools > Settings > Shortcuts).
@@ -75,7 +81,7 @@ hpvis [options] [FILE...]
 | `--creverse` | Reverse the colormap |
 | `--cscale linear\|log\|asinh` | Color scale |
 | `--cmin V`, `--cmax V` | Color range |
-| `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer` |
+| `-p, --projection P` | `mollweide`, `equirectangular`, `orthographic`, `azimuthal_equidistant`, `gnomonic`, `mercator`, `sinusoidal`, `lambert_cylindrical`, `gall_peters`, `stereographic`, `hammer`, `aitoff`, `werner`, `lambert_azimuthal` |
 | `--orientation O` | `free` (default), `galactic`, `ecliptic` or `equatorial`: the frame to show the sky in |
 | `--view inside\|outside` | Perspective: the sky seen from the inside (longitude increases to the left, the default) or from the outside like a globe (mirrored) |
 | `-g, --graticule` | Show the coordinate grid |

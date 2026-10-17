@@ -269,12 +269,25 @@ View::setComputedMap(Healpix_Map<float> &&map, const QString &title,
 {
     m_computed = true;
     m_title    = title;
+    m_unit.clear();
     m_filePath.clear();
     m_hdu      = 0;
     m_column   = 0;
     m_fitsInfo = FitsInfo();
     m_glWidget->setMapFrame(frame);
     m_glWidget->setMap(std::move(map));
+}
+
+QString
+View::unit() const
+{
+    if (m_computed)
+        return m_unit;
+    if (const FitsHdu *hdu = m_fitsInfo.find(m_hdu))
+        for (const FitsColumn &c : hdu->columns)
+            if (c.index == m_column)
+                return c.unit;
+    return {};
 }
 
 QString

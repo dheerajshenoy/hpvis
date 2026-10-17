@@ -486,7 +486,8 @@ SettingsDialog::createAppearanceSettingsPage()
                                  "Orthographic", "Azimuthal Equidistant",
                                  "Gnomonic", "Mercator", "Sinusoidal",
                                  "Lambert Cylindrical", "Gall-Peters",
-                                 "Stereographic", "Hammer"});
+                                 "Stereographic", "Hammer", "Aitoff", "Werner",
+                                 "Lambert Azimuthal"});
     projForm->addRow("Default projection:", m_projectionCombo);
 
     m_perspectiveCombo = new QComboBox();
@@ -620,9 +621,10 @@ SettingsDialog::createTheorySettingsPage()
     m_theoryUnitCombo = new QComboBox();
     m_theoryUnitCombo->addItems({"uK", "mK", "K"});
     m_theoryUnitCombo->setToolTip(
-        "The unit of the maps you analyse. The theory is in uK^2 and is "
-        "scaled to match.");
-    form->addRow("Map unit:", m_theoryUnitCombo);
+        "The unit of the maps you analyse, used when the file does not give "
+        "one (the FITS TUNIT keyword is used when it does). The theory is in "
+        "uK^2 and is scaled to match.");
+    form->addRow("Default map unit:", m_theoryUnitCombo);
 
     auto *note = new QLabel(
         "Overplot it from the power spectrum dock: Compare > Theory.");

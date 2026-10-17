@@ -16,6 +16,7 @@
 #include "openglwidget.hpp"
 #include "plotrenderer.hpp"
 #include "theoryspectrum.hpp"
+#include "units.hpp"
 #include "view.hpp"
 
 #include <QCheckBox>
@@ -1235,10 +1236,26 @@ PowerSpectrumDock::theorySpectra()
     TheorySource src;
     src.preset = TheoryPreset(s.theoryPreset);
     src.file   = s.theoryFile;
-    src.unit   = TheoryUnit(s.theoryUnit);
-    const QString key
-        = QString("%1|%2|%3").arg(s.theoryPreset).arg(s.theoryFile).arg(
-            s.theoryUnit);
+    src.unit   = TheoryUnit(s.theoryUnit); // the default: the settings'
+
+    // The unit the map says it is in (FITS TUNIT) wins: the theory is drawn
+    // in the unit of the map being analysed. Only CMB temperatures can be
+    // scaled from the spectrum; any other unit leaves the setting.
+    bool unitFromMap = false;
+    if (m_view)
+        if (const auto u = units::fromFits(m_view->unit());
+            u && units::isCmbTemperature(*u))
+        {
+            src.unit = *u == units::Unit::K_CMB    ? TheoryUnit::Kelvin
+                       : *u == units::Unit::mK_CMB ? TheoryUnit::MilliKelvin
+                                                   : TheoryUnit::MicroKelvin;
+            unitFromMap = true;
+        }
+    const QString key = QString("%1|%2|%3|%4")
+                            .arg(s.theoryPreset)
+                            .arg(s.theoryFile)
+                            .arg(int(src.unit))
+                            .arg(unitFromMap);
     if (!m_theoryLoaded || key != m_theoryKey)
     {
         m_theoryKey    = key;
@@ -1248,6 +1265,12 @@ PowerSpectrumDock::theorySpectra()
         {
             m_theory     = loadTheorySpectra(src);
             m_theoryName = src.label();
+            if (unitFromMap)
+            {
+                static const char *names[] = {"uK", "mK", "K"};
+                m_theoryName += QString(" (%1, from the map)")
+                                    .arg(names[int(src.unit)]);
+            }
         }
         catch (const std::exception &e)
         {

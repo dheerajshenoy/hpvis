@@ -206,6 +206,36 @@ First development release.
   used HEALPix's map2alm and ignored the masks. It now warns when a mask is
   applied but the correction is off.
 
+### Projections and rotation
+- Three more projections: Aitoff, Werner and Lambert azimuthal equal-area
+  (`aitoff`, `werner`, `lambert_azimuthal` on the command line), 14 in all.
+  Aitoff is the azimuthal equidistant map of the hemisphere with halved
+  longitudes, so its inverse is exact; Werner is the heart-shaped equal-area
+  map of the sphere (Bonne with the pole as standard parallel); Lambert
+  azimuthal shows the whole sphere in a disk and rotates like the other disk
+  projections. The stored projection numbers of the existing ones do not
+  change.
+- View > Rotation > Set Rotation... is a small window that stays open, has
+  sliders as well as boxes and follows the rotation done with the mouse.
+- View > Rotation > Center On: North Pole, South Pole, Equator.
+- A right click recenters the view on the point under it, gliding along the
+  great circle (View > Rotation > Recenter on Right Click, on by default). A
+  frame keeps north up; in the free orientation Lock Roll When Recentering
+  keeps the roll.
+
+### Units and random maps
+- Tools > Maps > Convert Units...: K, mK and uK as CMB (thermodynamic) or
+  Rayleigh-Jeans temperatures, Jy/sr and MJy/sr, at a given frequency
+  (`include/units.hpp`). The source unit is read from the column's FITS
+  `TUNIT`; the converted map remembers its unit.
+- The theory curve of the power spectrum is scaled to the unit in the `TUNIT`
+  of the column being analysed (when it is a CMB temperature). The Settings >
+  Theory map unit is now the default for files that give none.
+- Tools > Maps > Generate Random Map...: Gaussian or uniform noise (seeded per
+  block of pixels, so the same seed gives the same map on any number of
+  threads), or a CMB realization from the theory spectrum (temperature, or
+  T, Q and U) with an optional Gaussian beam, from nside 1 to 8192.
+
 ### Plot export
 - The power spectrum and the histogram export to SVG and PDF as well as PNG.
   SVG and PDF are vector graphics drawn again from the plot's data (axes,
