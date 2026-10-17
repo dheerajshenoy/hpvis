@@ -29,6 +29,7 @@ class QSpinBox;
 class QDoubleSpinBox;
 class QPushButton;
 class SmoothDialog;
+class HarmonicDialog;
 class MapOperationDialog;
 
 class HpVis : public QMainWindow
@@ -118,6 +119,7 @@ private slots:
     void onColormapInvertChanged(bool invert);
     void onColormapScaleChanged(ColormapScale scale);
     void onColormapRangeResetRequested();
+    void onColormapPercentileRequested();
     void onBackgroundColorChanged(const QColor &color);
     void onUnseenColorChanged(const QColor &color);
     void onMaskFilesSelected(const QStringList &files);
@@ -131,6 +133,7 @@ private slots:
     void onOperateTriggered();
     void onDowngradeTriggered();
     void onSmoothTriggered();
+    void onHarmonicTriggered();
     QList<OpenMap> openMaps() const;
     void onSaveMapTriggered();
     void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
@@ -212,6 +215,7 @@ private:
     MapOperationDialog *m_operateDialog = nullptr;
     DowngradeDialog *m_downgradeDialog  = nullptr;
     SmoothDialog *m_smoothDialog        = nullptr;
+    HarmonicDialog *m_harmonicDialog    = nullptr;
     FileExplorerDock *m_explorerDock    = nullptr;
     StatisticsDock *m_statsDock         = nullptr;
     PowerSpectrumDock *m_powerDock      = nullptr;

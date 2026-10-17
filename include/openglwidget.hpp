@@ -113,6 +113,9 @@ public:
 
     // Restore the colormap range to the min/max of the loaded map
     void resetColormapRange();
+    // Range between two percentiles of the valid, unmasked pixels (e.g. 1 and
+    // 99 clip the outliers); a flat map keeps the current range
+    void setColormapPercentiles(double lowPercent, double highPercent);
     void setColormapMin(double min);
     void setColormapMax(double max);
     void setColormapScale(ColormapScale scale);

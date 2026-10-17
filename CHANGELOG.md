@@ -148,6 +148,16 @@ First development release.
   out and the new nside's multiplied in; the windows are read from a FITS
   table (HEALPix's pixel_window_n*.fits), a .npy array or a text file.
 
+### Derivatives and E/B maps
+- Tools > Derivatives and E/B Maps computes, through the spherical harmonics,
+  the Laplacian (each a_lm times -l(l+1)), the gradient magnitude |grad T|
+  (from the theta and phi derivatives) or the E and B maps of the T, Q and U
+  columns of the map's HDU (opened as two tabs). Results open as new tabs in
+  the input's nside and ordering. Checked on known maps: the Laplacian of
+  P2(cos theta) is -6 P2 and a pure E (B) input gives a B (E) map at 1e-8.
+- The Laplacian multiplies small scales by l(l+1), so noise grows fast; the
+  dialog notes it and the analysis l max can be lowered.
+
 ### Masks
 - Masks > Add Mask From Map Column... lists the columns of the open maps' files
   (and of any other FITS or .npy file you add) so a mask stored next to the map,
@@ -170,10 +180,18 @@ First development release.
 - Loading a map of a different size drops the loaded masks.
 
 ### Color bar
+- Color Bar > Percentile Range... sets the color range between two percentiles
+  of the valid, unmasked pixels (default 1% and 99%), so a few extreme pixels
+  do not wash out the fluctuations.
 - Optional color bar (View > Color Bar) with tick marks and labels. The tick
   count adapts to the width, and labels use a compact or scientific format.
 
 ### Power spectrum
+- Compare > Cross-spectrum (TT) with... adds the cross-spectrum of the current
+  map and another open map (same nside) as a curve. Independent noise averages
+  out of it, so it is the null test of two splits. The current map's masks
+  weight both maps, pixels unseen in either are left out, and the result is
+  divided by the mean squared weight (not a full MASTER correction).
 - Mask correction: the power spectrum dock can correct the spectra for the
   masks on the map (MASTER method, NaMaster's coupling coefficients), with
   C1 / C2 / Smooth apodization, bandpowers (Δℓ 4 to 64) shown at their
@@ -319,6 +337,17 @@ First development release.
   the map), the format (PNG, JPEG, BMP), the width in device pixels, the JPEG
   quality and whether to keep a transparent background; the file name gets the
   extension of the chosen format when none is typed.
+
+### Internals
+- One `UNSEEN` constant and an `isSeen()` test (`include/unseen.hpp`) replace
+  the hardcoded -1.6375e30 / -1e30 values and the four copies of the validity
+  check. Pixels count as unseen below half of UNSEEN; the shader keeps an
+  equivalent cutoff.
+- Per-pixel loops of the smoothing, resolution, power spectrum and `--stats`
+  code run on all cores, and the mask-corrected spectrum no longer copies the
+  weights and the T / Q / U maps before weighting them.
+- Fix: smoothing crashed instead of reporting an error when the map had no Q
+  and U columns (HEALPix's PlanckError is not a std::exception).
 
 ### Build and packaging
 - A man page is written in `docs/MAN.md` and converted with pandoc during the

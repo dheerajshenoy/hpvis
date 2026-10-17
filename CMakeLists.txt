@@ -143,6 +143,9 @@ add_executable(${PROJECT_NAME}
     src/theoryspectrum.cpp
     src/smoothing.cpp
     src/smoothdialog.cpp
+    src/harmonicmaps.cpp
+    src/crossspectrum.cpp
+    src/harmonicdialog.cpp
     src/masksource.cpp
     src/fileexplorerdock.cpp
     src/masterspectrum.cpp
@@ -181,6 +184,9 @@ add_executable(${PROJECT_NAME}
     include/theoryspectrum.hpp
     include/smoothing.hpp
     include/smoothdialog.hpp
+    include/harmonicmaps.hpp
+    include/crossspectrum.hpp
+    include/harmonicdialog.hpp
     include/masksource.hpp
     include/masksourcedialog.hpp
     include/downgradedialog.hpp

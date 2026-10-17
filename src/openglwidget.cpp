@@ -314,6 +314,58 @@ OpenGLWidget::resetColormapRange()
 }
 
 void
+OpenGLWidget::setColormapPercentiles(double lowPercent, double highPercent)
+{
+    const long total = m_pendingMap.Npix();
+    const float *data = m_pendingMap.Map().begin();
+
+    // Same selection as the statistics: valid pixels that pass the masks
+    std::vector<const uint8_t *> maskData;
+    std::vector<bool> maskInverted;
+    for (const MaskEntry &m : m_masks)
+        if (m.enabled && m.data.size() == size_t(total))
+        {
+            maskData.push_back(m.data.data());
+            maskInverted.push_back(m.inverted);
+        }
+
+    std::vector<float> values;
+    values.reserve(size_t(total));
+    for (long i = 0; i < total; ++i)
+    {
+        if (!isSeen(data[i]))
+            continue;
+        float keep = 1.0f;
+        for (size_t k = 0; k < maskData.size(); ++k)
+        {
+            const float w = maskData[k][i] * (1.0f / 255.0f);
+            keep *= maskInverted[k] ? 1.0f - w : w;
+        }
+        if (keep >= 0.5f)
+            values.push_back(data[i]);
+    }
+    if (values.empty())
+        return;
+
+    // Value at a percentile; nth_element only partitions, it does not sort
+    auto percentile = [&values](double percent)
+    {
+        const double frac = std::clamp(percent, 0.0, 100.0) / 100.0;
+        const size_t rank = size_t(frac * double(values.size() - 1));
+        std::nth_element(values.begin(), values.begin() + rank, values.end());
+        return values[rank];
+    };
+    const float lo = percentile(lowPercent);
+    const float hi = percentile(highPercent);
+    if (!(lo < hi))
+        return; // flat map: keep the current range
+
+    m_vmin = lo;
+    m_vmax = hi;
+    update();
+}
+
+void
 OpenGLWidget::setColormapMin(double min)
 {
     m_vmin = static_cast<float>(min);

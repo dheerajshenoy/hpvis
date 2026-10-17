@@ -134,6 +134,8 @@ private:
     // Without a path the user is asked for the file; `unit` (0 = C_l, 1 = D_l,
     // -1 = ask) answers the question of what the values are
     void loadExternalCurve(const QString &path = QString(), int unit = -1);
+    // TT cross-spectrum of the current map and `other`, added as a curve
+    void computeCrossSpectrum(View *other);
     QString titleOf(const View *view) const;
     void pickPlotColor(QPushButton *button, QColor &color,
                        const QString &title);

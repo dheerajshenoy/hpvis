@@ -44,3 +44,27 @@ hasPolarization(const QString &path, int hdu);
 // in the transform. Blocking: run it on a worker thread.
 SmoothResult
 smoothMap(const Healpix_Map<float> &in, const SmoothOptions &options);
+
+// Helpers shared with harmonicmaps.cpp.
+struct FitsHdu;
+
+// Copy of `in` in double precision and RING order; UNSEEN / NaN pixels become
+// zero and are added to `unseen`
+Healpix_Map<double>
+toDouble(const Healpix_Map<float> &in, long &unseen);
+
+// Float copy of `m` (RING) in the ordering of `in`; with keepUnseen the pixels
+// that are UNSEEN in `in` are set to UNSEEN again
+std::shared_ptr<Healpix_Map<float>>
+toFloat(const Healpix_Map<double> &m, const Healpix_Map<float> &in,
+        bool keepUnseen);
+
+// Columns of the intensity, Q and U maps of an HDU; false when it has no Q / U
+bool
+stokesColumns(const FitsHdu &hdu, int cols[3]);
+
+// Reads the T, Q and U maps of HDU `hdu` of `path` into maps[0..2], with the
+// pixel ordering and nside of `in`. Throws when they are missing or differ.
+void
+readStokesMaps(const Healpix_Map<float> &in, const QString &path, int hdu,
+               Healpix_Map<float> maps[3]);

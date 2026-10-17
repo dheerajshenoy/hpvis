@@ -13,8 +13,6 @@
 #include <algorithm>
 #include <cmath>
 
-namespace
-{
 // Copies to double in RING order; UNSEEN / NaN pixels become zero
 Healpix_Map<double>
 toDouble(const Healpix_Map<float> &in, long &unseen)
@@ -95,7 +93,30 @@ stokesColumns(const FitsHdu &hdu, int cols[3])
     cols[2] = u;
     return true;
 }
-} // namespace
+void
+readStokesMaps(const Healpix_Map<float> &in, const QString &path, int hdu,
+               Healpix_Map<float> maps[3])
+{
+    fitshandle file;
+    file.open(path.toStdString());
+    const FitsInfo info = scanFits(file);
+    const FitsHdu *h    = info.find(hdu);
+    int cols[3];
+    if (!h || !stokesColumns(*h, cols))
+        throw PlanckError("the map has no Q and U columns");
+    for (int k = 0; k < 3; ++k)
+    {
+        file.goto_hdu(hdu);
+        read_Healpix_map_from_fits(file, maps[k], cols[k]);
+        // The view may show the map with another pixel ordering than the file
+        // says: read the values the same way
+        if (maps[k].Scheme() != in.Scheme())
+            maps[k].Healpix_Base::SetNside(maps[k].Nside(), in.Scheme());
+    }
+    if (maps[1].Nside() != maps[0].Nside() || maps[2].Nside() != maps[0].Nside()
+        || maps[0].Nside() != in.Nside())
+        throw PlanckError("T, Q and U differ in resolution");
+}
 
 bool
 hasPolarization(const QString &path, int hdu)
@@ -141,28 +162,9 @@ smoothMap(const Healpix_Map<float> &in, const SmoothOptions &o)
         const Healpix_Map<float> *src[3] = {&in, nullptr, nullptr};
         if (o.polarization)
         {
-            fitshandle file;
-            file.open(o.path.toStdString());
-            const FitsInfo info = scanFits(file);
-            const FitsHdu *hdu  = info.find(o.hdu);
-            int cols[3];
-            if (!hdu || !stokesColumns(*hdu, cols))
-                throw PlanckError("the map has no Q and U columns");
+            readStokesMaps(in, o.path, o.hdu, maps);
             for (int k = 0; k < 3; ++k)
-            {
-                file.goto_hdu(o.hdu);
-                read_Healpix_map_from_fits(file, maps[k], cols[k]);
-                // The view may show the map with another pixel ordering than
-                // the file says: read the values the same way
-                if (maps[k].Scheme() != in.Scheme())
-                    maps[k].Healpix_Base::SetNside(maps[k].Nside(),
-                                                   in.Scheme());
                 src[k] = &maps[k];
-            }
-            if (maps[1].Nside() != maps[0].Nside()
-                || maps[2].Nside() != maps[0].Nside()
-                || maps[0].Nside() != nside)
-                throw PlanckError("T, Q and U differ in resolution");
         }
 
         long unseen = 0;
@@ -219,6 +221,11 @@ smoothMap(const Healpix_Map<float> &in, const SmoothOptions &o)
                                "the transform; on a cut sky this leaks power "
                                "across the edge of the mask.")
                            .arg(unseen);
+    }
+    catch (const PlanckError &e) // not derived from std::exception
+    {
+        r       = SmoothResult();
+        r.error = e.what();
     }
     catch (const std::exception &e)
     {

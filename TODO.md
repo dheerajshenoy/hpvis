@@ -10,6 +10,14 @@
 
 # Medium Priority
 
+- [ ] Point-source / peak finder (local maxima above N sigma, listed with positions; optional matched filter or wavelet)
+- [ ] Real-space statistics: one-point PDF with skewness and kurtosis, two-point correlation function C(theta) from the C_l
+- [ ] Mask builder (threshold, galactic cut, disc) with f_sky readout
+- [ ] Multipole filtering: low-pass, high-pass, band-pass or notch in l (isolate the quadrupole or any l range)
+- [ ] Monopole / dipole fit and removal outside a mask
+- [ ] Wiener filtering and inpainting of cut-sky maps
+- [ ] Needlets / wavelets and Minkowski functionals (non-Gaussianity checks)
+
 # Low Priority
 
 - [ ] Smooth/bilinear interpolation option

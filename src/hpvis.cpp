@@ -4,6 +4,7 @@
 #include "downgradedialog.hpp"
 #include "exportdialog.hpp"
 #include "smoothdialog.hpp"
+#include "harmonicdialog.hpp"
 #include "fitsheaderdialog.hpp"
 #include "masksourcedialog.hpp"
 #include "mapoperationdialog.hpp"
@@ -728,6 +729,8 @@ HpVis::initMenubar()
                             &HpVis::onColormapRangeActionTriggered);
     colorBarMenu->addAction("Re&set Range", this,
                             &HpVis::onColormapRangeResetRequested);
+    colorBarMenu->addAction("&Percentile Range...", this,
+                            &HpVis::onColormapPercentileRequested);
 
     m_viewMenu->addAction("Set &Rotation...", this,
                           &HpVis::onRotationActionTriggered);
@@ -829,6 +832,8 @@ HpVis::initMenubar()
                            &HpVis::onDowngradeTriggered);
     m_toolsMenu->addAction("&Beam Smoothing...", this,
                            &HpVis::onSmoothTriggered);
+    m_toolsMenu->addAction("&Derivatives and E/B Maps...", this,
+                           &HpVis::onHarmonicTriggered);
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
@@ -1436,6 +1441,23 @@ HpVis::onColormapRangeResetRequested()
 {
     if (m_view)
         m_view->glWidget()->resetColormapRange();
+}
+
+// Auto-range: the color range between the p-th and (100 - p)-th percentile, so
+// a few extreme pixels (the Galactic plane, point sources) do not wash out
+// the fluctuations
+void
+HpVis::onColormapPercentileRequested()
+{
+    if (!m_view)
+        return;
+    bool ok = false;
+    const double p
+        = QInputDialog::getDouble(this, "Percentile Range",
+                                  "Clip this percent at each end:", 1.0, 0.0,
+                                  49.9, 2, &ok);
+    if (ok)
+        m_view->glWidget()->setColormapPercentiles(p, 100.0 - p);
 }
 
 void
@@ -2067,6 +2089,23 @@ HpVis::onSmoothTriggered()
 }
 
 // Opens a map that was computed from other maps as a new tab
+// The Derivatives and E/B Maps dialog: works on the current tab
+void
+HpVis::onHarmonicTriggered()
+{
+    if (!m_harmonicDialog)
+    {
+        m_harmonicDialog
+            = new HarmonicDialog([this]() { return m_view; }, this);
+        connect(m_harmonicDialog, &HarmonicDialog::mapReady, this,
+                &HpVis::openComputedMap);
+    }
+    m_harmonicDialog->refresh();
+    m_harmonicDialog->show();
+    m_harmonicDialog->raise();
+    m_harmonicDialog->activateWindow();
+}
+
 void
 HpVis::openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
                        const QString &title, SkyFrame frame)

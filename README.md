@@ -40,6 +40,9 @@ shader, so large maps (nside 2048 and above) stay responsive.
   The power spectrum is corrected for the masks on the map (MASTER method,
   with NaMaster's coupling coefficients), with optional mask apodization,
   bandpowers and E/B purification.
+- Tools > Derivatives and E/B Maps: Laplacian, gradient magnitude, and E and B
+  maps of a polarized map, as new tabs.
+- Color Bar > Percentile Range: auto-range that clips the extreme pixels.
 - Settings dialog for the defaults of new maps.
 
 
@@ -124,6 +127,29 @@ decoupled with the mode-coupling matrix of the mask, in bandpowers of
 
 Without the correction the masks are ignored by the spectrum and the dock
 warns about it.
+
+**Cross-spectrum.** Compare > Cross-spectrum (TT) with... adds the cross-spectrum
+C_l^AB of the current map and another open map of the same nside as a curve.
+For two maps with the same sky and independent noise (for example half-mission
+splits) the noise cancels, so it is a null test with no noise bias to
+subtract. The masks on the current map weight both maps, and the result is
+divided by the mean squared weight: this is accurate for l well above the
+size of the mask but does not remove the mode coupling like the MASTER
+correction.
+
+## Derivatives and E/B maps
+
+Tools > Derivatives and E/B Maps works through the spherical harmonics and
+opens the result as a new tab:
+
+- **Laplacian**: each a_lm is multiplied by -l(l+1). This boosts small
+  scales, so noise grows quickly; lower the analysis l max to suppress it.
+- **Gradient magnitude** |∇T|, in map units per radian.
+- **E and B maps**: splits the polarization (Q, U) of the map's HDU into its
+  gradient-like (E) and curl-like (B) parts, opened as two tabs. On a cut sky
+  some E leaks into B near the edge of the mask.
+
+UNSEEN pixels are taken as zero in the transform and restored in the result.
 
 ## Sessions
 

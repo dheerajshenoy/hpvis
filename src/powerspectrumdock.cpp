@@ -12,6 +12,8 @@
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "powspec.h"
 #include "masterspectrum.hpp"
+#include "crossspectrum.hpp"
+#include "openglwidget.hpp"
 #include "theoryspectrum.hpp"
 #include "view.hpp"
 
@@ -1572,6 +1574,19 @@ PowerSpectrumDock::buildCompareMenu()
         }
     }
 
+    // Cross-spectrum of the current map with another one (null tests)
+    QMenu *cross = menu->addMenu("&Cross-spectrum (TT) with...");
+    int crossCount = 0;
+    for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
+    {
+        if (!m.view || m.view.data() == m_view.data())
+            continue;
+        View *v = m.view.data();
+        cross->addAction(m.title, this, [this, v]() { computeCrossSpectrum(v); });
+        ++crossCount;
+    }
+    cross->setEnabled(m_view && crossCount > 0);
+
     menu->addSeparator();
     QAction *theory = menu->addAction("&Theory (Settings > Theory)");
     theory->setCheckable(true);
@@ -1779,6 +1794,61 @@ PowerSpectrumDock::loadExternalCurve(const QString &givenPath, int unit)
 
     m_external.append(ext);
     replot();
+}
+
+void
+PowerSpectrumDock::computeCrossSpectrum(View *other)
+{
+    View *self = m_view.data();
+    if (!self || !other || !self->glWidget()->healpixMap()
+        || !other->glWidget()->healpixMap())
+        return;
+
+    // The worker gets its own copies: the tabs may change while it runs. The
+    // mask of the current map is applied to both maps.
+    auto a = std::make_shared<const Healpix_Map<float>>(
+        *self->glWidget()->healpixMap());
+    auto b = std::make_shared<const Healpix_Map<float>>(
+        *other->glWidget()->healpixMap());
+    auto w = std::make_shared<const std::vector<float>>(
+        self->glWidget()->maskWeights());
+    const int lmax = int(3 * a->Nside() - 1);
+    const QString name
+        = QString("%1 \u00d7 %2").arg(titleOf(self), titleOf(other));
+
+    m_statusLabel->setText("Computing the cross-spectrum\u2026");
+    auto *watcher = new QFutureWatcher<CrossSpectrumResult>(this);
+    connect(watcher, &QFutureWatcher<CrossSpectrumResult>::finished, this,
+            [this, watcher, name]()
+    {
+        CrossSpectrumResult r = watcher->result();
+        watcher->deleteLater();
+        if (!r.error.isEmpty())
+        {
+            QMessageBox::critical(this, "Cross-spectrum", r.error);
+            refresh();
+            return;
+        }
+        External ext;
+        ext.name       = name;
+        ext.spectra.TT = std::move(r.cl);
+        m_external.append(ext);
+        buildCompareMenu();
+        refresh();
+        replot();
+        QString note = QString("Cross-spectrum added as \"%1\" (divided by "
+                               "<w\u00b2> = %2).")
+                           .arg(name)
+                           .arg(r.fsky, 0, 'g', 3);
+        if (r.unseen > 0)
+            note += QString(" %1 pixels unseen in either map were left out.")
+                        .arg(r.unseen);
+        m_statusLabel->setText(note);
+    });
+    watcher->setFuture(QtConcurrent::run([a, b, w, lmax]()
+    {
+        return crossSpectrum(*a, *b, *w, lmax, 3);
+    }));
 }
 
 static QString
