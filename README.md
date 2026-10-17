@@ -46,6 +46,11 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Settings dialog for the defaults of new maps.
 
 
+## Documentation
+
+The full usage guide is in [docs/USAGE.md](docs/USAGE.md) and inside the
+program: Help > Usage (`F1`).
+
 ## Installation
 
 See [INSTALLATION.md](INSTALLATION.md) for dependencies, build options and

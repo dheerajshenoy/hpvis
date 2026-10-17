@@ -164,6 +164,7 @@ add_executable(${PROJECT_NAME}
     src/settingsdialog.cpp
     src/aboutbanner.cpp
     src/aboutcontent.cpp
+    src/usagedialog.cpp
     src/powerspectrumdock.cpp
     src/statisticsdock.cpp
 
@@ -176,6 +177,7 @@ add_executable(${PROJECT_NAME}
     include/aboutinfo.hpp
     include/aboutbanner.hpp
     include/aboutcontent.hpp
+    include/usagedialog.hpp
     include/exportoptions.hpp
     include/view.hpp
     include/hpvis.hpp

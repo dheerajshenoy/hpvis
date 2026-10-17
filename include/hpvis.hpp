@@ -30,6 +30,7 @@ class QDoubleSpinBox;
 class QPushButton;
 class SmoothDialog;
 class HarmonicDialog;
+class UsageDialog;
 class MapOperationDialog;
 
 class HpVis : public QMainWindow
@@ -216,6 +217,7 @@ private:
     DowngradeDialog *m_downgradeDialog  = nullptr;
     SmoothDialog *m_smoothDialog        = nullptr;
     HarmonicDialog *m_harmonicDialog    = nullptr;
+    UsageDialog *m_usageDialog          = nullptr;
     FileExplorerDock *m_explorerDock    = nullptr;
     StatisticsDock *m_statsDock         = nullptr;
     PowerSpectrumDock *m_powerDock      = nullptr;

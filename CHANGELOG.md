@@ -207,6 +207,10 @@ First development release.
   applied but the correction is off.
 
 ### Interface
+- Help > Usage (`F1`) opens the usage guide (`docs/USAGE.md`, embedded in the
+  program): a section list, search that filters the sections, and the text on
+  the right. It covers every menu, dock, tool and setting, the shortcuts, the
+  command line, limits and a glossary.
 - Help > About and the About page of the settings show the same text
   (`include/aboutinfo.hpp`) under an animated banner: a slowly turning conical
   rainbow behind the name (in the Major Mono Display font). The animation only

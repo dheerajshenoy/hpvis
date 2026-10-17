@@ -17,6 +17,9 @@
         <!-- Licence text, shown in the About dialog -->
         <file>LICENSE</file>
 
+        <!-- Usage guide, shown in Help > Usage -->
+        <file>docs/USAGE.md</file>
+
         <!-- Fonts -->
         <file>resources/fonts/Major-Mono-Display.ttf</file>
 

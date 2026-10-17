@@ -1,5 +1,6 @@
 #include "hpvis.hpp"
 #include "aboutcontent.hpp"
+#include "usagedialog.hpp"
 
 #include "colormapregistry.hpp"
 #include "downgradedialog.hpp"
@@ -849,6 +850,16 @@ HpVis::initMenubar()
 
     auto helpMenu = menuBar->addMenu("&Help");
 
+    // The guide (docs/USAGE.md); one dialog, kept so it reopens where it was
+    QAction *usage = helpMenu->addAction("&Usage", this, [this]()
+    {
+        if (!m_usageDialog)
+            m_usageDialog = new UsageDialog(this);
+        m_usageDialog->show();
+        m_usageDialog->raise();
+        m_usageDialog->activateWindow();
+    });
+    usage->setShortcut(QKeySequence("F1"));
     helpMenu->addAction("&About", this, [this]()
     {
         // The same content as the About page of the settings
