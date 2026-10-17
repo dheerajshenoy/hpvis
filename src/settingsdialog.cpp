@@ -2,17 +2,22 @@
 #include "aboutcontent.hpp"
 
 #include "colormapregistry.hpp"
+#include "theoryspectrum.hpp"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QFileDialog>
 #include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QFutureWatcher>
+#include <QtConcurrent>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QKeySequenceEdit>
+#include <QScrollArea>
 #include <QTableWidget>
 #include <QLabel>
 #include <QLineEdit>
@@ -144,8 +149,20 @@ SettingsDialog::initConnections()
         const bool custom = m_theoryPresetCombo->currentIndex() == 1;
         m_theoryFile->setEnabled(custom);
         m_theoryBrowse->setEnabled(custom);
+        m_cosmoBox->setEnabled(!custom);
         changed();
     });
+    auto cosmoChanged = [this, changed]()
+    {
+        updateCosmoStatus();
+        changed();
+    };
+    for (QDoubleSpinBox *spin : m_cosmoSpin)
+        connect(spin, &QDoubleSpinBox::valueChanged, this, cosmoChanged);
+    connect(m_ntConsistency, &QCheckBox::toggled, this, cosmoChanged);
+    connect(m_yheFromBbn, &QCheckBox::toggled, this, cosmoChanged);
+    connect(m_cosmoReset, &QPushButton::clicked, this,
+            [this]() { setCosmoControls(CosmoParams()); });
     connect(m_theoryUnitCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_theoryFile, &QLineEdit::textChanged, this, changed);
     connect(m_theoryBrowse, &QPushButton::clicked, this, [this]()
@@ -241,6 +258,91 @@ SettingsDialog::onSaveClicked()
         commitShortcut(m_lastEditedShortcut);
     saveSettings();
     emit settingsSaved();
+    computeTheoryInBackground();
+}
+
+CosmoParams
+SettingsDialog::cosmoFromControls() const
+{
+    CosmoParams p;
+    for (size_t i = 0; i < std::size(cosmoFields); ++i)
+        p.*cosmoFields[i].member = m_cosmoSpin[int(i)]->value();
+    p.ntConsistency = m_ntConsistency->isChecked();
+    p.yheFromBbn    = m_yheFromBbn->isChecked();
+    return p;
+}
+
+void
+SettingsDialog::setCosmoControls(const CosmoParams &p)
+{
+    for (size_t i = 0; i < std::size(cosmoFields); ++i)
+        m_cosmoSpin[int(i)]->setValue(p.*cosmoFields[i].member);
+    m_ntConsistency->setChecked(p.ntConsistency);
+    m_yheFromBbn->setChecked(p.yheFromBbn);
+    updateCosmoStatus();
+}
+
+void
+SettingsDialog::updateCosmoStatus()
+{
+    if (m_theoryComputing)
+        return;
+    const CosmoParams p = cosmoFromControls();
+    m_cosmoReset->setEnabled(!p.isDefault());
+    QString text;
+    if (p.isDefault())
+        text = "Planck 2018 best fit: the bundled spectrum is used.";
+    else if (theoryTableCached(p))
+        text = "Custom parameters: the spectrum computed with CLASS is ready.";
+    else
+        text = "Custom parameters: the spectrum is computed with CLASS when "
+               "you save (it takes up to a minute, then it is kept).";
+    m_cosmoStatus->setText(text);
+}
+
+// Computes the spectrum of custom parameters right after saving, so that the
+// power spectrum dock and random maps find it ready
+void
+SettingsDialog::computeTheoryInBackground()
+{
+    const AppSettings a = AppSettings::load();
+    if (m_theoryComputing || a.theoryPreset != 0
+        || theoryTableCached(a.theoryCosmo))
+    {
+        updateCosmoStatus();
+        return;
+    }
+    m_theoryComputing = true;
+    m_cosmoStatus->setText("Computing the spectrum with CLASS...");
+    const CosmoParams params = a.theoryCosmo;
+    auto *watcher            = new QFutureWatcher<QString>(this);
+    connect(watcher, &QFutureWatcher<QString>::finished, this,
+            [this, watcher]()
+    {
+        const QString error = watcher->result();
+        watcher->deleteLater();
+        m_theoryComputing = false;
+        updateCosmoStatus();
+        if (!error.isEmpty())
+        {
+            m_cosmoStatus->setText("CLASS failed: " + error);
+            m_cosmoStatus->setStyleSheet("color: #d33;");
+        }
+        else
+            m_cosmoStatus->setStyleSheet(QString());
+    });
+    watcher->setFuture(QtConcurrent::run([params]() -> QString
+    {
+        try
+        {
+            ensureTheoryTable(params);
+            return QString();
+        }
+        catch (const std::exception &e)
+        {
+            return QString::fromUtf8(e.what());
+        }
+    }));
 }
 
 AppSettings
@@ -276,6 +378,7 @@ SettingsDialog::currentSettings() const
     a.theoryPreset       = m_theoryPresetCombo->currentIndex();
     a.theoryFile         = m_theoryFile->text().trimmed();
     a.theoryUnit         = m_theoryUnitCombo->currentIndex();
+    a.theoryCosmo        = cosmoFromControls();
     a.plotBackground     = m_plotBackground;
     a.plotForeground     = m_plotForeground;
     a.plotLine           = m_plotLine;
@@ -346,6 +449,8 @@ SettingsDialog::loadSettings()
     m_theoryUnitCombo->setCurrentIndex(a.theoryUnit);
     m_theoryFile->setEnabled(a.theoryPreset == 1);
     m_theoryBrowse->setEnabled(a.theoryPreset == 1);
+    m_cosmoBox->setEnabled(a.theoryPreset != 1);
+    setCosmoControls(a.theoryCosmo);
     m_plotBackground = a.plotBackground;
     m_plotForeground = a.plotForeground;
     m_plotLine       = a.plotLine;
@@ -632,8 +737,107 @@ SettingsDialog::createTheorySettingsPage()
     form->addRow(note);
 
     outer->addWidget(box);
+
+    // The Planck 2018 spectrum from its parameters: the defaults give the
+    // bundled best fit, others are computed with CLASS
+    m_cosmoBox      = new QGroupBox("Planck 2018 cosmological parameters");
+    auto *cosmoForm = new QFormLayout(m_cosmoBox);
+    struct Row
+    {
+        const char *section; // heading shown before the row (or null)
+        const char *label;
+        const char *tip;
+        double min, max, step;
+        int decimals;
+    };
+    // In the order of cosmoFields
+    static const Row rows[] = {
+        {"Base LCDM", "H0 [km/s/Mpc]:", "Hubble constant", 20.0, 100.0, 0.1, 3},
+        {nullptr, "\u03a9b h\u00b2:", "Physical baryon density", 0.005, 0.1,
+         0.0001, 5},
+        {nullptr, "\u03a9c h\u00b2:", "Physical cold dark matter density",
+         0.01, 0.5, 0.001, 5},
+        {nullptr, "\u03c4:", "Optical depth to reionization", 0.01, 0.3, 0.001,
+         4},
+        {nullptr, "ln(10\u00b9\u2070 A\u209b):",
+         "Log of the scalar amplitude", 2.0, 4.0, 0.001, 4},
+        {nullptr, "n\u209b:", "Scalar spectral index", 0.8, 1.2, 0.001, 4},
+        {"Primordial", "dn\u209b/dln k:", "Running of the spectral index",
+         -0.1, 0.1, 0.001, 4},
+        {nullptr, "r:",
+         "Tensor-to-scalar ratio. Above 0 adds primordial gravitational waves "
+         "(B modes at low l); the computation takes longer.",
+         0.0, 1.0, 0.001, 4},
+        {nullptr, "n\u209c:", "Tensor spectral index", -2.0, 2.0, 0.01, 4},
+        {"Neutrinos", "N_eff:", "Effective number of neutrino species", 0.5,
+         10.0, 0.01, 3},
+        {nullptr, "\u03a3m\u03bd [eV]:",
+         "Sum of the neutrino masses, in one massive species. 0 makes them "
+         "all massless.",
+         0.0, 5.0, 0.01, 3},
+        {"Geometry and dark energy", "\u03a9k:", "Curvature density", -0.3,
+         0.3, 0.001, 4},
+        {nullptr, "w0:",
+         "Dark energy equation of state, w = w0 + wa (1 - a). Away from -1 "
+         "the cosmological constant is replaced by a dark energy fluid.",
+         -3.0, 0.0, 0.01, 3},
+        {nullptr, "wa:", "Evolution of the dark energy equation of state", -3.0,
+         3.0, 0.01, 3},
+        {"Thermal history", "T_cmb [K]:", "CMB temperature today", 2.0, 3.5,
+         0.001, 4},
+        {nullptr, "Y_He:", "Helium mass fraction", 0.1, 0.5, 0.001, 4}};
+    static_assert(std::size(rows) == std::size(cosmoFields));
+    for (size_t i = 0; i < std::size(rows); ++i)
+    {
+        if (rows[i].section)
+        {
+            auto *heading = new QLabel(QString("<b>%1</b>").arg(rows[i].section));
+            cosmoForm->addRow(heading);
+        }
+        auto *spin = new QDoubleSpinBox();
+        spin->setRange(rows[i].min, rows[i].max);
+        spin->setDecimals(rows[i].decimals);
+        spin->setSingleStep(rows[i].step);
+        spin->setToolTip(rows[i].tip);
+        m_cosmoSpin.append(spin);
+        cosmoForm->addRow(QString::fromUtf8(rows[i].label), spin);
+        if (QString(cosmoFields[i].key) == "nt")
+        {
+            m_ntConsistency = new QCheckBox("n\u209c = -r/8 (single-field)");
+            m_ntConsistency->setToolTip(
+                "Set the tensor tilt from the single-field consistency "
+                "relation");
+            cosmoForm->addRow(m_ntConsistency);
+            connect(m_ntConsistency, &QCheckBox::toggled, spin,
+                    [spin](bool on) { spin->setEnabled(!on); });
+        }
+        else if (QString(cosmoFields[i].key) == "yhe")
+        {
+            m_yheFromBbn = new QCheckBox("Y_He from BBN");
+            m_yheFromBbn->setToolTip(
+                "Compute the helium fraction from the baryon density");
+            cosmoForm->addRow(m_yheFromBbn);
+            connect(m_yheFromBbn, &QCheckBox::toggled, spin,
+                    [spin](bool on) { spin->setEnabled(!on); });
+        }
+    }
+    m_cosmoReset = new QPushButton("Reset to Planck 2018");
+    m_cosmoReset->setToolTip("Restore the Planck 2018 best-fit parameters "
+                             "(TT,TE,EE+lowE+lensing)");
+    cosmoForm->addRow(m_cosmoReset);
+    m_cosmoStatus = new QLabel();
+    m_cosmoStatus->setWordWrap(true);
+    cosmoForm->addRow(m_cosmoStatus);
+    outer->addWidget(m_cosmoBox);
+    setCosmoControls(CosmoParams());
     outer->addStretch();
-    return page;
+
+    // There are many parameters: the page scrolls
+    auto *scroll = new QScrollArea();
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setWidget(page);
+    return scroll;
 }
 
 QWidget *

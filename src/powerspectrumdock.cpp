@@ -1247,6 +1247,7 @@ PowerSpectrumDock::theorySpectra()
     TheorySource src;
     src.preset = TheoryPreset(s.theoryPreset);
     src.file   = s.theoryFile;
+    src.cosmo  = s.theoryCosmo;
     src.unit   = TheoryUnit(s.theoryUnit); // the default: the settings'
 
     // The unit the map says it is in (FITS TUNIT) wins: the theory is drawn
@@ -1262,11 +1263,16 @@ PowerSpectrumDock::theorySpectra()
                                                    : TheoryUnit::MicroKelvin;
             unitFromMap = true;
         }
-    const QString key = QString("%1|%2|%3|%4")
-                            .arg(s.theoryPreset)
-                            .arg(s.theoryFile)
-                            .arg(int(src.unit))
-                            .arg(unitFromMap);
+    QString key = QString("%1|%2|%3|%4")
+                      .arg(s.theoryPreset)
+                      .arg(s.theoryFile)
+                      .arg(int(src.unit))
+                      .arg(unitFromMap);
+    for (const CosmoField &f : cosmoFields)
+        key += QString("|%1").arg(s.theoryCosmo.*f.member);
+    key += QString("|%1|%2")
+               .arg(s.theoryCosmo.ntConsistency)
+               .arg(s.theoryCosmo.yheFromBbn);
     if (!m_theoryLoaded || key != m_theoryKey)
     {
         m_theoryKey    = key;

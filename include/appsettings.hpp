@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cosmoparams.hpp"
 #include "colormap.hpp"
 #include "projection.hpp"
 #include "skyframe.hpp"
@@ -55,6 +56,7 @@ struct AppSettings
     int theoryPreset        = 0; // TheoryPreset
     QString theoryFile;          // for the custom preset
     int theoryUnit          = 0; // TheoryUnit: the maps' unit (uK, mK, K)
+    CosmoParams theoryCosmo;     // Planck preset: the base LCDM parameters
 
     // Key bindings that differ from the built-in ones: command id -> key
     // sequence (PortableText). An empty sequence means the key was removed.

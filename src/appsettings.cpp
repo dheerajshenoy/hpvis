@@ -94,6 +94,15 @@ AppSettings::load()
     a.theoryFile = s.value("theory/file", d.theoryFile).toString();
     a.theoryUnit
         = std::clamp(s.value("theory/unit", d.theoryUnit).toInt(), 0, 2);
+    for (const CosmoField &f : cosmoFields)
+        a.theoryCosmo.*f.member
+            = s.value(QString("theory/cosmo/") + f.key, d.theoryCosmo.*f.member)
+                  .toDouble();
+    a.theoryCosmo.ntConsistency
+        = s.value("theory/cosmo/ntConsistency", d.theoryCosmo.ntConsistency)
+              .toBool();
+    a.theoryCosmo.yheFromBbn
+        = s.value("theory/cosmo/yheFromBbn", d.theoryCosmo.yheFromBbn).toBool();
 
     s.beginGroup("shortcuts");
     for (const QString &id : s.allKeys())
@@ -166,6 +175,10 @@ AppSettings::save() const
     s.setValue("theory/preset", theoryPreset);
     s.setValue("theory/file", theoryFile);
     s.setValue("theory/unit", theoryUnit);
+    for (const CosmoField &f : cosmoFields)
+        s.setValue(QString("theory/cosmo/") + f.key, theoryCosmo.*f.member);
+    s.setValue("theory/cosmo/ntConsistency", theoryCosmo.ntConsistency);
+    s.setValue("theory/cosmo/yheFromBbn", theoryCosmo.yheFromBbn);
     s.remove("shortcuts");
     for (auto it = shortcuts.cbegin(); it != shortcuts.cend(); ++it)
         s.setValue("shortcuts/" + it.key(), it.value());

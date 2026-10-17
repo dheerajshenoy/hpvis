@@ -121,6 +121,44 @@ if (WITH_NAMASTER)
     add_dependencies(nmt namaster_ext)
 endif()
 
+# --- CLASS (Boltzmann code, for theory spectra from cosmological parameters) --
+# Built from thirdparty/class_public the way its Makefile does: C sources, plus
+# the few files that are C++ in CLASS, with HyRec. CLASS reads its data files
+# (BBN, HyRec) from CLASS_DATA_DIR at run time.
+set(CLASS_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/class_public)
+set(CLASS_DATA_DIR ${CLASS_ROOT} CACHE PATH "Directory with CLASS's external/ data files")
+set(CLASS_C_SOURCES
+    tools/growTable.c tools/dei_rkck.c tools/sparse.c tools/evolver_rkck.c
+    tools/evolver_ndf15.c tools/parser.c tools/quadrature.c tools/common.c
+    tools/trigonometric_integrals.c
+    source/input.c source/background.c source/thermodynamics.c
+    source/fourier.c source/distortions.c
+    external/RecfastCLASS/wrap_recfast.c
+    external/heating/injection.c external/heating/noninjection.c
+    external/HyRec2020/hyrectools.c external/HyRec2020/helium.c
+    external/HyRec2020/hydrogen.c external/HyRec2020/history.c
+    external/HyRec2020/wrap_hyrec.c external/HyRec2020/energy_injection.c
+    external/Halofit/halofit.c)
+set(CLASS_CXX_SOURCES
+    tools/arrays.c tools/hyperspherical.c
+    source/perturbations.c source/primordial.c source/transfer.c
+    source/harmonic.c source/lensing.c external/HMcode/hmcode.c)
+list(TRANSFORM CLASS_C_SOURCES PREPEND ${CLASS_ROOT}/)
+list(TRANSFORM CLASS_CXX_SOURCES PREPEND ${CLASS_ROOT}/)
+set_source_files_properties(${CLASS_CXX_SOURCES} PROPERTIES LANGUAGE CXX)
+add_library(class_lib STATIC ${CLASS_C_SOURCES} ${CLASS_CXX_SOURCES})
+target_include_directories(class_lib SYSTEM PUBLIC
+    ${CLASS_ROOT}/include ${CLASS_ROOT}/external/RecfastCLASS
+    ${CLASS_ROOT}/external/heating ${CLASS_ROOT}/external/HyRec2020
+    ${CLASS_ROOT}/external/Halofit ${CLASS_ROOT}/external/HMcode)
+target_compile_definitions(class_lib PRIVATE HYREC
+    __CLASSDIR__="${CLASS_DATA_DIR}")
+target_compile_options(class_lib PRIVATE -w -O3 -fPIC
+    $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
+set_target_properties(class_lib PROPERTIES CXX_STANDARD 11
+    POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(class_lib PUBLIC OpenMP::OpenMP_C OpenMP::OpenMP_CXX m)
+
 include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/include)
 
@@ -133,6 +171,7 @@ add_executable(${PROJECT_NAME}
     src/recentfiles.cpp
     src/projectionmath.cpp
     src/appsettings.cpp
+    src/classwrap.cpp
     src/colormapregistry.cpp
     src/skyframe.cpp
     src/mapexpression.cpp
@@ -227,6 +266,8 @@ add_executable(${PROJECT_NAME}
     include/recentfiles.hpp
     include/projectionmath.hpp
     include/appsettings.hpp
+    include/cosmoparams.hpp
+    include/classwrap.hpp
     include/fitsheaderdialog.hpp
     include/statusbar.hpp
     include/powerspectrumdock.hpp
@@ -242,6 +283,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     healpix_cxx
+    class_lib
     PkgConfig::CFITSIO
     PkgConfig::LIBZIP
     nmt

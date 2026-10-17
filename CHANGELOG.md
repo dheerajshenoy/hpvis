@@ -2,6 +2,12 @@
 
 ## 0.1.1
 
+### Theory spectrum
+- Settings > Theory: the Planck 2018 cosmological parameters (base ΛCDM, running,
+  r, n_t, N_eff, Σm_ν, Ωk, w0, wa, T_cmb, Y_He) can be edited, with a Reset button. Other values than the
+  defaults compute the lensed TT, TE, EE and BB spectra with CLASS (vendored in
+  `thirdparty/class_public`) and cache them.
+
 ### Multipole filter
 - Tools > Maps > Multipole Filter keeps or removes a range of multipoles
   (low-pass, high-pass, band-pass, band-stop) with a sharp, cosine or Gaussian

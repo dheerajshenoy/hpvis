@@ -4,10 +4,13 @@
 #include "shortcuts.hpp"
 
 #include <QDialog>
+#include <QList>
 #include <QStringList>
 
 class QCheckBox;
 class QComboBox;
+class QDoubleSpinBox;
+class QGroupBox;
 class QKeySequenceEdit;
 class QTableWidget;
 class QLabel;
@@ -51,6 +54,10 @@ private:
     QWidget *createAppearanceSettingsPage();
     QWidget *createOverlaysSettingsPage();
     QWidget *createTheorySettingsPage();
+    CosmoParams cosmoFromControls() const;
+    void setCosmoControls(const CosmoParams &params);
+    void updateCosmoStatus();
+    void computeTheoryInBackground(); // after a save with custom parameters
     QWidget *createShortcutsPage();
     // `row` was just given a key: any other command with the same key loses it
     void commitShortcut(int row);
@@ -116,6 +123,13 @@ private:
     QLineEdit *m_theoryFile         = nullptr;
     QPushButton *m_theoryBrowse     = nullptr;
     QComboBox *m_theoryUnitCombo    = nullptr;
+    QGroupBox *m_cosmoBox           = nullptr;
+    QList<QDoubleSpinBox *> m_cosmoSpin; // in the order of cosmoFields
+    QCheckBox *m_ntConsistency      = nullptr;
+    QCheckBox *m_yheFromBbn         = nullptr;
+    QPushButton *m_cosmoReset       = nullptr;
+    QLabel *m_cosmoStatus           = nullptr;
+    bool m_theoryComputing          = false;
     QCheckBox *m_hdrCheck           = nullptr;
     QCheckBox *m_animateCheck       = nullptr;
     QCheckBox *m_animateProjectionCheck = nullptr;

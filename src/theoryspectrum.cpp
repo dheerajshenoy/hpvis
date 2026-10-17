@@ -1,10 +1,17 @@
 #include "theoryspectrum.hpp"
 
+#include "classwrap.hpp"
+
+#include <QCryptographicHash>
+#include <QDir>
 #include <QFile>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QStringList>
 #include <cmath>
+#include <mutex>
 #include <numbers>
 #include <stdexcept>
 
@@ -12,8 +19,59 @@ QString
 TheorySource::label() const
 {
     return preset == TheoryPreset::Planck2018
-               ? QString("Planck 2018 best fit")
+               ? (cosmo.isDefault() ? QString("Planck 2018 best fit")
+                                    : QString("LCDM (CLASS, custom parameters)"))
                : QString("Theory: %1").arg(QFileInfo(file).completeBaseName());
+}
+
+static QString
+cachePath(const CosmoParams &p)
+{
+    // Part of the key, so a change of CLASS settings does not reuse old files
+    QString key = "v2";
+    for (const CosmoField &f : cosmoFields)
+        key += QString("|%1").arg(p.*f.member, 0, 'g', 10);
+    key += QString("|%1|%2").arg(p.ntConsistency).arg(p.yheFromBbn);
+    const QByteArray hash
+        = QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Sha1)
+              .toHex()
+              .left(16);
+    return QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
+           + "/theory/class_" + hash + ".txt";
+}
+
+bool
+theoryTableCached(const CosmoParams &params)
+{
+    return params.isDefault() || QFile::exists(cachePath(params));
+}
+
+QString
+ensureTheoryTable(const CosmoParams &params)
+{
+    const QString path = cachePath(params);
+    static std::mutex mutex; // one CLASS run at a time
+    std::lock_guard<std::mutex> lock(mutex);
+    if (QFile::exists(path))
+        return path;
+
+    const ClassSpectra s = computeClassSpectra(params);
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QSaveFile out(path);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Text))
+        throw std::runtime_error(("cannot write " + path).toStdString());
+    out.write("#    L    TT             TE             EE             BB\n");
+    for (int l = 2; l <= s.lmax; ++l)
+        out.write(QString("%1 %2 %3 %4 %5\n")
+                      .arg(l)
+                      .arg(s.TT[l], 0, 'e', 8)
+                      .arg(s.TE[l], 0, 'e', 8)
+                      .arg(s.EE[l], 0, 'e', 8)
+                      .arg(s.BB[l], 0, 'e', 8)
+                      .toUtf8());
+    if (!out.commit())
+        throw std::runtime_error(("cannot write " + path).toStdString());
+    return path;
 }
 
 Spectra
@@ -21,7 +79,9 @@ loadTheorySpectra(const TheorySource &src)
 {
     const QString path
         = src.preset == TheoryPreset::Planck2018
-              ? QString(":/resources/theory/planck2018_bestfit.txt")
+              ? (src.cosmo.isDefault()
+                     ? QString(":/resources/theory/planck2018_bestfit.txt")
+                     : ensureTheoryTable(src.cosmo))
               : src.file;
     QFile file(path);
     if (path.isEmpty() || !file.open(QIODevice::ReadOnly | QIODevice::Text))

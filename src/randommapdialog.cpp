@@ -192,6 +192,7 @@ RandomMapDialog::compute()
     const AppSettings settings = AppSettings::load();
     o.theory.preset            = TheoryPreset(settings.theoryPreset);
     o.theory.file              = settings.theoryFile;
+    o.theory.cosmo             = settings.theoryCosmo;
     o.theory.unit              = TheoryUnit(m_unit->currentIndex());
 
     QSettings s;

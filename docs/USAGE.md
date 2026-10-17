@@ -568,6 +568,17 @@ extension (or the file type chosen in the dialog when you type none).
   takes precedence (when it is a CMB temperature), so the theory is scaled to
   the map you are looking at. The curve's name in the legend says when the
   unit came from the map.
+
+  The Planck 2018 preset has editable **parameters**: base ΛCDM (H0, Ωbh²,
+  Ωch², τ, ln(10¹⁰A_s), n_s), primordial (running, tensor-to-scalar ratio r,
+  tensor tilt, or n_t = −r/8), neutrinos (N_eff and Σm_ν in one massive
+  species), geometry and dark energy (Ωk, w0, wa) and thermal history (T_cmb,
+  Y_He, or from BBN). With r > 0 the primordial tensor B modes are added to BB.
+  The defaults are the Planck 2018 best fit and use the bundled spectrum. For other values the
+  lensed TT, TE, EE and BB spectra are computed with the built-in CLASS when you
+  save (a few seconds to a minute) and kept in the cache directory, so the same
+  parameters are not computed twice. **Reset to Planck 2018** restores the
+  defaults. The parameters also set the spectrum Random Map draws from.
 - **Shortcuts:** see the next section.
 - **About:** version, libraries and license.
 
