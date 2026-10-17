@@ -37,13 +37,18 @@ shader, so large maps (nside 2048 and above) stay responsive.
 - Operations on maps: add, subtract, multiply, divide or any expression of
   several maps, with the result opened as a new map and saved as FITS.
 - Map statistics, a FITS header viewer, power spectrum and image export.
+  The power spectrum and the histogram plots export to PNG, or to SVG and PDF
+  as vector graphics, in the colors on screen or black on white (Settings >
+  Appearance).
   The power spectrum is corrected for the masks on the map (MASTER method,
   with NaMaster's coupling coefficients), with optional mask apodization,
   bandpowers and E/B purification.
-- Tools > Derivatives and E/B Maps: Laplacian, gradient magnitude, and E and B
+- Tools > Maps > Derivatives and E/B Maps: Laplacian, gradient magnitude, and E and B
   maps of a polarized map, as new tabs.
-- Color Bar > Percentile Range: auto-range that clips the extreme pixels.
+- Colormap > Color Bar > Percentile Range: auto-range that clips the extreme pixels.
 - Settings dialog for the defaults of new maps.
+- Menus grouped by topic (View, Colormap, Masks, Tools), with icons, and a key
+  binding for almost every command (Tools > Settings > Shortcuts).
 
 
 ## Documentation
@@ -144,7 +149,7 @@ correction.
 
 ## Derivatives and E/B maps
 
-Tools > Derivatives and E/B Maps works through the spherical harmonics and
+Tools > Maps > Derivatives and E/B Maps works through the spherical harmonics and
 opens the result as a new tab:
 
 - **Laplacian**: each a_lm is multiplied by -l(l+1). This boosts small
@@ -173,7 +178,7 @@ per-map view options (colormap, range, ...) are not part of the session.
 | Pan | Left-drag, or two-finger scroll |
 | Rotate the sky | middle-drag (plain left-drag in the Orthographic, Azimuthal, Gnomonic and Stereographic views) |
 | Zoom to a region | Shift + left-drag |
-| Statistics of a region | Ctrl + Shift + left-drag for a rectangle, or View > Select Statistics Region for a rectangle, ellipse, polygon (click corners, double click or Enter to close, Esc cancels, right click removes the last corner) or line (great-circle arc, drag between its ends); shown in the Statistics dock |
+| Statistics of a region | Ctrl + Shift + left-drag for a rectangle, or View > Statistics Region for a rectangle, ellipse, polygon (click corners, double click or Enter to close, Esc cancels, right click removes the last corner) or line (great-circle arc, drag between its ends); shown in the Statistics dock |
 | Reset view | Double-click, or `0` |
 | Toggle minimap | `M` |
 | Toggle color bar | `C` |
@@ -183,9 +188,9 @@ per-map view options (colormap, range, ...) are not part of the session.
 ## Custom colormaps
 
 Add your own colormaps as CSV or JSON files, either with
-**View > Custom Colormaps > Load Colormap...** (the file is copied into the
+**Colormap > Custom Colormaps > Load Colormap...** (the file is copied into the
 colormaps folder) or by putting them in that folder yourself
-(**View > Custom Colormaps > Open Colormaps Folder**, `colormaps/` in the
+(**Colormap > Custom Colormaps > Open Colormaps Folder**, `colormaps/` in the
 app's config directory). They are picked up at startup and appear after the
 built-in ones in the toolbar and in Settings. `--colormap` takes their name or
 a file path. You can have up to 64.

@@ -3,6 +3,7 @@
 #include "usagedialog.hpp"
 
 #include "colormapregistry.hpp"
+#include "command.hpp"
 #include "downgradedialog.hpp"
 #include "exportdialog.hpp"
 #include "smoothdialog.hpp"
@@ -37,6 +38,7 @@
 #include <QLabel>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStyle>
 #include <QWidgetAction>
 #include <QLocale>
 #include <QMenuBar>
@@ -53,6 +55,25 @@
 
 namespace
 {
+// Marks `action` as the command `command` (for its key binding)
+QAction *
+tag(QAction *action, Command command)
+{
+    action->setProperty("hpvisCommand", int(command));
+    return action;
+}
+
+// An icon of the user's icon theme, else Qt's own for `fallback` (pass
+// SP_CustomBase for none: then a missing theme icon leaves the item bare)
+QIcon
+themeIcon(const QString &name,
+          QStyle::StandardPixmap fallback = QStyle::SP_CustomBase)
+{
+    if (fallback == QStyle::SP_CustomBase)
+        return QIcon::fromTheme(name);
+    return QIcon::fromTheme(name, QApplication::style()->standardIcon(fallback));
+}
+
 // Steps by powers of two: the pixel grid only takes power-of-two nsides
 class Pow2SpinBox : public QSpinBox
 {
@@ -360,22 +381,29 @@ HpVis::initMenubar()
     m_fileMenu = menuBar->addMenu("&File");
 
     m_fileOpenAction
-        = m_fileMenu->addAction("&Open", this, [this]() { OpenFile(); });
+        = tag(m_fileMenu->addAction("&Open...", this, [this]() { OpenFile(); }), Command::FileOpen);
+
+    m_fileOpenAction->setIcon(
+        themeIcon("document-open", QStyle::SP_DialogOpenButton));
 
     m_fileOpenRecentMenu = m_fileMenu->addMenu("&Open Recent");
+    tag(m_fileOpenRecentMenu->menuAction(), Command::FileOpenRecent);
+    m_fileOpenRecentMenu->setIcon(
+        themeIcon("document-open-recent", QStyle::SP_DirOpenIcon));
     updateRecentMenu();
 
-    m_fileReopenSessionAction = m_fileMenu->addAction(
-        "Reopen &Last Session", this, &HpVis::restoreSession);
+    m_fileReopenSessionAction = tag(m_fileMenu->addAction(
+        "Reopen &Last Session", this, &HpVis::restoreSession), Command::FileReopenSession);
+    m_fileReopenSessionAction->setIcon(
+        themeIcon("document-revert", QStyle::SP_BrowserReload));
     connect(m_fileMenu, &QMenu::aboutToShow, this, [this]()
     {
         m_fileReopenSessionAction->setEnabled(storedSessionSize() > 0);
     });
 
-    m_fileExportAction = m_fileMenu->addAction("&Export", this,
-                                               &HpVis::onExportActionTriggered);
+    m_fileMenu->addSeparator();
 
-    m_headerAction = m_fileMenu->addAction("FITS &Header...", this, [this]()
+    m_headerAction = tag(m_fileMenu->addAction("FITS &Header...", this, [this]()
     {
         if (!m_view)
         {
@@ -398,22 +426,38 @@ HpVis::initMenubar()
         }
         FitsHeaderDialog dialog(m_view->filePath(), m_view->hdu(), this);
         dialog.exec();
-    });
+    }), Command::FileHeader);
+    m_headerAction->setIcon(
+        themeIcon("document-properties", QStyle::SP_FileDialogInfoView));
 
-    m_fileSaveMapAction = m_fileMenu->addAction("&Save Map As...", this,
-                                                &HpVis::onSaveMapTriggered);
+    m_fileSaveMapAction = tag(m_fileMenu->addAction("&Save Map As...", this,
+                                                &HpVis::onSaveMapTriggered), Command::FileSaveMap);
+    m_fileSaveMapAction->setIcon(
+        themeIcon("document-save-as", QStyle::SP_DialogSaveButton));
 
-    m_fileCloseTabAction = m_fileMenu->addAction("&Close Tab", this, [this]()
+    m_fileExportAction = tag(m_fileMenu->addAction("&Export Image...", this,
+                                               &HpVis::onExportActionTriggered), Command::FileExport);
+    m_fileExportAction->setIcon(
+        themeIcon("document-export", QStyle::SP_FileIcon));
+
+    m_fileMenu->addSeparator();
+
+    m_fileCloseTabAction = tag(m_fileMenu->addAction("&Close Tab", this, [this]()
     {
         int index = m_tabWidget->currentIndex();
         if (index >= 0)
             onTabCloseRequested(index);
-    });
+    }), Command::FileCloseTab);
+    m_fileCloseTabAction->setIcon(
+        themeIcon("tab-close", QStyle::SP_DialogCloseButton));
 
-    m_fileMenu->addAction("&Exit", this, &HpVis::close);
+    m_fileExitAction = tag(m_fileMenu->addAction("&Exit", this, &HpVis::close), Command::FileExit);
+    m_fileExitAction->setIcon(
+        themeIcon("application-exit", QStyle::SP_TitleBarCloseButton));
 
     m_editMenu = menuBar->addMenu("&Edit");
-    m_editMenu->addAction("&Copy Image", QKeySequence("Ctrl+Shift+C"), this,
+    tag(m_editMenu->addAction(themeIcon("edit-copy"), "&Copy Image",
+                          QKeySequence("Ctrl+Shift+C"), this,
                           [this]()
     {
         if (!m_view)
@@ -421,15 +465,17 @@ HpVis::initMenubar()
         QGuiApplication::clipboard()->setImage(
             m_view->glWidget()->grabFramebuffer());
         statusBar()->showMessage("Image copied to clipboard", 3000);
-    });
+    }), Command::EditCopyImage);
     m_viewMenu = menuBar->addMenu("&View");
 
-    m_viewMenu->addAction(m_explorerDock->toggleViewAction());
+    m_viewMenu->addAction(
+        tag(m_explorerDock->toggleViewAction(), Command::ViewFileExplorer));
     m_explorerDock->toggleViewAction()->setText("File &Explorer");
-    m_viewMenu->addSeparator();
+    m_explorerDock->toggleViewAction()->setIcon(
+        themeIcon("folder-open", QStyle::SP_DirOpenIcon));
 
     m_viewMinimapAction
-        = m_viewMenu->addAction("&Minimap", this, &HpVis::onMinimapToggled);
+        = tag(m_viewMenu->addAction("&Minimap", this, &HpVis::onMinimapToggled), Command::ViewMinimap);
     m_viewMinimapAction->setCheckable(true);
 
     m_viewMenu->addSeparator();
@@ -444,9 +490,13 @@ HpVis::initMenubar()
            "Show the sky in Galactic coordinates, north up",
            "Show the sky in Ecliptic coordinates, north up",
            "Show the sky in Equatorial (J2000) coordinates, north up"};
+    const Command orientationCommands[]
+        = {Command::ViewOrientationDefault, Command::ViewOrientationGalactic,
+           Command::ViewOrientationEcliptic, Command::ViewOrientationEquatorial};
     for (int i = 0; i < orientationNames.size(); ++i)
     {
-        QAction *a = m_orientationMenu->addAction(orientationNames[i]);
+        QAction *a = tag(m_orientationMenu->addAction(orientationNames[i]),
+                         orientationCommands[i]);
         a->setStatusTip(orientationTips[i]);
         a->setCheckable(true);
         orientationGroup->addAction(a);
@@ -459,8 +509,8 @@ HpVis::initMenubar()
     // Perspective (radio items: Inside / Outside)
     m_perspectiveMenu      = m_viewMenu->addMenu("&Perspective");
     auto *perspectiveGroup = new QActionGroup(this);
-    m_insideAction         = m_perspectiveMenu->addAction("&Inside (sky)");
-    m_outsideAction        = m_perspectiveMenu->addAction("&Outside (globe)");
+    m_insideAction         = tag(m_perspectiveMenu->addAction("&Inside (sky)"), Command::ViewPerspectiveInside);
+    m_outsideAction        = tag(m_perspectiveMenu->addAction("&Outside (globe)"), Command::ViewPerspectiveOutside);
     m_insideAction->setStatusTip(
         "The sky seen from the center: longitude increases to the left");
     m_outsideAction->setStatusTip(
@@ -485,8 +535,8 @@ HpVis::initMenubar()
     // Pixel ordering (radio items: Nested / Ring)
     m_pixelOrderingMenu = m_viewMenu->addMenu("Pixel &Ordering");
     auto *orderingGroup = new QActionGroup(this);
-    m_nestedAction      = m_pixelOrderingMenu->addAction("&Nested");
-    m_ringAction        = m_pixelOrderingMenu->addAction("&Ring");
+    m_nestedAction      = tag(m_pixelOrderingMenu->addAction("&Nested"), Command::ViewPixelOrderingNested);
+    m_ringAction        = tag(m_pixelOrderingMenu->addAction("&Ring"), Command::ViewPixelOrderingRing);
     for (QAction *a : {m_nestedAction, m_ringAction})
     {
         a->setCheckable(true);
@@ -498,8 +548,95 @@ HpVis::initMenubar()
     connect(m_ringAction, &QAction::triggered, this,
             [this]() { onPixelOrderingChanged(PixelOrdering::RING); });
 
+    m_viewMenu->addSeparator();
+
+    m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
+
+    tag(m_viewZoomMenu->addAction(themeIcon("zoom-in"), "Zoom &In", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->zoomStep(1.25f);
+    }), Command::ViewZoomIn);
+    tag(m_viewZoomMenu->addAction(themeIcon("zoom-out"), "Zoom &Out", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->zoomStep(0.8f);
+    }), Command::ViewZoomOut);
+    tag(m_viewZoomMenu->addAction(themeIcon("zoom-original"), "Reset Zoom", this,
+                              [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->resetZoom();
+    }), Command::ViewResetZoom);
+    tag(m_viewZoomMenu->addAction(themeIcon("zoom-fit-best"), "Zoom To Region",
+                              this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->beginZoomToRegion();
+    }), Command::ViewZoomToRegion);
+
+    m_viewZoomMenu->addSeparator();
+
+    auto zoomLevels
+        = {0.1f, 0.25f, 0.5f, 1.0f,  2.0f,  4.0f,   8.0f,
+       16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f};
+
+    const Command zoomCommands[]
+        = {Command::ViewZoom10,    Command::ViewZoom25,   Command::ViewZoom50,
+           Command::ViewZoom100,   Command::ViewZoom200,  Command::ViewZoom400,
+           Command::ViewZoom800,   Command::ViewZoom1600, Command::ViewZoom3200,
+           Command::ViewZoom6400,  Command::ViewZoom12800,
+           Command::ViewZoom25600, Command::ViewZoom51200};
+    int zoomIndex = 0;
+    for (float zoom : zoomLevels)
+    {
+        QString label = QString::number(zoom * 100) + "x";
+        tag(m_viewZoomMenu->addAction(label, this, [this, zoom]()
+        {
+            if (m_view)
+                m_view->glWidget()->setZoom(zoom);
+        }), zoomCommands[zoomIndex++]);
+    }
+
+    // Moves a zoomed-in view; the keys are up to the user (Settings > Shortcuts)
+    QMenu *panMenu = m_viewMenu->addMenu("&Pan");
+    const std::tuple<const char *, float, float, Command> pans[]
+        = {{"&Left", -1.0f, 0.0f, Command::ViewPanLeft},
+           {"&Right", 1.0f, 0.0f, Command::ViewPanRight},
+           {"&Up", 0.0f, 1.0f, Command::ViewPanUp},
+           {"&Down", 0.0f, -1.0f, Command::ViewPanDown}};
+    for (const auto &[name, dx, dy, command] : pans)
+        tag(panMenu->addAction(name, this, [this, dx = dx, dy = dy]()
+        {
+            if (m_view)
+                m_view->glWidget()->panStep(dx, dy);
+        }), command);
+
+    QMenu *rotationMenu = m_viewMenu->addMenu("&Rotation");
+    tag(rotationMenu->addAction("&Set Rotation...", this,
+                                &HpVis::onRotationActionTriggered),
+        Command::ViewSetRotation);
+    tag(rotationMenu->addAction("&Reset Rotation", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->resetRotation();
+    }), Command::ViewResetRotation);
+
+    m_viewResetViewAction = tag(m_viewMenu->addAction("&Reset View", this, [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->resetView();
+    }), Command::ViewResetView);
+    m_viewResetViewAction->setIcon(
+        themeIcon("view-refresh", QStyle::SP_BrowserReload));
+
+
+    m_viewMenu->addSeparator();
+
     // Colors
-    m_viewMenu->addAction("&Background Color...", this, [this]()
+    QMenu *colorsMenu = m_viewMenu->addMenu("&Colors");
+    tag(colorsMenu->addAction(themeIcon("preferences-desktop-color"),
+                          "&Background Color...", this, [this]()
     {
         if (!m_view)
             return;
@@ -507,8 +644,9 @@ HpVis::initMenubar()
                                           this, "Select Background Color");
         if (c.isValid())
             onBackgroundColorChanged(c);
-    });
-    m_viewMenu->addAction("&Unseen Pixel Color...", this, [this]()
+    }), Command::ViewBackgroundColor);
+    tag(colorsMenu->addAction(themeIcon("preferences-desktop-color"),
+                          "&Unseen Pixel Color...", this, [this]()
     {
         if (!m_view)
             return;
@@ -516,12 +654,13 @@ HpVis::initMenubar()
                                           this, "Select Unseen Color");
         if (c.isValid())
             onUnseenColorChanged(c);
-    });
+    }), Command::ViewUnseenColor);
 
     // Graticule spacing and color
     m_graticuleMenu       = m_viewMenu->addMenu("&Graticule");
-    m_graticuleShowAction = m_graticuleMenu->addAction(
-        "&Show Graticule", this, &HpVis::onGraticuleToggled);
+    m_graticuleShowAction = tag(m_graticuleMenu->addAction(
+        "&Show Graticule", this, &HpVis::onGraticuleToggled),
+        Command::ViewGraticuleShow);
     m_graticuleShowAction->setCheckable(true);
     auto *stepWidget = new QWidget;
     auto *stepLayout = new QHBoxLayout(stepWidget);
@@ -608,7 +747,7 @@ HpVis::initMenubar()
 
     // Pixel grid: the boundaries of the HEALPix pixels of any nside
     QMenu *cellMenu     = m_viewMenu->addMenu("&Pixel Grid");
-    m_cellGridShowAction = cellMenu->addAction("&Show Pixel Grid");
+    m_cellGridShowAction = tag(cellMenu->addAction("&Show Pixel Grid"), Command::ViewPixelGridShow);
     m_cellGridShowAction->setCheckable(true);
     connect(m_cellGridShowAction, &QAction::toggled, this, [this](bool on)
     {
@@ -640,7 +779,7 @@ HpVis::initMenubar()
         const QSignalBlocker block(m_cellGridNsideSpin);
         m_cellGridNsideSpin->setValue(gl->cellGridNside());
     });
-    m_cellLabelsAction = cellMenu->addAction("Show Pixel &Numbers");
+    m_cellLabelsAction = tag(cellMenu->addAction("Show Pixel &Numbers"), Command::ViewPixelGridNumbers);
     m_cellLabelsAction->setCheckable(true);
     connect(m_cellLabelsAction, &QAction::toggled, this, [this](bool on)
     {
@@ -659,33 +798,66 @@ HpVis::initMenubar()
             m_view->glWidget()->setCellGridColor(c);
     }, "Select Pixel Grid Color");
 
-    QMenu *customMenu = m_viewMenu->addMenu("Custom Colormaps");
-    customMenu->addAction("&Load Colormap...", this,
-                          &HpVis::onLoadColormapTriggered);
-    customMenu->addAction("&Open Colormaps Folder", this, []()
+    m_viewMenu->addSeparator();
+
+    // Everything about the region the Statistics dock measures
+    QMenu *regionMenu = m_viewMenu->addMenu("&Statistics Region");
+    const std::tuple<const char *, OpenGLWidget::RegionShape, Command> shapes[]
+        = {{"&Rectangle", OpenGLWidget::RegionShape::Rectangle,
+            Command::ViewRegionRectangle},
+           {"&Ellipse", OpenGLWidget::RegionShape::Ellipse,
+            Command::ViewRegionEllipse},
+           {"&Polygon (double click or Enter to close)",
+            OpenGLWidget::RegionShape::Polygon, Command::ViewRegionPolygon},
+           {"&Line (great circle)", OpenGLWidget::RegionShape::Line,
+            Command::ViewRegionLine}};
+    for (const auto &[name, shape, command] : shapes)
+        tag(regionMenu->addAction(name, this, [this, shape = shape]()
+        {
+            if (m_view)
+                m_view->glWidget()->beginStatsRegion(shape);
+        }), command);
+    regionMenu->addSeparator();
+    tag(regionMenu->addAction(themeIcon("edit-clear"), "&Clear Region", this,
+                              [this]()
+    {
+        if (m_view)
+            m_view->glWidget()->clearStatsRegion();
+    }), Command::ViewRegionClear);
+
+    // Colormap: the colors of the map and of its color bar
+    m_colormapMenu = menuBar->addMenu("&Colormap");
+    QMenu *customMenu = m_colormapMenu->addMenu("Custom Colormaps");
+    tag(customMenu->addAction(themeIcon("document-open", QStyle::SP_DialogOpenButton),
+                          "&Load Colormap...", this,
+                          &HpVis::onLoadColormapTriggered), Command::ColormapLoad);
+    tag(customMenu->addAction(themeIcon("folder-open", QStyle::SP_DirOpenIcon),
+                          "&Open Colormaps Folder", this, []()
     {
         QDesktopServices::openUrl(
             QUrl::fromLocalFile(ColormapRegistry::instance().directory()));
-    });
+    }), Command::ColormapOpenFolder);
 
-    m_reverseColormapAction = m_viewMenu->addAction(
-        "Re&verse Colormap", this, &HpVis::onColormapInvertChanged);
+    m_reverseColormapAction = tag(m_colormapMenu->addAction(
+        "Re&verse Colormap", this, &HpVis::onColormapInvertChanged), Command::ColormapReverse);
     m_reverseColormapAction->setCheckable(true);
+    m_reverseColormapAction->setIcon(themeIcon("object-flip-horizontal"));
 
-    QMenu *colorBarMenu = m_viewMenu->addMenu("&Color Bar");
+    m_colormapMenu->addSeparator();
+    QMenu *colorBarMenu = m_colormapMenu->addMenu("&Color Bar");
     m_viewColorBarAction
-        = colorBarMenu->addAction("&Show Color Bar", this, [this](bool state)
+        = tag(colorBarMenu->addAction("&Show Color Bar", this, [this](bool state)
     {
         if (m_view)
             m_view->glWidget()->setColorBarVisible(state);
-    });
+    }), Command::ColorBarShow);
     m_viewColorBarAction->setCheckable(true);
     m_viewColorBarAction->setChecked(true);
     colorBarMenu->addSeparator();
     auto *scaleGroup    = new QActionGroup(this);
-    m_scaleLinearAction = colorBarMenu->addAction("&Linear");
-    m_scaleLogAction    = colorBarMenu->addAction("L&ogarithmic");
-    m_scaleAsinhAction  = colorBarMenu->addAction("&Asinh");
+    m_scaleLinearAction = tag(colorBarMenu->addAction("&Linear"), Command::ColorBarLinear);
+    m_scaleLogAction    = tag(colorBarMenu->addAction("L&ogarithmic"), Command::ColorBarLog);
+    m_scaleAsinhAction  = tag(colorBarMenu->addAction("&Asinh"), Command::ColorBarAsinh);
     for (QAction *a :
          {m_scaleLinearAction, m_scaleLogAction, m_scaleAsinhAction})
     {
@@ -727,140 +899,61 @@ HpVis::initMenubar()
     });
 
     colorBarMenu->addSeparator();
-    colorBarMenu->addAction("&Range...", this,
-                            &HpVis::onColormapRangeActionTriggered);
-    colorBarMenu->addAction("Re&set Range", this,
-                            &HpVis::onColormapRangeResetRequested);
-    colorBarMenu->addAction("&Percentile Range...", this,
-                            &HpVis::onColormapPercentileRequested);
-
-    m_viewMenu->addAction("Set &Rotation...", this,
-                          &HpVis::onRotationActionTriggered);
-    m_viewMenu->addAction("Reset R&otation", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->resetRotation();
-    });
-    m_viewMenu->addSeparator();
-
-    m_viewZoomMenu = m_viewMenu->addMenu("&Zoom");
-
-    auto zoomLevels
-        = {0.1f, 0.25f, 0.5f, 1.0f,  2.0f,  4.0f,   8.0f,
-       16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f};
-
-    for (float zoom : zoomLevels)
-    {
-        QString label = QString::number(zoom * 100) + "x";
-        m_viewZoomMenu->addAction(label, this, [this, zoom]()
-        {
-            if (m_view)
-                m_view->glWidget()->setZoom(zoom);
-        });
-    }
-
-    m_viewZoomMenu->addSeparator();
-
-    m_viewZoomMenu->addAction("Zoom To Region", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->beginZoomToRegion();
-    });
-
-    m_viewZoomMenu->addAction("Reset Zoom", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->resetZoom();
-    });
-
-    m_viewZoomMenu->addAction("Zoom &In", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->zoomStep(1.25f);
-    });
-    m_viewZoomMenu->addAction("Zoom &Out", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->zoomStep(0.8f);
-    });
-
-    // Moves a zoomed-in view; the keys are up to the user (Settings > Shortcuts)
-    QMenu *panMenu = m_viewMenu->addMenu("&Pan");
-    const std::tuple<const char *, float, float> pans[]
-        = {{"&Left", -1.0f, 0.0f},
-           {"&Right", 1.0f, 0.0f},
-           {"&Up", 0.0f, 1.0f},
-           {"&Down", 0.0f, -1.0f}};
-    for (const auto &[name, dx, dy] : pans)
-        panMenu->addAction(name, this, [this, dx = dx, dy = dy]()
-        {
-            if (m_view)
-                m_view->glWidget()->panStep(dx, dy);
-        });
-
-    QMenu *regionMenu = m_viewMenu->addMenu("Select &Statistics Region");
-    const std::pair<const char *, OpenGLWidget::RegionShape> shapes[] = {
-        {"&Rectangle", OpenGLWidget::RegionShape::Rectangle},
-        {"&Ellipse", OpenGLWidget::RegionShape::Ellipse},
-        {"&Polygon (double click or Enter to close)",
-         OpenGLWidget::RegionShape::Polygon},
-        {"&Line (great circle)", OpenGLWidget::RegionShape::Line}};
-    for (const auto &[name, shape] : shapes)
-        regionMenu->addAction(name, this, [this, shape = shape]()
-        {
-            if (m_view)
-                m_view->glWidget()->beginStatsRegion(shape);
-        });
-    m_viewMenu->addAction("Clear Statistics Re&gion", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->clearStatsRegion();
-    });
-
-    m_viewResetViewAction = m_viewMenu->addAction("&Reset View", this, [this]()
-    {
-        if (m_view)
-            m_view->glWidget()->resetView();
-    });
+    tag(colorBarMenu->addAction("&Range...", this,
+                            &HpVis::onColormapRangeActionTriggered), Command::ColorBarRange);
+    tag(colorBarMenu->addAction(themeIcon("edit-undo"), "Re&set Range", this,
+                            &HpVis::onColormapRangeResetRequested), Command::ColorBarResetRange);
+    tag(colorBarMenu->addAction("&Percentile Range...", this,
+                            &HpVis::onColormapPercentileRequested), Command::ColorBarPercentile);
 
     m_masksMenu = menuBar->addMenu("&Masks");
     rebuildMasksMenu(nullptr);
 
     m_toolsMenu = menuBar->addMenu("&Tools");
 
-    m_toolsMenu->addAction("&Operate on Maps...", this,
-                           &HpVis::onOperateTriggered);
-    m_toolsMenu->addAction("Change &Resolution...", this,
-                           &HpVis::onDowngradeTriggered);
-    m_toolsMenu->addAction("&Beam Smoothing...", this,
-                           &HpVis::onSmoothTriggered);
-    m_toolsMenu->addAction("&Derivatives and E/B Maps...", this,
-                           &HpVis::onHarmonicTriggered);
+    QMenu *mapsMenu = m_toolsMenu->addMenu("&Maps");
+
+    tag(mapsMenu->addAction("&Operate on Maps...", this,
+                           &HpVis::onOperateTriggered), Command::ToolsOperate);
+    tag(mapsMenu->addAction("Change &Resolution...", this,
+                           &HpVis::onDowngradeTriggered), Command::ToolsResolution);
+    tag(mapsMenu->addAction("&Beam Smoothing...", this,
+                           &HpVis::onSmoothTriggered), Command::ToolsSmooth);
+    tag(mapsMenu->addAction("&Derivatives and E/B Maps...", this,
+                           &HpVis::onHarmonicTriggered), Command::ToolsHarmonic);
 
     m_toolsAnalysisMenu = m_toolsMenu->addMenu("&Analysis");
 
     // The docks provide checkable actions that stay in sync with their
     // visibility (including their own close buttons)
-    m_toolsAnalysisMenu->addAction(m_powerDock->toggleViewAction());
+    m_powerDock->toggleViewAction()->setIcon(themeIcon("office-chart-line"));
+    m_statsDock->toggleViewAction()->setIcon(themeIcon("office-chart-bar"));
+    m_toolsAnalysisMenu->addAction(
+        tag(m_powerDock->toggleViewAction(), Command::ToolsPowerSpectrum));
 
-    m_toolsAnalysisMenu->addAction(m_statsDock->toggleViewAction());
+    m_toolsAnalysisMenu->addAction(
+        tag(m_statsDock->toggleViewAction(), Command::ToolsStatistics));
 
-    m_toolsSettingsAction = m_toolsMenu->addAction(
-        "&Settings", this, &HpVis::onSettingsActionTriggered);
+    m_toolsMenu->addSeparator();
+    m_toolsSettingsAction = tag(m_toolsMenu->addAction(
+        "&Settings...", this, &HpVis::onSettingsActionTriggered), Command::ToolsSettings);
+    m_toolsSettingsAction->setIcon(themeIcon("preferences-system"));
 
     auto helpMenu = menuBar->addMenu("&Help");
 
     // The guide (docs/USAGE.md); one dialog, kept so it reopens where it was
-    QAction *usage = helpMenu->addAction("&Usage", this, [this]()
+    QAction *usage = tag(helpMenu->addAction("&Usage", this, [this]()
     {
         if (!m_usageDialog)
             m_usageDialog = new UsageDialog(this);
         m_usageDialog->show();
         m_usageDialog->raise();
         m_usageDialog->activateWindow();
-    });
+    }), Command::HelpUsage);
     usage->setShortcut(QKeySequence("F1"));
-    helpMenu->addAction("&About", this, [this]()
+    usage->setIcon(themeIcon("help-contents", QStyle::SP_DialogHelpButton));
+    helpMenu->addSeparator();
+    QAction *about = tag(helpMenu->addAction("&About", this, [this]()
     {
         // The same content as the About page of the settings
         QDialog dialog(this);
@@ -874,7 +967,9 @@ HpVis::initMenubar()
         buttons->setContentsMargins(12, 0, 12, 0);
         layout->addWidget(buttons);
         dialog.exec();
-    });
+    }), Command::HelpAbout);
+    about->setIcon(
+        themeIcon("help-about", QStyle::SP_MessageBoxInformation));
 }
 
 // Rebuilds File > Open Recent from the saved list
@@ -882,8 +977,6 @@ void
 HpVis::updateRecentMenu()
 {
     m_fileOpenRecentMenu->clear();
-    // Only the menu itself can have a key: its entries change
-    m_fileOpenRecentMenu->menuAction()->setProperty("hpvisBindMenu", true);
 
     const QStringList files = m_recentFiles.files();
     if (files.isEmpty())
@@ -903,7 +996,9 @@ HpVis::updateRecentMenu()
     }
 
     m_fileOpenRecentMenu->addSeparator();
-    m_fileOpenRecentMenu->addAction("&Clear Recent Files", this, [this]()
+    m_fileOpenRecentMenu->addAction(themeIcon("edit-clear-history",
+                                              QStyle::SP_DialogResetButton),
+                                    "&Clear Recent Files", this, [this]()
     {
         m_recentFiles.clear();
         updateRecentMenu();
@@ -1289,7 +1384,8 @@ HpVis::buildMasksMenu(const View *view)
     m_masksMenu->clear();
     OpenGLWidget *gl = view ? view->glWidget() : nullptr;
 
-    QAction *add = m_masksMenu->addAction("&Add Mask...", this, [this]()
+    QAction *add = tag(m_masksMenu->addAction(themeIcon("list-add"),
+                                          "&Add Mask...", this, [this]()
     {
         const auto files = QFileDialog::getOpenFileNames(
             this, "Load Mask(s)", "",
@@ -1297,32 +1393,38 @@ HpVis::buildMasksMenu(const View *view)
             "NumPy Files (*.npy *.npz);;All Files (*)");
         if (!files.isEmpty())
             onMaskFilesSelected(files);
-    });
+    }), Command::MaskAdd);
     add->setEnabled(gl);
 
-    QAction *addColumn = m_masksMenu->addAction(
-        "Add Mask From &Map Column...", this, [this]()
+    QAction *addColumn = tag(m_masksMenu->addAction(
+        themeIcon("list-add"), "Add Mask From &Map Column...", this, [this]()
     {
         if (!m_view)
             return;
         MaskSourceDialog dialog(openMaps(), m_view, this);
         if (dialog.exec() == QDialog::Accepted && m_view)
             m_view->glWidget()->addMasks(dialog.selected());
-    });
+    }), Command::MaskAddFromColumn);
     addColumn->setEnabled(gl);
 
-    QAction *clear
-        = m_masksMenu->addAction("&Clear All", this, &HpVis::onMaskCleared);
-    clear->setEnabled(gl && gl->maskCount() > 0);
+    m_masksMenu->addSeparator();
+    auto addClear = [this, gl]()
+    {
+        QAction *clear = tag(m_masksMenu->addAction(
+            themeIcon("edit-clear", QStyle::SP_DialogResetButton),
+            "&Clear All", this, &HpVis::onMaskCleared), Command::MaskClear);
+        clear->setEnabled(gl && gl->maskCount() > 0);
+    };
 
     if (!gl || gl->maskCount() == 0)
+    {
+        addClear();
         return;
+    }
 
-    m_masksMenu->addSeparator();
     for (int i = 0; i < gl->maskCount(); ++i)
     {
         QMenu *sub = m_masksMenu->addMenu(gl->maskName(i));
-        sub->menuAction()->setProperty("hpvisNoBind", true); // one per mask
         sub->menuAction()->setCheckable(true);
         sub->setToolTipsVisible(true);
         sub->setToolTip(gl->maskPath(i));
@@ -1345,7 +1447,7 @@ HpVis::buildMasksMenu(const View *view)
                 m_view->glWidget()->setMaskInverted(i, v);
         });
 
-        sub->addAction("&Remove", this, [this, i]()
+        sub->addAction(themeIcon("list-remove"), "&Remove", this, [this, i]()
         {
             if (m_view)
                 m_view->glWidget()->removeMask(i);
@@ -1354,7 +1456,6 @@ HpVis::buildMasksMenu(const View *view)
 
     m_masksMenu->addSeparator();
     QMenu *mode = m_masksMenu->addMenu("&Mode");
-    mode->menuAction()->setProperty("hpvisNoBind", true);
     auto *group = new QActionGroup(mode);
     for (int m = 0; m < 2; ++m)
     {
@@ -1370,7 +1471,7 @@ HpVis::buildMasksMenu(const View *view)
     }
 
     QAction *strength
-        = m_masksMenu->addAction("Dim &Strength...", this, [this]()
+        = tag(m_masksMenu->addAction("Dim &Strength...", this, [this]()
     {
         if (!m_view)
             return;
@@ -1381,8 +1482,11 @@ HpVis::buildMasksMenu(const View *view)
             0, 100, 1, &ok);
         if (ok)
             m_view->glWidget()->setMaskOpacity(v / 100.0f);
-    });
+    }), Command::MaskDimStrength);
     strength->setEnabled(gl->maskMode() == 1);
+
+    m_masksMenu->addSeparator();
+    addClear();
 }
 
 void
@@ -1768,45 +1872,36 @@ HpVis::initShortcuts()
     applyShortcuts();
 }
 
-namespace
+// The stored name of a command, as the settings dialog and file know it
+static QString
+commandId(Command c)
 {
-const char *const kFinishRegionId = "region/finish-polygon";
-const char *const kCancelRegionId = "region/cancel-selection";
-
-QString
-shortcutSlug(const QString &text)
-{
-    QString out;
-    for (const QChar c : text.toLower())
-    {
-        if (c.isLetterOrNumber())
-            out += c;
-        else if (!out.isEmpty() && !out.endsWith('-'))
-            out += '-';
-    }
-    while (out.endsWith('-'))
-        out.chop(1);
-    return out;
+    const std::string_view name = storedName(c);
+    return QString::fromUtf8(name.data(), qsizetype(name.size()));
 }
-} // namespace
 
+// The menu items that are commands (tagged with tag()); `path` is only used
+// for the label shown in the settings
 void
 HpVis::collectShortcutTargets(QMenu *menu, const QStringList &path,
-                              QList<ShortcutTarget> &out, QSet<QString> &seen)
+                              QList<ShortcutTarget> &out)
 {
     for (QAction *a : menu->actions())
     {
-        if (a->isSeparator() || a->property("hpvisNoBind").toBool())
+        if (a->isSeparator())
             continue;
         QString text = a->text();
         text.remove('&');
         if (text.isEmpty())
             continue;
 
-        QMenu *sub = a->menu();
-        if (sub && !a->property("hpvisBindMenu").toBool())
+        const Command cmd = Command(a->property("hpvisCommand").toInt());
+        if (cmd == Command::None)
         {
-            collectShortcutTargets(sub, path + QStringList{text}, out, seen);
+            // Not a command itself; its entries may be (a menu), or it is
+            // not bindable (the recent files, one entry per mask, ...)
+            if (QMenu *sub = a->menu())
+                collectShortcutTargets(sub, path + QStringList{text}, out);
             continue;
         }
 
@@ -1816,20 +1911,13 @@ HpVis::collectShortcutTargets(QMenu *menu, const QStringList &path,
             a->setProperty("hpvisDefaultKey",
                            a->shortcut().toString(QKeySequence::PortableText));
 
-        QStringList slugs;
-        for (const QString &part : path + QStringList{text})
-            slugs << shortcutSlug(part);
-        QString id = slugs.join('/');
-        for (int n = 2; seen.contains(id); ++n)
-            id = slugs.join('/') + "-" + QString::number(n);
-        seen.insert(id);
-
         ShortcutTarget t;
-        t.action = a;
-        t.command.id       = id;
-        t.command.label    = (path.mid(1) + QStringList{text}).join(" > ");
-        t.command.category = path.value(0);
-        t.command.defaultKey = QKeySequence(
+        t.action              = a;
+        t.cmd                 = cmd;
+        t.command.id          = commandId(cmd);
+        t.command.label       = (path.mid(1) + QStringList{text}).join(" > ");
+        t.command.category    = path.value(0);
+        t.command.defaultKey  = QKeySequence(
             a->property("hpvisDefaultKey").toString(),
             QKeySequence::PortableText);
         out.append(t);
@@ -1840,28 +1928,28 @@ QList<HpVis::ShortcutTarget>
 HpVis::shortcutTargets()
 {
     QList<ShortcutTarget> out;
-    QSet<QString> seen;
     for (QAction *top : menuBar()->actions())
     {
         QString title = top->text();
         title.remove('&');
         if (top->menu())
-            collectShortcutTargets(top->menu(), {title}, out, seen);
+            collectShortcutTargets(top->menu(), {title}, out);
     }
 
     // Keys read by the viewer rather than being menu actions
-    const std::pair<const char *, const char *> region[]
-        = {{kFinishRegionId, "Finish polygon region"},
-           {kCancelRegionId, "Cancel region selection"}};
-    for (const auto &[id, label] : region)
+    const std::pair<Command, const char *> region[]
+        = {{Command::RegionFinish, "Finish polygon region"},
+           {Command::RegionCancel, "Cancel region selection"}};
+    for (const auto &[cmd, label] : region)
     {
         ShortcutTarget t;
-        t.command.id       = id;
+        t.cmd              = cmd;
+        t.command.id       = commandId(cmd);
         t.command.label    = label;
         t.command.category = "Region selection";
         t.command.defaultKey
-            = QKeySequence(QString(id) == kFinishRegionId ? Qt::Key_Return
-                                                          : Qt::Key_Escape);
+            = QKeySequence(cmd == Command::RegionFinish ? Qt::Key_Return
+                                                        : Qt::Key_Escape);
         out.append(t);
     }
     return out;
@@ -1896,9 +1984,9 @@ HpVis::applyShortcuts()
         const QKeySequence key = effectiveKey(t.command);
         if (t.action)
             t.action->setShortcut(key);
-        else if (t.command.id == kFinishRegionId)
+        else if (t.cmd == Command::RegionFinish)
             finish = key;
-        else if (t.command.id == kCancelRegionId)
+        else if (t.cmd == Command::RegionCancel)
             cancel = key;
     }
     m_regionKeys = {finish, cancel};

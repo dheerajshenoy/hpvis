@@ -100,9 +100,26 @@ AppSettings::load()
     {
         // A comma in the value (a key chord) makes the ini reader return a list
         const QVariant v = s.value(id);
-        a.shortcuts.insert(id, v.metaType().id() == QMetaType::QStringList
-                                   ? v.toStringList().join(", ")
-                                   : v.toString());
+        // Names written by a short-lived build that derived them from the
+        // new menu layout; the stable names are the original ones
+        static const std::pair<const char *, const char *> moved[]
+            = {{"colormap/custom-colormaps/", "view/custom-colormaps/"},
+               {"colormap/color-bar/", "view/color-bar/"},
+               {"colormap/reverse-colormap", "view/reverse-colormap"},
+               {"file/export-image", "file/export"}};
+        QString key = id;
+        for (const auto &[from, to] : moved)
+        {
+            const QString f(from);
+            if (id == f || (f.endsWith('/') && id.startsWith(f)))
+            {
+                key = QString(to) + id.mid(f.size());
+                break;
+            }
+        }
+        a.shortcuts.insert(key, v.metaType().id() == QMetaType::QStringList
+                                    ? v.toStringList().join(", ")
+                                    : v.toString());
     }
     s.endGroup();
     return a;

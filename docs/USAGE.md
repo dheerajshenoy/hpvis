@@ -4,7 +4,7 @@ hpvis is a viewer and a small analysis tool for HEALPix maps, such as maps of
 the cosmic microwave background (CMB). This guide explains every part of it.
 Pick a section on the left; the search box finds sections that mention a word.
 
-Menu items are written as **Menu > Item**, for example **View > Color Bar**.
+Menu items are written as **Menu > Item**, for example **Colormap > Color Bar**.
 
 ## 1. Getting started
 
@@ -27,7 +27,9 @@ all statistics.
 
 ### The window
 
-- **Menu bar:** File, Edit, View, Masks, Tools and Help.
+- **Menu bar:** File, Edit, View, Colormap, Masks, Tools and Help. Related
+  items are grouped in submenus (for example **View > Zoom**, **View >
+  Rotation**, **View > Statistics Region**, **Tools > Maps**).
 - **Toolbar:** the HDU and column of the file, the projection, the
   orientation and the colormap of the current map.
 - **Tabs:** every open map has its own tab, with its own projection,
@@ -102,7 +104,7 @@ session on demand with **File > Reopen Last Session**. Maps that were computed
   Out**, **Zoom To Region** (then drag a rectangle) and **Reset Zoom**.
 - **View > Pan:** Left, Right, Up and Down. They have no keys by default;
   assign some in **Tools > Settings > Shortcuts**.
-- **View > Set Rotation...:** type the longitude and latitude of the center
+- **View > Rotation > Set Rotation...:** type the longitude and latitude of the center
   and the roll, in degrees. **Reset Rotation** goes back.
 - **View > Reset View:** zoom and rotation together (`0`).
 - **View > Minimap** (`M`): a small overview of the whole sky showing where
@@ -152,7 +154,7 @@ Choose in the toolbar. Built in: Grayscale, Inferno, Magma, Plasma, Viridis,
 Cubehelix, Jet, HSV, Hot, Cool, Spring, Summer, Autumn, Winter and Rainbow.
 **Viridis** is the default and is a good choice for most data.
 
-**Custom colormaps** (**View > Custom Colormaps**):
+**Custom colormaps** (**Colormap > Custom Colormaps**):
 
 - **Load Colormap...** copies a CSV or JSON file into the colormaps folder.
 - **Open Colormaps Folder** opens that folder.
@@ -165,7 +167,7 @@ after the built-in ones. You can have up to 64.
 
 ### Color scale
 
-**View > Color Bar** holds the scale:
+**Colormap > Color Bar** holds the scale:
 
 - **Linear:** value maps directly to color.
 - **Logarithmic:** brings out faint structure in data that spans orders of
@@ -182,7 +184,7 @@ colors.
 
 - By default the range is the minimum and maximum of the valid pixels (masked
   pixels are left out).
-- **View > Color Bar > Range...** lets you type a minimum and a maximum, with a
+- **Colormap > Color Bar > Range...** lets you type a minimum and a maximum, with a
   **Reset** button.
 - **Reset Range** goes back to the default.
 - **Percentile Range...** sets the range from percentiles of the valid,
@@ -194,14 +196,14 @@ The command line has `--cmin` and `--cmax`.
 
 ### Color bar
 
-**View > Color Bar > Show Color Bar** (`C`) draws a bar with the value scale
+**Colormap > Color Bar > Show Color Bar** (`C`) draws a bar with the value scale
 over the map.
 
 ### Background and unseen colors
 
-- **View > Background Color...:** the color outside the map (outside the oval,
+- **View > Colors > Background Color...:** the color outside the map (outside the oval,
   for example).
-- **View > Unseen Pixel Color...:** the color of UNSEEN, NaN and masked pixels
+- **View > Colors > Unseen Pixel Color...:** the color of UNSEEN, NaN and masked pixels
   (in Hide mode).
 
 ## 5. Overlays
@@ -260,12 +262,12 @@ copies the table as text.
 ### Selecting a region
 
 - **Ctrl + Shift + drag** a rectangle on the map, or
-- **View > Select Statistics Region** and choose a shape: **Rectangle**,
+- **View > Statistics Region** and choose a shape: **Rectangle**,
   **Ellipse**, **Polygon** (click the corners; double-click or Enter closes it;
   Esc cancels; right-click removes the last corner) or **Line** (a great-circle
   arc: drag between its two ends).
 
-**View > Clear Statistics Region** (or **Clear region** in the dock) removes
+**View > Statistics Region > Clear Region** (or **Clear region** in the dock) removes
 it. The keys that finish and cancel a polygon can be changed in the shortcuts.
 
 ### The histogram
@@ -282,7 +284,8 @@ The same dock draws the histogram of the pixel values:
 - **Region:** also plot the pixels inside the selected region.
 - **Compare:** add the histogram of another open map, as an **Overlay**, a
   **Ratio** to this map or a **Difference** from it.
-- **Export:** the plot as an image, or the histogram as CSV.
+- **Export:** the plot as an image (PNG, or SVG or PDF as vector graphics), or
+  the histogram as CSV. See **Exporting plots** in section 10.
 
 On the plot, the wheel zooms, dragging pans and double-click resets.
 
@@ -342,8 +345,9 @@ coupling matrix.
 - Wheel zoom, drag to pan, double-click to reset; hover for a readout.
 - The plot **colors** (background, foreground, line) can be changed with the
   buttons here or in Settings.
-- **Export:** the plot as an image, or all spectra as CSV (bandpowers at their
-  effective ℓ when corrected).
+- **Export:** the plot as an image (PNG, or SVG or PDF as vector graphics), or
+  all spectra as CSV (bandpowers at their effective ℓ when corrected). See
+  **Exporting plots** in section 10.
 
 ### Comparing spectra: the Compare menu
 
@@ -374,7 +378,7 @@ yet: use **File > Save Map As...** to keep it.
 
 ### Operate on Maps
 
-**Tools > Operate on Maps...** combines maps pixel by pixel.
+**Tools > Maps > Operate on Maps...** combines maps pixel by pixel.
 
 1. Add the inputs: **Add Open Map** (from a tab) or **Add File...**. Each gets
    a name (A, B, C, ...) and you can choose its HDU and column.
@@ -392,7 +396,7 @@ the expression has no finite value there (a division by zero, for example).
 
 ### Change Resolution
 
-**Tools > Change Resolution...** lowers the nside of the current map.
+**Tools > Maps > Change Resolution...** lowers the nside of the current map.
 
 - **Average the pixels:** the mean of the sub-pixels, like healpy's `ud_grade`.
   Optionally a pixel becomes UNSEEN when any of its sub-pixels is. Power above
@@ -406,7 +410,7 @@ the expression has no finite value there (a division by zero, for example).
 
 ### Beam Smoothing
 
-**Tools > Beam Smoothing...** convolves the map with a beam (a telescope's
+**Tools > Maps > Beam Smoothing...** convolves the map with a beam (a telescope's
 blurring), through the harmonics.
 
 - **Gaussian:** give the **FWHM** (full width at half maximum) in arcminutes,
@@ -421,7 +425,7 @@ The dialog estimates the memory needed; above nside 1024 it can take long.
 
 ### Derivatives and E/B Maps
 
-**Tools > Derivatives and E/B Maps...** works through the spherical harmonics:
+**Tools > Maps > Derivatives and E/B Maps...** works through the spherical harmonics:
 
 - **Laplacian (∇²T):** each a_ℓm is multiplied by −ℓ(ℓ+1). It highlights small
   scales, so noise grows quickly: lower the analysis l max to suppress it.
@@ -437,7 +441,7 @@ UNSEEN pixels are taken as zero in the transform and restored afterwards.
 
 ## 10. Saving and exporting
 
-- **File > Export:** saves the view as an image (PNG, JPEG or BMP). Choose the
+- **File > Export Image:** saves the view as an image (PNG, JPEG or BMP). Choose the
   title, size in pixels, quality, and, for PNG, whether the background stays
   transparent.
 - **Edit > Copy Image** (`Ctrl+Shift+C`): copies the view to the clipboard.
@@ -446,6 +450,22 @@ UNSEEN pixels are taken as zero in the transform and restored afterwards.
 - **File > FITS Header...:** shows the header of the current HDU (not for
   computed maps or NumPy files, which have none).
 - **Command line:** `hpvis --output out.png map.fits` saves the view and exits.
+
+### Exporting plots
+
+The **Export** menus of the Power Spectrum and Statistics docks save the plot
+as **PNG**, **SVG** or **PDF**. The format is the one of the file name's
+extension (or the file type chosen in the dialog when you type none).
+
+- PNG is a picture of the plot as it looks on screen.
+- SVG and PDF are vector graphics: the plot is drawn again from its data, with
+  the axes, ticks, grid, curves and legend, so it stays sharp at any size and
+  the text stays selectable. They show what the plot shows now, including your
+  zoom, the scales (linear or logarithmic) and the curves being compared.
+- By default SVG and PDF keep the colors of the plot on screen. To get black
+  on white (with the curve colors darkened so they read on paper), turn off
+  **Keep the plot colors in SVG / PDF export** in **Tools > Settings >
+  Appearance**.
 
 ## 11. Settings
 
@@ -462,7 +482,8 @@ UNSEEN pixels are taken as zero in the transform and restored afterwards.
   orientation, colormap, reverse, scale, background and unseen colors. For the
   orthographic globe: the shadow around the globe and limb darkening.
   *Animation*: the globe spins after dragging, and projections fade into each
-  other. The colors of the power spectrum plot.
+  other. The colors of the power spectrum plot and histogram, and whether SVG
+  and PDF exports keep them or use black on white.
 - **Overlays:** whether the color bar and minimap show by default; the
   graticule (show, spacing, color); the masks (mode, dim strength).
 - **Theory:** the theoretical spectrum for **Compare > Theory**: the bundled
@@ -494,7 +515,9 @@ press the new combination to change it; clear it to remove the key. Use the
 filter to find a command. If a key already belongs to another command, hpvis
 says so and moves it to the new command. **Reset All to Defaults** restores
 the original keys. Commands such as View > Pan have no key until you assign
-one.
+one. A key belongs to the command, not to its place in the menus, so a
+key you set stays with the command if the menus are reorganized in a later
+version.
 
 ## 13. Command line
 
@@ -556,7 +579,7 @@ hpvis --stats map.fits
 - **Banding or odd display on an old GPU:** turn off HDR rendering in the
   settings.
 - **Power spectrum is slow:** use Fast accuracy, lower lmax, or downgrade the
-  map first with **Tools > Change Resolution**. Mask correction and
+  map first with **Tools > Maps > Change Resolution**. Mask correction and
   apodization are slow for large maps.
 - **Floats:** maps are stored as 32-bit floats, even when a file holds 64-bit
   values (rounded when loaded). Transforms and sums are computed in double

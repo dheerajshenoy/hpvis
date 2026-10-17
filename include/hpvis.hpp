@@ -2,6 +2,7 @@
 
 #include "appsettings.hpp"
 #include "argparse.hpp"
+#include "command.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "openglwidget.hpp"
@@ -96,12 +97,12 @@ private:
     struct ShortcutTarget
     {
         ShortcutCommand command;
+        Command cmd     = Command::None;
         QAction *action = nullptr; // null for the viewer's own keys
     };
     QList<ShortcutTarget> shortcutTargets();
     void collectShortcutTargets(QMenu *menu, const QStringList &path,
-                                QList<ShortcutTarget> &out,
-                                QSet<QString> &seen);
+                                QList<ShortcutTarget> &out);
     QKeySequence effectiveKey(const ShortcutCommand &command) const;
     QList<ShortcutCommand> shortcutCommands();
     void applyShortcuts();
@@ -175,9 +176,11 @@ private:
     AppSettings m_settings        = AppSettings::load();
     QAction *m_fileSaveMapAction  = nullptr;
     QAction *m_fileExportAction   = nullptr;
+    QAction *m_fileExitAction     = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
 
     QMenu *m_viewMenu             = nullptr;
+    QMenu *m_colormapMenu         = nullptr;
     QAction *m_viewMinimapAction  = nullptr;
     QAction *m_headerAction       = nullptr;
     QAction *m_viewColorBarAction = nullptr;

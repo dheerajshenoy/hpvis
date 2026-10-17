@@ -206,7 +206,27 @@ First development release.
   used HEALPix's map2alm and ignored the masks. It now warns when a mask is
   applied but the correction is off.
 
+### Plot export
+- The power spectrum and the histogram export to SVG and PDF as well as PNG.
+  SVG and PDF are vector graphics drawn again from the plot's data (axes,
+  ticks, grid, curves, legend) with a QPainter (`include/plotrenderer.hpp`),
+  because the Qt Graphs view can only be grabbed as pixels. They show the
+  current zoom, scales and compared curves. Needs Qt Svg.
+- Settings > Appearance: "Keep the plot colors in SVG / PDF export" (on by
+  default). When off, the export is black on white with the curve colors
+  darkened for paper.
+
 ### Interface
+- Menus are grouped by topic: a new Colormap menu (custom colormaps, reverse,
+  color bar), View > Zoom, Rotation, Colors and Statistics Region submenus,
+  Tools > Maps (the operations) and Tools > Analysis, with separators between
+  the groups, "..." on the items that open a dialog (File > Export Image...)
+  and icons on the common items (from the icon theme, with Qt's own icons as
+  a fallback).
+- Key bindings are tied to a `Command` enumerator (`include/command.hpp`)
+  with a fixed stored name each, not to the menu path, so moving or
+  relabelling a menu item no longer loses the key a user set. The stored
+  names are the ones the old menu paths gave, so existing keys keep working.
 - `--export` (`-e`) is now `--output` (`-o`). `-o` used to be the short flag of
   `--orientation`, which now has only its long form.
 - The colormap options of the command line have a `c` prefix, to show they are
