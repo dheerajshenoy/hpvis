@@ -248,4 +248,9 @@ file explorer's folder are stored with the preferences.
 - If the GPU cannot allocate the textures, a message is shown and the map is
   not displayed; lower the streaming limit in the settings.
 
+## License
+
+hpvis is licensed under the [GNU Affero General Public License, version 3](LICENSE).
+Help > About lists the libraries it uses and shows the license text.
+
 See [CHANGELOG.md](CHANGELOG.md) for the list of changes.

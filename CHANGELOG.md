@@ -207,6 +207,13 @@ First development release.
   applied but the correction is off.
 
 ### Interface
+- Help > About and the About page of the settings show the same text
+  (`include/aboutinfo.hpp`) under an animated banner: a slowly turning conical
+  rainbow behind the name (in the Major Mono Display font). The animation only
+  runs while it is visible.
+- The About dialog has three tabs: About, Libraries (the code libraries hpvis
+  uses, with links) and License (the AGPL-3.0 text, embedded from
+  the new `LICENSE` file).
 - Sessions: the files open when the window closes (with their HDU / array and
   column / row, and which tab was current) are reopened at the next start,
   in the same order, when no file is given on the command line. Files that no
