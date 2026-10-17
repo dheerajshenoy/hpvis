@@ -27,6 +27,10 @@ struct RandomOptions
     // Gaussian beam to apply (arcminutes FWHM, 0 = none)
     TheorySource theory;
     double fwhmArcmin = 0.0;
+    // CMB: multiply the a_lm by the HEALPix pixel window of the nside (the
+    // temperature window for T, the polarization one for E and B), like
+    // synfast(pixwin=True)
+    bool pixelWindow = false;
 };
 
 struct RandomResult

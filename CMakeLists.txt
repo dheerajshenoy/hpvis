@@ -172,6 +172,8 @@ add_executable(${PROJECT_NAME}
     src/projectionmath.cpp
     src/appsettings.cpp
     src/classwrap.cpp
+    src/pixelwindow.cpp
+    src/beamwindow.cpp
     src/colormapregistry.cpp
     src/skyframe.cpp
     src/mapexpression.cpp
@@ -268,6 +270,8 @@ add_executable(${PROJECT_NAME}
     include/appsettings.hpp
     include/cosmoparams.hpp
     include/classwrap.hpp
+    include/pixelwindow.hpp
+    include/beamwindow.hpp
     include/fitsheaderdialog.hpp
     include/statusbar.hpp
     include/powerspectrumdock.hpp

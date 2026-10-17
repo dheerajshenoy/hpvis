@@ -14,6 +14,21 @@
         <file>shaders/colormapstrip.frag</file>
         <file>shaders/graticule.glsl</file>
 
+        <!-- HEALPix pixel window functions (healpy.pixwin) -->
+        <file alias="resources/pixwin/pixel_window_n0002.fits">thirdparty/healpix/data/pixel_window_n0002.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0004.fits">thirdparty/healpix/data/pixel_window_n0004.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0008.fits">thirdparty/healpix/data/pixel_window_n0008.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0016.fits">thirdparty/healpix/data/pixel_window_n0016.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0032.fits">thirdparty/healpix/data/pixel_window_n0032.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0064.fits">thirdparty/healpix/data/pixel_window_n0064.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0128.fits">thirdparty/healpix/data/pixel_window_n0128.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0256.fits">thirdparty/healpix/data/pixel_window_n0256.fits</file>
+        <file alias="resources/pixwin/pixel_window_n0512.fits">thirdparty/healpix/data/pixel_window_n0512.fits</file>
+        <file alias="resources/pixwin/pixel_window_n1024.fits">thirdparty/healpix/data/pixel_window_n1024.fits</file>
+        <file alias="resources/pixwin/pixel_window_n2048.fits">thirdparty/healpix/data/pixel_window_n2048.fits</file>
+        <file alias="resources/pixwin/pixel_window_n4096.fits">thirdparty/healpix/data/pixel_window_n4096.fits</file>
+        <file alias="resources/pixwin/pixel_window_n8192.fits">thirdparty/healpix/data/pixel_window_n8192.fits</file>
+
         <!-- Licence text, shown in the About dialog -->
         <file>LICENSE</file>
 

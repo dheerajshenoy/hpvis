@@ -44,6 +44,7 @@ private:
     QLabel *m_unitLabel          = nullptr;
     QDoubleSpinBox *m_fwhm       = nullptr;
     QLabel *m_fwhmLabel          = nullptr;
+    QCheckBox *m_pixwin          = nullptr;
     QCheckBox *m_randomSeed      = nullptr;
     QSpinBox *m_seed             = nullptr;
     QLabel *m_hint               = nullptr;

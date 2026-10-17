@@ -12,6 +12,8 @@
 #include "healpix_cxx/healpix_map_fitsio.h"
 #include "powspec.h"
 #include "masterspectrum.hpp"
+#include "beamwindow.hpp"
+#include "pixelwindow.hpp"
 #include "crossspectrum.hpp"
 #include "openglwidget.hpp"
 #include "plotrenderer.hpp"
@@ -57,6 +59,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <deque>
 #include <limits>
 #include <memory>
 
@@ -720,6 +723,100 @@ PowerSpectrumDock::initUI()
         QSettings().setValue("powerspectrum/binTheory", on);
         replot(true);
     });
+    m_pixwinCheck = new QCheckBox("Pixel window");
+    m_pixwinCheck->setToolTip(
+        "Divide the spectra by the pixel window of the map's nside (HEALPix's\n"
+        "pixel_window files, as healpy's pixwin): w_T^2 for TT, w_P^2 for EE,\n"
+        "BB and EB, w_T w_P for TE and TB. Bandpowers use the mean over their\n"
+        "band. Applies to the maps shown, without recomputing.");
+    m_pixwinCheck->setChecked(
+        QSettings().value("powerspectrum/pixwin", false).toBool());
+    connect(m_pixwinCheck, &QCheckBox::toggled, this, [this](bool on)
+    {
+        if (on && !pixelWindowAvailable())
+        {
+            QSignalBlocker block(m_pixwinCheck);
+            m_pixwinCheck->setChecked(false);
+            return;
+        }
+        QSettings().setValue("powerspectrum/pixwin", on);
+        replot(true);
+    });
+    m_pixwinTheoryCheck = new QCheckBox("Theory pixel window");
+    m_pixwinTheoryCheck->setToolTip(
+        "Multiply the theory spectrum by the pixel window of the current map\n"
+        "(what a pixelized map of that theory should show). Use it instead of\n"
+        "Pixel window when you compare the map with the theory.");
+    m_pixwinTheoryCheck->setChecked(
+        QSettings().value("powerspectrum/pixwinTheory", false).toBool());
+    connect(m_pixwinTheoryCheck, &QCheckBox::toggled, this, [this](bool on)
+    {
+        if (on && !pixelWindowAvailable())
+        {
+            QSignalBlocker block(m_pixwinTheoryCheck);
+            m_pixwinTheoryCheck->setChecked(false);
+            return;
+        }
+        QSettings().setValue("powerspectrum/pixwinTheory", on);
+        replot(true);
+    });
+    // Beam: divide the spectra by B_l^2 (or multiply the theory by it)
+    m_beamCheck = new QCheckBox("Beam");
+    m_beamCheck->setToolTip(
+        "Divide the spectra by the beam window B_l^2 of the map (a Planck map\n"
+        "is smoothed to a beam, e.g. 5 arcmin for SMICA). A Gaussian of the\n"
+        "given FWHM, or the beam file chosen with File. Polarization uses the\n"
+        "spin-2 Gaussian beam. Applies to the maps shown, without recomputing.");
+    m_beamFwhm = new QDoubleSpinBox();
+    m_beamFwhm->setRange(0.1, 600.0);
+    m_beamFwhm->setDecimals(2);
+    m_beamFwhm->setSingleStep(0.5);
+    m_beamFwhm->setSuffix(" arcmin");
+    m_beamFwhm->setToolTip("FWHM of the Gaussian beam");
+    m_beamFileButton = new QPushButton("File...");
+    m_beamFileButton->setToolTip(
+        "Use a beam window file (B_l from l = 0: a FITS table, .npy or text)\n"
+        "instead of the Gaussian. Click again to go back to the Gaussian.");
+    m_beamTheoryCheck = new QCheckBox("Theory beam");
+    m_beamTheoryCheck->setToolTip(
+        "Multiply the theory spectrum by B_l^2 instead of correcting the map\n"
+        "(the smoothed map should follow it). Use it instead of Beam.");
+    {
+        const QSettings s;
+        m_beamFwhm->setValue(s.value("powerspectrum/beamFwhm", 5.0).toDouble());
+        m_beamFile = s.value("powerspectrum/beamFile").toString();
+        if (!m_beamFile.isEmpty())
+            try
+            {
+                m_beamLoaded = std::make_shared<const PixelWindow>(
+                    readBeamWindow(m_beamFile));
+            }
+            catch (const std::exception &)
+            {
+                m_beamFile.clear();
+            }
+        m_beamCheck->setChecked(s.value("powerspectrum/beam", false).toBool());
+        m_beamTheoryCheck->setChecked(
+            s.value("powerspectrum/beamTheory", false).toBool());
+    }
+    updateBeamButton();
+    connect(m_beamCheck, &QCheckBox::toggled, this, [this](bool on)
+    {
+        QSettings().setValue("powerspectrum/beam", on);
+        replot(true);
+    });
+    connect(m_beamTheoryCheck, &QCheckBox::toggled, this, [this](bool on)
+    {
+        QSettings().setValue("powerspectrum/beamTheory", on);
+        replot(true);
+    });
+    connect(m_beamFwhm, &QDoubleSpinBox::editingFinished, this, [this]()
+    {
+        QSettings().setValue("powerspectrum/beamFwhm", m_beamFwhm->value());
+        replot(true);
+    });
+    connect(m_beamFileButton, &QPushButton::clicked, this,
+            &PowerSpectrumDock::chooseBeamFile);
     m_commonCheck = new QCheckBox("Common \u2113 range");
     m_commonCheck->setToolTip(
         "Show every curve only up to the highest multipole they all have.\n"
@@ -742,13 +839,22 @@ PowerSpectrumDock::initUI()
         m_plotRows << row;
         return l;
     };
-    QWidget *compareRow = nullptr, *axisRow = nullptr, *plotRow = nullptr;
+    QWidget *compareRow = nullptr, *axisRow = nullptr, *plotRow = nullptr,
+            *beamRow = nullptr;
     auto *compareOptions = makeRow(compareRow);
     compareOptions->addWidget(m_compareButton);
     compareOptions->addWidget(m_modeCombo);
     compareOptions->addWidget(m_commonCheck);
     compareOptions->addWidget(m_binTheoryCheck);
+    compareOptions->addWidget(m_pixwinTheoryCheck);
     compareOptions->addStretch();
+
+    auto *beamOptions = makeRow(beamRow);
+    beamOptions->addWidget(m_beamCheck);
+    beamOptions->addWidget(m_beamFwhm);
+    beamOptions->addWidget(m_beamFileButton);
+    beamOptions->addWidget(m_beamTheoryCheck);
+    beamOptions->addStretch();
 
     // Below the plot: what it shows and the axis scales
     auto *axisOptions = makeRow(axisRow);
@@ -756,6 +862,7 @@ PowerSpectrumDock::initUI()
     axisOptions->addWidget(m_quantityCombo);
     axisOptions->addWidget(m_logXCheck);
     axisOptions->addWidget(m_logYCheck);
+    axisOptions->addWidget(m_pixwinCheck);
     axisOptions->addStretch();
 
     auto *plotOptions = makeRow(plotRow);
@@ -778,6 +885,7 @@ PowerSpectrumDock::initUI()
     layout->addWidget(m_progressLabel);
     layout->addWidget(m_statusLabel);
     layout->addWidget(compareRow);
+    layout->addWidget(beamRow);
     layout->addWidget(plotRow);
     layout->addWidget(m_chartContainer, 1);
     layout->addWidget(axisRow);
@@ -1339,7 +1447,103 @@ PowerSpectrumDock::replot(bool keepRange)
 {
     const auto it = m_results.constFind(m_view.data());
     if (it != m_results.constEnd())
-        updatePlot(it->spectra, keepRange);
+        updatePlot(shown(*it), keepRange);
+}
+
+Spectra
+PowerSpectrumDock::shown(const Result &r) const
+{
+    Spectra s = r.spectra;
+    const int bandwidth = r.corrected ? r.correction.bandwidth : 1;
+    if (m_pixwinCheck->isChecked() && r.nside >= 2)
+        try
+        {
+            applyPixelWindow(s, pixwin(r.nside), false, bandwidth);
+        }
+        catch (const std::exception &)
+        {
+            // no window for this nside: shown as computed
+        }
+    if (m_beamCheck->isChecked() && r.lmax > 1)
+        try
+        {
+            // B_l is an amplitude: the spectrum is divided by B_l^2
+            PixelWindow b = beam(r.lmax);
+            applyPixelWindow(s, b, false, bandwidth);
+        }
+        catch (const std::exception &)
+        {
+        }
+    return s;
+}
+
+PixelWindow
+PowerSpectrumDock::beam(int lmax) const
+{
+    if (m_beamLoaded)
+        return *m_beamLoaded;
+    return gaussianBeam(m_beamFwhm->value(), lmax);
+}
+
+void
+PowerSpectrumDock::updateBeamButton()
+{
+    const bool file = !m_beamFile.isEmpty();
+    m_beamFileButton->setText(file ? QFileInfo(m_beamFile).fileName()
+                                   : QString("File..."));
+    m_beamFwhm->setEnabled(!file);
+}
+
+void
+PowerSpectrumDock::chooseBeamFile()
+{
+    if (!m_beamFile.isEmpty()) // back to the Gaussian
+    {
+        m_beamFile.clear();
+        m_beamLoaded.reset();
+    }
+    else
+    {
+        const QString f = QFileDialog::getOpenFileName(
+            this, "Beam window function", QString(),
+            "Window Files (*.fits *.fit *.fts *.npy *.txt *.dat *.csv);;All "
+            "Files (*)");
+        if (f.isEmpty())
+            return;
+        try
+        {
+            m_beamLoaded
+                = std::make_shared<const PixelWindow>(readBeamWindow(f));
+            m_beamFile = f;
+        }
+        catch (const std::exception &e)
+        {
+            QMessageBox::warning(this, "Beam window", e.what());
+            return;
+        }
+    }
+    QSettings().setValue("powerspectrum/beamFile", m_beamFile);
+    updateBeamButton();
+    replot(true);
+}
+
+bool
+PowerSpectrumDock::pixelWindowAvailable()
+{
+    const auto it = m_results.constFind(m_view.data());
+    const int nside = it != m_results.constEnd() ? it->nside : 0;
+    if (nside < 2)
+        return true; // nothing to correct yet; checked when it is
+    try
+    {
+        pixwin(nside);
+    }
+    catch (const std::exception &e)
+    {
+        QMessageBox::warning(this, "Pixel window", e.what());
+        return false;
+    }
+    return true;
 }
 
 // A spectrum as the plot wants it: values at multipoles. Either a C_l for
@@ -1455,6 +1659,7 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
                       sp.ell.empty() ? nullptr : &sp.ell};
     };
     QList<Other> others;
+    std::deque<Spectra> keep; // the corrected spectra the series point into
     for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
     {
         if (!m.view || m.view.data() == m_view.data()
@@ -1463,7 +1668,8 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
         const auto r = m_results.constFind(m.view.data());
         if (r == m_results.constEnd())
             continue;
-        const Series d = seriesOf(r->spectra);
+        keep.push_back(shown(*r));
+        const Series d = seriesOf(keep.back());
         if (!d.values->empty())
             others.append({m.title, d});
     }
@@ -1481,9 +1687,37 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
     if (m_theoryOn)
         if (const Spectra *t = theorySpectra())
         {
-            const Spectra *use = t;
-            QString label      = m_theoryName;
             const auto res     = m_results.constFind(m_view.data());
+            Spectra pixelated;
+            QString label = m_theoryName;
+            if (m_pixwinTheoryCheck->isChecked() && res != m_results.constEnd()
+                && res->nside >= 2)
+                try
+                {
+                    pixelated = *t;
+                    applyPixelWindow(pixelated, pixwin(res->nside), true);
+                    t = &pixelated;
+                    label += " \u00d7 pixel window";
+                }
+                catch (const std::exception &)
+                {
+                }
+            if (m_beamTheoryCheck->isChecked())
+                try
+                {
+                    const int top
+                        = int(std::max(t->TT.size(), t->EE.size())) - 1;
+                    const PixelWindow b = beam(top);
+                    Spectra smoothed    = *t;
+                    applyPixelWindow(smoothed, b, true);
+                    pixelated = std::move(smoothed);
+                    t         = &pixelated;
+                    label += " \u00d7 beam";
+                }
+                catch (const std::exception &)
+                {
+                }
+            const Spectra *use = t;
             if (m_binTheoryCheck->isChecked() && !spectra.ell.empty()
                 && res != m_results.constEnd() && res->master)
             {
@@ -2020,7 +2254,10 @@ PowerSpectrumDock::exportCsv(const QString &givenPath)
             return;
         }
         QTextStream out(&bandFile);
-        const Spectra &sp = it->spectra;
+        const Spectra spShown = shown(*it);
+        const Spectra &sp     = spShown;
+        if (m_pixwinCheck->isChecked())
+            out << "# divided by the pixel window\n";
         out << "# bandpowers corrected for the mask (MASTER), lmax = "
             << it->lmax << ", nside = " << it->nside << ", bandwidth = "
             << it->correction.bandwidth << ", f_sky = " << it->fsky
@@ -2073,7 +2310,9 @@ PowerSpectrumDock::exportCsv(const QString &givenPath)
         return name;
     };
     QList<Source> sources;
-    sources.append({QString(), titleOf(m_view.data()), &it->spectra});
+    std::deque<Spectra> keep; // the spectra as shown (pixel window)
+    keep.push_back(shown(*it));
+    sources.append({QString(), titleOf(m_view.data()), &keep.back()});
     for (const OpenMap &m : m_openMaps ? m_openMaps() : QList<OpenMap>())
     {
         if (!m.view || m.view.data() == m_view.data()
@@ -2081,7 +2320,10 @@ PowerSpectrumDock::exportCsv(const QString &givenPath)
             continue;
         const auto r = m_results.constFind(m.view.data());
         if (r != m_results.constEnd())
-            sources.append({"@" + clean(m.title), m.title, &r->spectra});
+        {
+            keep.push_back(shown(*r));
+            sources.append({"@" + clean(m.title), m.title, &keep.back()});
+        }
     }
     for (const External &e : m_external)
         if (e.enabled)

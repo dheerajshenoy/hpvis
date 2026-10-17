@@ -70,6 +70,12 @@ RandomMapDialog::RandomMapDialog(QWidget *parent) : QDialog(parent)
                        "leaves it unsmoothed");
     m_fwhmLabel = new QLabel("Beam FWHM:");
     form->addRow(m_fwhmLabel, m_fwhm);
+    m_pixwin = new QCheckBox("Apply the pixel window");
+    m_pixwin->setToolTip(
+        "Smooth the map with the HEALPix pixel window of its nside, as a map "
+        "made of pixels is (healpy's synfast pixwin=True). Temperature and "
+        "polarization have different windows.");
+    form->addRow(m_pixwin);
 
     auto *seedRow = new QHBoxLayout();
     m_randomSeed  = new QCheckBox("Random");
@@ -137,6 +143,7 @@ RandomMapDialog::updateOptions()
     m_unitLabel->setVisible(cmb);
     m_fwhm->setVisible(cmb);
     m_fwhmLabel->setVisible(cmb);
+    m_pixwin->setVisible(cmb);
 
     if (kind == RandomKind::GaussianNoise)
     {
@@ -188,6 +195,7 @@ RandomMapDialog::compute()
                   ? unsigned(std::random_device{}() & 0x7fffffff)
                   : unsigned(m_seed->value());
     o.fwhmArcmin = m_fwhm->value();
+    o.pixelWindow = m_pixwin->isChecked();
 
     const AppSettings settings = AppSettings::load();
     o.theory.preset            = TheoryPreset(settings.theoryPreset);

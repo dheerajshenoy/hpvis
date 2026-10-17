@@ -1,4 +1,5 @@
 #include "randommap.hpp"
+#include "pixelwindow.hpp"
 
 #include "alm.h"
 #include "alm_healpix_tools.h"
@@ -101,6 +102,8 @@ cmbMaps(const RandomOptions &o, RandomResult &r)
             ps.tt(l) = std::max(0.0, at(spectra.TT, l));
         Alm<xcomplex<float>> alm(lmax, lmax);
         create_alm(ps, alm, rng);
+        if (o.pixelWindow)
+            alm.ScaleL(pixwin(int(o.nside), lmax).T);
         if (fwhm > 0.0)
             smoothWithGauss(alm, fwhm);
         r.map = newMap(o.nside);
@@ -122,6 +125,13 @@ cmbMaps(const RandomOptions &o, RandomResult &r)
     }
     Alm<xcomplex<float>> aT(lmax, lmax), aE(lmax, lmax), aB(lmax, lmax);
     create_alm_pol(ps, aT, aE, aB, rng);
+    if (o.pixelWindow)
+    {
+        const PixelWindow w = pixwin(int(o.nside), lmax);
+        aT.ScaleL(w.T); // the polarization window is not the temperature one
+        aE.ScaleL(w.P);
+        aB.ScaleL(w.P);
+    }
     if (fwhm > 0.0)
         smoothWithGauss(aT, aE, aB, fwhm);
     r.map  = newMap(o.nside);

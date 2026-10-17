@@ -458,6 +458,39 @@ by a window f(ℓ). The result opens as a new tab.
 On a masked map the filter leaks power across the edge of the mask, since UNSEEN
 pixels are taken as zero.
 
+### Pixel window
+
+Maps made of pixels are smoothed by the pixel (the *pixel window function*
+w_ℓ). HEALPix gives two: w_T for temperature and w_P for polarization (E and B),
+which differ. hpvis has them for nsides 2 to 8192 (the files of
+`healpy.sphtfunc.pixwin`, bundled), picked by the map's nside.
+
+- **Power spectrum dock > Pixel window** divides the spectra by w²: TT by w_T²,
+  EE, BB and EB by w_P², TE and TB by w_T w_P. Bandpowers use the mean over their
+  band. It applies to every map shown and to CSV exports, and needs no
+  recomputing.
+- **Theory pixel window** multiplies the theory curve by the same factors, to
+  compare it with the pixelized map. Use one of the two, not both.
+- **Tools > Maps > Generate Random Map > Apply the pixel window** (CMB) scales
+  the a_ℓm by w_T for T and w_P for E and B, like `synfast(pixwin=True)`.
+
+### Beam correction
+
+Maps such as Planck's are smoothed to a beam (5 arcmin for SMICA), which lowers
+the spectrum at high ℓ by B_ℓ². The power spectrum dock has a **Beam** row:
+
+- **Beam** divides the spectra by B_ℓ², for the maps shown and for CSV exports,
+  without recomputing. Give the **FWHM** of a Gaussian beam, or click **File...**
+  for a beam window file (B_ℓ from ℓ = 0 as an amplitude, like HEALPix's
+  `gaussian_beam`; a FITS table, `.npy` or text). Click the file's name to go
+  back to the Gaussian.
+- **Theory beam** multiplies the theory curve by B_ℓ² instead, to compare it with
+  the smoothed map. Use one of the two, not both.
+- Polarization (EE, BB, EB, TE, TB) uses the spin-2 Gaussian beam, as
+  `smoothWithGauss` does. A FITS beam file with a POLARIZATION (or EE) column
+  gives its own polarization beam; any other file is used for both.
+- It combines with **Pixel window**: the total transfer function is B_ℓ w_ℓ.
+
 ### Derivatives and E/B Maps
 
 **Tools > Maps > Derivatives and E/B Maps...** works through the spherical harmonics:

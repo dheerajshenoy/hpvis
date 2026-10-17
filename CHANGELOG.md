@@ -2,6 +2,16 @@
 
 ## 0.1.1
 
+### Beam correction
+- The power spectrum dock can divide the spectra by a beam window B_ℓ² (a
+  Gaussian of a given FWHM, or a beam file) or multiply the theory by it.
+
+### Pixel window
+- The HEALPix pixel window functions (temperature and polarization, nside 2 to
+  8192, as healpy's `pixwin`) are bundled. The power spectrum dock can divide
+  the spectra by them (Pixel window), or multiply the theory (Theory pixel
+  window); Random Map can apply them to the CMB it draws.
+
 ### Theory spectrum
 - Settings > Theory: the Planck 2018 cosmological parameters (base ΛCDM, running,
   r, n_t, N_eff, Σm_ν, Ωk, w0, wa, T_cmb, Y_He) can be edited, with a Reset button. Other values than the

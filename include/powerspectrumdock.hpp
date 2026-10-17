@@ -31,6 +31,7 @@ class QProgressBar;
 class QToolButton;
 class QTimer;
 struct PowerSpectrumJob;
+struct PixelWindow;
 
 struct Spectra
 {
@@ -130,6 +131,17 @@ private:
     void updatePlot(const Spectra &spectra, bool keepRange = false);
     void applyPlotColors();
     void replot(bool keepRange = false);
+    // The spectra of a result as shown: corrected for the pixel window of its
+    // nside when that is ticked
+    Spectra shown(const Result &result) const;
+    // False (with a message) when the pixel window of the current map's nside
+    // is not available
+    bool pixelWindowAvailable();
+    // The beam B_l (T and P) for l = 0..lmax: the file's, or the Gaussian
+    // one; throws std::runtime_error
+    PixelWindow beam(int lmax) const;
+    void chooseBeamFile();
+    void updateBeamButton();
     void buildCompareMenu();
     // Without a path the user is asked for the file; `unit` (0 = C_l, 1 = D_l,
     // -1 = ask) answers the question of what the values are
@@ -188,6 +200,14 @@ private:
     QCheckBox *m_purifyECheck   = nullptr;
     QCheckBox *m_purifyBCheck   = nullptr;
     QCheckBox *m_binTheoryCheck = nullptr;
+    QCheckBox *m_pixwinCheck       = nullptr; // divide the spectra by w_l^2
+    QCheckBox *m_pixwinTheoryCheck = nullptr; // multiply the theory by w_l^2
+    QCheckBox *m_beamCheck         = nullptr; // divide the spectra by B_l^2
+    QCheckBox *m_beamTheoryCheck   = nullptr; // multiply the theory by B_l^2
+    QDoubleSpinBox *m_beamFwhm     = nullptr; // Gaussian beam, arcmin
+    QPushButton *m_beamFileButton  = nullptr;
+    QString m_beamFile;                       // the beam file ("" = Gaussian)
+    std::shared_ptr<const PixelWindow> m_beamLoaded; // its beam, when read
     QLabel *m_maskHint          = nullptr;
     QLabel *m_infoLabel         = nullptr;
     QComboBox *m_quantityCombo  = nullptr; // what the y axis shows
