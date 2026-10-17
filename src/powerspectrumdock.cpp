@@ -1,4 +1,5 @@
 #include "powerspectrumdock.hpp"
+#include "unseen.hpp"
 
 #include "alm.h"
 #include "alm_healpix_tools.h"
@@ -76,7 +77,7 @@ toDouble(const Healpix_Map<float> &map, bool &unseen)
     Healpix_Map<double> m(map.Nside(), map.Scheme(), SET_NSIDE);
     for (long i = 0; i < map.Npix(); ++i)
     {
-        const bool good = std::isfinite(map[i]) && map[i] > -1e30f;
+        const bool good = isSeen(map[i]);
         unseen |= !good;
         m[i] = good ? map[i] : 0.0;
     }
@@ -373,7 +374,7 @@ computeMasked(const PowerSpectrumInput &in, Stokes &st, int wanted,
         const std::vector<float> &weights = *in.weights;
         for (long i = 0; i < map.Npix(); ++i)
         {
-            const bool good = std::isfinite(map[i]) && map[i] > -1e30f;
+            const bool good = isSeen(map[i]);
             w[i]            = good ? double(weights[size_t(i)]) : 0.0;
         }
         if (w.Scheme() == NEST)

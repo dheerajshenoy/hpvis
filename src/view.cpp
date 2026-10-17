@@ -1,4 +1,5 @@
 #include "view.hpp"
+#include "unseen.hpp"
 
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
@@ -59,13 +60,13 @@ markBinaryMaskUnseen(Healpix_Map<float> &map)
             hasZero = true;
         else if (d[i] == 1.0f)
             hasOne = true;
-        else if (std::isfinite(d[i]) && d[i] > -1e30f)
+        else if (isSeen(d[i]))
             binary = false;
     }
     if (binary && hasZero && hasOne)
         for (long i = 0; i < n; ++i)
             if (d[i] == 0.0f)
-                d[i] = float(Healpix_undef);
+                d[i] = UNSEEN;
 }
 
 // Reads the file on a worker thread; the (large) map is handed to the GL

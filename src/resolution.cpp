@@ -1,4 +1,5 @@
 #include "resolution.hpp"
+#include "unseen.hpp"
 
 #include "alm.h"
 #include "healpix_cxx/fitshandle.h"
@@ -14,12 +15,6 @@
 
 namespace
 {
-bool
-isGood(float v)
-{
-    return std::isfinite(v) && v > -1.0e30f;
-}
-
 bool
 isPowerOfTwo(long n)
 {
@@ -44,7 +39,7 @@ pixelDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
         cleaned = in;
         for (long i = 0; i < cleaned.Npix(); ++i)
             if (!std::isfinite(cleaned[i]))
-                cleaned[i] = float(Healpix_undef);
+                cleaned[i] = UNSEEN;
         src = &cleaned;
     }
     out->Import_degrade(*src, o.pessimistic);
@@ -71,7 +66,7 @@ harmonicDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
     long unseen = 0;
     for (long i = 0; i < in.Npix(); ++i)
     {
-        const bool good = isGood(in[i]);
+        const bool good = isSeen(in[i]);
         unseen += !good;
         map[i] = good ? double(in[i]) : 0.0;
     }
@@ -136,14 +131,14 @@ harmonicDowngrade(const Healpix_Map<float> &in, const DowngradeOptions &o)
     {
         Healpix_Map<float> valid(nsideIn, in.Scheme(), SET_NSIDE);
         for (long i = 0; i < in.Npix(); ++i)
-            valid[i] = isGood(in[i]) ? 1.0f : 0.0f;
+            valid[i] = isSeen(in[i]) ? 1.0f : 0.0f;
         Healpix_Map<float> frac(o.nsideOut, in.Scheme(), SET_NSIDE);
         frac.Import_degrade(valid, false); // mean of 1 / 0 = valid fraction
         if (frac.Scheme() == NEST)
             frac.swap_scheme();
         for (long i = 0; i < out->Npix(); ++i)
             if (frac[i] < 0.5f)
-                (*out)[i] = float(Healpix_undef);
+                (*out)[i] = UNSEEN;
     }
 
     if (in.Scheme() == NEST)

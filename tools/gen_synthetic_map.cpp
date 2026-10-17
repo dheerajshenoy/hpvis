@@ -5,6 +5,7 @@
 // fine small-scale structure (so zooming in keeps showing detail) and a
 // circular patch of UNSEEN pixels.
 #include <healpix_cxx/healpix_map.h>
+#include "../include/unseen.hpp"
 #include <healpix_cxx/healpix_map_fitsio.h>
 
 #include <cmath>
@@ -60,7 +61,7 @@ main(int argc, char **argv)
 
         if (angularDistance(th, ph, holeTheta, holePhi) < holeRadius)
         {
-            map[i] = float(Healpix_undef); // UNSEEN
+            map[i] = UNSEEN;
             continue;
         }
 

@@ -1,4 +1,5 @@
 #include "mapoperation.hpp"
+#include "unseen.hpp"
 
 #include "fitsinfo.hpp"
 #include "healpix_cxx/error_handling.h"
@@ -114,11 +115,6 @@ load(const OperandSource &op)
     return out;
 }
 
-inline bool
-isValid(float v)
-{
-    return std::isfinite(v) && v > -1.0e30f;
-}
 } // namespace
 
 OperationResult
@@ -201,7 +197,7 @@ runOperation(const std::vector<OperandSource> &operands,
         auto out
             = std::make_shared<Healpix_Map<float>>(nside, scheme, SET_NSIDE);
         const long npix   = out->Npix();
-        const float undef = float(Healpix_undef);
+        const float undef = UNSEEN;
         long valid        = 0;
 
 #pragma omp parallel for schedule(static) reduction(+ : valid)
@@ -212,7 +208,7 @@ runOperation(const std::vector<OperandSource> &operands,
             for (int index : used)
             {
                 const float v = (*aligned[index])[p];
-                if (!isValid(v))
+                if (!isSeen(v))
                 {
                     ok = false;
                     break;

@@ -1,4 +1,5 @@
 #include "openglwidget.hpp"
+#include "unseen.hpp"
 
 #include "appsettings.hpp"
 #include "colormapregistry.hpp"
@@ -473,7 +474,7 @@ OpenGLWidget::recomputeDataRange()
         for (long i = begin; i < end; ++i)
         {
             const float v = data[i];
-            if (!std::isfinite(v) || v < -1e30f)
+            if (!isSeen(v))
                 continue;
             if (!active.empty())
             {
@@ -1128,7 +1129,7 @@ OpenGLWidget::addMasks(const QList<MaskSource> &sources)
                     for (long i = begin; i < end; ++i)
                     {
                         // NaN / UNSEEN count as masked; weights clamp to [0, 1]
-                        const float v = (std::isfinite(d[i]) && d[i] > -1e30f)
+                        const float v = (isSeen(d[i]))
                                             ? d[i]
                                             : 0.0f;
                         out[i]        = static_cast<uint8_t>(
@@ -1513,13 +1514,13 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
                 for (int i = 0; i < n; ++i)
                 {
                     const float v = mapDataPtr[pix[i]];
-                    if (v > -1.0e30f && std::isfinite(v))
+                    if (isSeen(v))
                     {
                         sum += v;
                         ++valid;
                     }
                 }
-                buf[texel] = valid ? float(sum / valid) : -1.6375e30f; // UNSEEN
+                buf[texel] = valid ? float(sum / valid) : UNSEEN;
             });
             glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, l, tex, tex, 1,
                             GL_RED, GL_FLOAT, buf.data());
@@ -1731,7 +1732,7 @@ OpenGLWidget::emitCursorData()
         m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING, SET_NSIDE);
     const qlonglong idx = base.ang2pix(pointing(mapColat, mapPhi));
     float v             = m_pendingMap.Map()[idx];
-    if (v < -1.0e30f || !std::isfinite(v))
+    if (!isSeen(v))
         v = std::nanf("");
 
     double lon = shownPhi * 180.0 / M_PI;
@@ -3061,7 +3062,7 @@ OpenGLWidget::startRegionJob()
         {
             ++a.pixels;
             const float v = data[i];
-            if (!std::isfinite(v) || v < -1e30f)
+            if (!isSeen(v))
                 return;
             if (keepData && !keepData[i])
                 return;

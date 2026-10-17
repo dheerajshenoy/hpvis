@@ -1,4 +1,5 @@
 #include "argparse.hpp"
+#include "unseen.hpp"
 #include "fitsinfo.hpp"
 #include "hpvis.hpp"
 #include "npyreader.hpp"
@@ -186,7 +187,7 @@ printStats(const QString &path, int hdu, int column, const QString &columnName)
     for (long i = 0; i < map.Npix(); ++i)
     {
         const float v = map[i];
-        if (!std::isfinite(v) || v <= -1e30f)
+        if (!isSeen(v))
             continue;
         if (n == 0)
             min = max = v;

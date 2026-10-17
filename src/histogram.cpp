@@ -1,4 +1,5 @@
 #include "histogram.hpp"
+#include "unseen.hpp"
 
 #include "healpix_cxx/error_handling.h"
 #include "healpix_cxx/fitshandle.h"
@@ -72,12 +73,6 @@ readColumn(const QString &path, int hdu, int column)
     return result;
 }
 
-inline bool
-isValid(float v)
-{
-    return std::isfinite(v) && v > -1.0e30f;
-}
-
 struct Range
 {
     double min = std::numeric_limits<double>::max();
@@ -98,7 +93,7 @@ valueRange(const Healpix_Map<float> &map, const std::vector<uint8_t> *keep)
         for (long i = 0; i < npix; ++i)
         {
             const float v = map[i];
-            if (!isValid(v) || (keep && !(*keep)[i]))
+            if (!isSeen(v) || (keep && !(*keep)[i]))
                 continue;
             r.min = std::min<double>(r.min, v);
             r.max = std::max<double>(r.max, v);
@@ -133,7 +128,7 @@ binCounts(const Healpix_Map<float> &map, const std::vector<uint8_t> *keep,
         for (long i = 0; i < npix; ++i)
         {
             const float v = map[i];
-            if (!isValid(v) || (keep && !(*keep)[i]) || v < lo || v > hi)
+            if (!isSeen(v) || (keep && !(*keep)[i]) || v < lo || v > hi)
                 continue;
             int b = int((v - lo) * scale);
             if (b >= bins)

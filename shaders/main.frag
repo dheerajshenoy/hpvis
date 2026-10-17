@@ -130,6 +130,7 @@ void main() {
     vec3 color;
 
     // HEALPix UNSEEN is -1.6375e30 (finite, not NaN); also catch NaN/Inf.
+    // Threshold must match isSeen() / UNSEEN in include/unseen.hpp.
     if (mapVal < -1.0e30 || isnan(mapVal) || isinf(mapVal)) {
         color = unseen_color;
     } else {

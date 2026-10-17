@@ -1,4 +1,5 @@
 #include "smoothing.hpp"
+#include "unseen.hpp"
 
 #include "alm.h"
 #include "alm_healpix_tools.h"
@@ -13,12 +14,6 @@
 
 namespace
 {
-bool
-isGood(float v)
-{
-    return std::isfinite(v) && v > -1e30f;
-}
-
 // Copies to double in RING order; UNSEEN / NaN pixels become zero
 Healpix_Map<double>
 toDouble(const Healpix_Map<float> &in, long &unseen)
@@ -26,7 +21,7 @@ toDouble(const Healpix_Map<float> &in, long &unseen)
     Healpix_Map<double> m(in.Nside(), in.Scheme(), SET_NSIDE);
     for (long i = 0; i < in.Npix(); ++i)
     {
-        const bool good = isGood(in[i]);
+        const bool good = isSeen(in[i]);
         unseen += !good;
         m[i] = good ? double(in[i]) : 0.0;
     }
@@ -46,8 +41,8 @@ toFloat(const Healpix_Map<double> &m, const Healpix_Map<float> &in,
         out->swap_scheme();
     if (keepUnseen)
         for (long i = 0; i < out->Npix(); ++i)
-            if (!isGood(in[i]))
-                (*out)[i] = float(Healpix_undef);
+            if (!isSeen(in[i]))
+                (*out)[i] = UNSEEN;
     return out;
 }
 
