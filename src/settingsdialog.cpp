@@ -1,5 +1,5 @@
 #include "settingsdialog.hpp"
-#include "aboutinfo.hpp"
+#include "aboutcontent.hpp"
 
 #include "colormapregistry.hpp"
 
@@ -814,14 +814,8 @@ SettingsDialog::createAboutPage()
     QWidget *page = new QWidget();
 
     QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->addStretch();
-
-    QLabel *aboutLabel = new QLabel(aboutHtml());
-    aboutLabel->setTextFormat(Qt::RichText);
-    aboutLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    aboutLabel->setOpenExternalLinks(true);
-    layout->addWidget(aboutLabel);
-    layout->addStretch();
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(new AboutContent());
 
     return page;
 }

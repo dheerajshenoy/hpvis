@@ -162,6 +162,8 @@ add_executable(${PROJECT_NAME}
     src/shaderloader.cpp
     src/statusbar.cpp
     src/settingsdialog.cpp
+    src/aboutbanner.cpp
+    src/aboutcontent.cpp
     src/powerspectrumdock.cpp
     src/statisticsdock.cpp
 
@@ -172,6 +174,8 @@ add_executable(${PROJECT_NAME}
     include/npyreader.hpp
     include/settingsdialog.hpp
     include/aboutinfo.hpp
+    include/aboutbanner.hpp
+    include/aboutcontent.hpp
     include/exportoptions.hpp
     include/view.hpp
     include/hpvis.hpp

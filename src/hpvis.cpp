@@ -1,5 +1,5 @@
 #include "hpvis.hpp"
-#include "aboutinfo.hpp"
+#include "aboutcontent.hpp"
 
 #include "colormapregistry.hpp"
 #include "downgradedialog.hpp"
@@ -851,12 +851,18 @@ HpVis::initMenubar()
 
     helpMenu->addAction("&About", this, [this]()
     {
-        // Rich text, with clickable links (the settings page shows the same)
-        QMessageBox box(QMessageBox::NoIcon, "About hpvis", aboutHtml(),
-                        QMessageBox::Ok, this);
-        box.setTextFormat(Qt::RichText);
-        box.setTextInteractionFlags(Qt::TextBrowserInteraction);
-        box.exec();
+        // The same content as the About page of the settings
+        QDialog dialog(this);
+        dialog.setWindowTitle("About hpvis");
+        auto *layout = new QVBoxLayout(&dialog);
+        layout->setContentsMargins(0, 0, 0, 8);
+        layout->addWidget(new AboutContent());
+
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+        connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+        buttons->setContentsMargins(12, 0, 12, 0);
+        layout->addWidget(buttons);
+        dialog.exec();
     });
 }
 

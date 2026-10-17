@@ -14,6 +14,9 @@
         <file>shaders/colormapstrip.frag</file>
         <file>shaders/graticule.glsl</file>
 
+        <!-- Licence text, shown in the About dialog -->
+        <file>LICENSE</file>
+
         <!-- Fonts -->
         <file>resources/fonts/Major-Mono-Display.ttf</file>
 
