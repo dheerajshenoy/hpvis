@@ -723,7 +723,7 @@ PowerSpectrumDock::initUI()
         QSettings().setValue("powerspectrum/binTheory", on);
         replot(true);
     });
-    m_pixwinCheck = new QCheckBox("Pixel window");
+    m_pixwinCheck = new QCheckBox("Divide by pixel window");
     m_pixwinCheck->setToolTip(
         "Divide the spectra by the pixel window of the map's nside (HEALPix's\n"
         "pixel_window files, as healpy's pixwin): w_T^2 for TT, w_P^2 for EE,\n"
@@ -746,7 +746,7 @@ PowerSpectrumDock::initUI()
     m_pixwinTheoryCheck->setToolTip(
         "Multiply the theory spectrum by the pixel window of the current map\n"
         "(what a pixelized map of that theory should show). Use it instead of\n"
-        "Pixel window when you compare the map with the theory.");
+        "Divide by pixel window when you compare the map with the theory.");
     m_pixwinTheoryCheck->setChecked(
         QSettings().value("powerspectrum/pixwinTheory", false).toBool());
     connect(m_pixwinTheoryCheck, &QCheckBox::toggled, this, [this](bool on)
@@ -761,7 +761,7 @@ PowerSpectrumDock::initUI()
         replot(true);
     });
     // Beam: divide the spectra by B_l^2 (or multiply the theory by it)
-    m_beamCheck = new QCheckBox("Beam");
+    m_beamCheck = new QCheckBox("Divide by beam");
     m_beamCheck->setToolTip(
         "Divide the spectra by the beam window B_l^2 of the map (a Planck map\n"
         "is smoothed to a beam, e.g. 5 arcmin for SMICA). A Gaussian of the\n"
@@ -780,7 +780,7 @@ PowerSpectrumDock::initUI()
     m_beamTheoryCheck = new QCheckBox("Theory beam");
     m_beamTheoryCheck->setToolTip(
         "Multiply the theory spectrum by B_l^2 instead of correcting the map\n"
-        "(the smoothed map should follow it). Use it instead of Beam.");
+        "(the smoothed map should follow it). Use it instead of Divide by beam.");
     {
         const QSettings s;
         m_beamFwhm->setValue(s.value("powerspectrum/beamFwhm", 5.0).toDouble());
@@ -1684,11 +1684,11 @@ PowerSpectrumDock::updatePlot(const Spectra &spectra, bool keepRange)
     // The theory spectrum; for a mask-corrected spectrum optionally through
     // the bandpower windows, so that it is what the bandpowers estimate
     Spectra binnedTheory;
+    Spectra pixelated; // the series point into it: it must outlive the block
     if (m_theoryOn)
         if (const Spectra *t = theorySpectra())
         {
             const auto res     = m_results.constFind(m_view.data());
-            Spectra pixelated;
             QString label = m_theoryName;
             if (m_pixwinTheoryCheck->isChecked() && res != m_results.constEnd()
                 && res->nside >= 2)
