@@ -17,6 +17,7 @@
 #include "powerspectrumdock.hpp"
 #include "randommapdialog.hpp"
 #include "rotationdialog.hpp"
+#include <QRegularExpression>
 #include "transformdialog.hpp"
 #include "unitsdialog.hpp"
 #include "settingsdialog.hpp"
@@ -2359,10 +2360,14 @@ HpVis::onSaveMapTriggered()
         return;
     }
 
-    QString suggestion
-        = m_view->isComputed()
-              ? QString("result.fits")
-              : QFileInfo(m_view->filePath()).completeBaseName() + "_copy.fits";
+    // The tab name, without the extension and with no characters a file
+    // name cannot hold
+    QString name = m_view->displayName();
+    if (!m_view->isComputed())
+        name = QFileInfo(name).completeBaseName();
+    name.replace(QRegularExpression("[/\\\\:*?\"<>|]"), "_");
+    const QString suggestion = (name.trimmed().isEmpty() ? "map" : name.trimmed())
+                               + ".fits";
     QFileDialog dialog(this, "Save Map As", startDirectory() + "/" + suggestion,
                        "FITS Files (*.fits);;All Files (*)");
     dialog.setAcceptMode(QFileDialog::AcceptSave);
