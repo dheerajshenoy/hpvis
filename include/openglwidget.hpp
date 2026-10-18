@@ -5,6 +5,7 @@
 #include "mapcamera.hpp"
 #include "masksource.hpp"
 #include "pixelordering.hpp"
+#include <climits>
 #include <QKeySequence>
 #include "projection.hpp"
 #include "skyframe.hpp"
@@ -493,6 +494,8 @@ private:
     void emitCursorData();
     void uploadMapToGPU(const Healpix_Map<float> &map);
     void uploadMaskToGPU();
+    // Re-uploads only the texel rectangles the paint brush touched
+    void uploadMaskRegions();
     // Streaming: the tiles on screen that are finer than the coarse map, most
     // central first, and loading them
     std::vector<int> visibleTiles() const;
@@ -686,6 +689,15 @@ private:
     static constexpr int kMaxMasks = 16; // 4 textures x 4 channels
     std::array<GLuint, 4 * kMaxSegments> m_maskTextures{}; // [set * 3 + seg]
     bool m_maskDirty               = false; // mask textures need re-uploading
+    // Texel rectangles (per face, inclusive) the brush changed since the last
+    // upload; cheaper than re-uploading every mask while a stroke is going
+    struct DirtyRect
+    {
+        int x0 = INT_MAX, y0 = INT_MAX, x1 = -1, y1 = -1;
+        bool empty() const { return x1 < 0; }
+    };
+    std::array<DirtyRect, 12> m_paintDirty{};
+    bool m_paintRegionDirty = false;
     bool m_colorBarVisible         = true;
     int m_maskMode                 = 0;
     float m_maskOpacity            = 0.8f;

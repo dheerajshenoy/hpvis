@@ -77,6 +77,10 @@ public:
     // Writes the map to a new FITS file (HDU 2, one float column; a computed
     // map with several columns writes them all)
     bool saveMap(const QString &path, QString *error) const;
+    // The same, plus a last column "MASK" with the product of the enabled
+    // masks (weights in [0, 1]). Needs at least one enabled mask. A map read
+    // from a FITS file keeps the other columns of its HDU.
+    bool saveMapWithMask(const QString &path, QString *error) const;
 
     // Asynchronous: reads the file in the background and emits loadFinished
     // hdu / column are 1-based; 0 picks the first map HDU / column

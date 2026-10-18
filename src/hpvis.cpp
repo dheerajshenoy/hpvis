@@ -455,6 +455,11 @@ HpVis::initMenubar()
     m_fileSaveMapAction->setIcon(
         themeIcon("document-save-as", QStyle::SP_DialogSaveButton));
 
+    m_fileSaveMapMaskAction = tag(
+        m_fileMenu->addAction("Save Map With &Mask Column...", this,
+                              &HpVis::onSaveMapWithMaskTriggered),
+        Command::FileSaveMapWithMask);
+
     m_fileExportAction = tag(m_fileMenu->addAction("&Export Image...", this,
                                                &HpVis::onExportActionTriggered), Command::FileExport);
     m_fileExportAction->setIcon(
@@ -2390,9 +2395,28 @@ HpVis::addComputedView(View *view, const QString &title)
 void
 HpVis::onSaveMapTriggered()
 {
+    saveMapDialog(false);
+}
+
+void
+HpVis::onSaveMapWithMaskTriggered()
+{
+    saveMapDialog(true);
+}
+
+void
+HpVis::saveMapDialog(bool withMask)
+{
     if (!m_view || !m_view->healpixMap())
     {
         QMessageBox::information(this, "Save Map", "Open a map first.");
+        return;
+    }
+    if (withMask && m_view->glWidget()->maskWeights().empty())
+    {
+        QMessageBox::information(this, "Save Map",
+                                 "There is no enabled mask to save. Add or "
+                                 "build a mask first.");
         return;
     }
 
@@ -2403,7 +2427,7 @@ HpVis::onSaveMapTriggered()
         name = QFileInfo(name).completeBaseName();
     name.replace(QRegularExpression("[/\\\\:*?\"<>|]"), "_");
     const QString suggestion = (name.trimmed().isEmpty() ? "map" : name.trimmed())
-                               + ".fits";
+                               + (withMask ? "_masked" : "") + ".fits";
     QFileDialog dialog(this, "Save Map As", startDirectory() + "/" + suggestion,
                        "FITS Files (*.fits);;All Files (*)");
     dialog.setAcceptMode(QFileDialog::AcceptSave);
@@ -2428,7 +2452,8 @@ HpVis::onSaveMapTriggered()
     rememberDirectory(path);
 
     QString error;
-    if (m_view->saveMap(path, &error))
+    if (withMask ? m_view->saveMapWithMask(path, &error)
+                 : m_view->saveMap(path, &error))
         m_statusBar->showMessage(QString("Saved %1").arg(path), 4000);
     else
         QMessageBox::critical(

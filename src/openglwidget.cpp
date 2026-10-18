@@ -751,6 +751,8 @@ OpenGLWidget::paintGL()
         updateTiles();
     if (m_maskDirty)
         uploadMaskToGPU();
+    else if (m_paintRegionDirty)
+        uploadMaskRegions();
     if (m_lutDirty)
         uploadColormapLut();
     if (m_colorBarVisible)
@@ -1436,6 +1438,8 @@ OpenGLWidget::uploadMaskToGPU()
     makeCurrent();
     deleteMaskTextures();
     m_maskDirty = false;
+    m_paintDirty.fill(DirtyRect{});
+    m_paintRegionDirty = false;
 
     if (m_masks.empty())
         return;
@@ -1486,6 +1490,75 @@ OpenGLWidget::uploadMaskToGPU()
             }
         }
     // Restore the default: Qt's text renderer relies on it
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+}
+
+void
+OpenGLWidget::uploadMaskRegions()
+{
+    m_paintRegionDirty = false;
+    const int k        = paintLayerIndex();
+    if (k < 0 || m_masks.empty())
+    {
+        m_paintDirty.fill(DirtyRect{});
+        return;
+    }
+    const int ns = int(m_texNside);
+    const size_t g = size_t(k) / 4;
+    const Healpix_Base base(
+        int(m_nside), m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING,
+        SET_NSIDE);
+    const int r = base.Nside() / ns;
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for (int face = 0; face < 12; ++face)
+    {
+        const DirtyRect dr = m_paintDirty[size_t(face)];
+        if (dr.empty())
+            continue;
+        const int seg = face / m_segLayers, layer = face % m_segLayers;
+        const GLuint tex = m_maskTextures[g * kMaxSegments + size_t(seg)];
+        if (!tex)
+        {
+            m_maskDirty = true; // no texture to patch: do the full upload
+            m_paintDirty.fill(DirtyRect{});
+            update();
+            break;
+        }
+        const int w = dr.x1 - dr.x0 + 1, h = dr.y1 - dr.y0 + 1;
+        std::vector<uint8_t> buf(size_t(w) * h * 4);
+        parallel::forRange(h, [&](long ya, long yb)
+        {
+            for (long yy = ya; yy < yb; ++yy)
+                for (int xx = 0; xx < w; ++xx)
+                {
+                    const size_t texel = size_t(yy) * w + xx;
+                    for (size_t c = 0; c < 4; ++c)
+                    {
+                        const size_t m = g * 4 + c;
+                        if (m >= m_masks.size())
+                        {
+                            buf[texel * 4 + c] = 255;
+                            continue;
+                        }
+                        const std::vector<uint8_t> &d = m_masks[m].data;
+                        int sum = 0;
+                        for (int dy = 0; dy < r; ++dy)
+                            for (int dx = 0; dx < r; ++dx)
+                                sum += d[size_t(base.xyf2pix(
+                                    (dr.x0 + xx) * r + dx,
+                                    (dr.y0 + int(yy)) * r + dy, face))];
+                        buf[texel * 4 + c]
+                            = uint8_t((sum + r * r / 2) / (r * r));
+                    }
+                }
+        });
+        glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, dr.x0, dr.y0, layer, w, h, 1,
+                        GL_RGBA, GL_UNSIGNED_BYTE, buf.data());
+        m_paintDirty[size_t(face)] = DirtyRect{};
+    }
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
@@ -3974,6 +4047,8 @@ OpenGLWidget::paintDab(const QPointF &pos)
 
     std::vector<uint8_t> &data = m_masks[size_t(k)].data;
     const double inner         = radius * m_paintHardness;
+    const int rr               = std::max<long>(1, long(m_nside) / m_texNside);
+    bool touched               = false;
     for (size_t r = 0; r < rs.nranges(); ++r)
         for (int pix = rs.ivbegin(r); pix < rs.ivend(r); ++pix)
         {
@@ -4005,8 +4080,17 @@ OpenGLWidget::paintDab(const QPointF &pos)
                 continue;
             m_strokeOld.emplace(pix, v); // the value before the stroke
             v = now;
+            int fx, fy, face;
+            base.pix2xyf(pix, fx, fy, face);
+            DirtyRect &dr = m_paintDirty[size_t(face)];
+            dr.x0 = std::min(dr.x0, fx / rr);
+            dr.x1 = std::max(dr.x1, fx / rr);
+            dr.y0 = std::min(dr.y0, fy / rr);
+            dr.y1 = std::max(dr.y1, fy / rr);
+            touched = true;
         }
-    m_maskDirty = true;
+    if (touched)
+        m_paintRegionDirty = true;
     update();
 }
 
@@ -4022,7 +4106,7 @@ OpenGLWidget::paintEnd()
         u.px.assign(m_strokeOld.begin(), m_strokeOld.end());
         pushPaintUndo(std::move(u));
         m_strokeOld.clear();
-        applyMaskChange(true);
+        applyMaskChange(false); // the textures are patched as the brush moves
     }
     emit paintChanged();
 }

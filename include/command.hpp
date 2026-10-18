@@ -15,6 +15,7 @@ enum class Command
     FileReopenSession,
     FileHeader,
     FileSaveMap,
+    FileSaveMapWithMask,
     FileExport,
     FileCloseTab,
     FileExit,
@@ -133,6 +134,7 @@ storedName(Command c)
     case Command::FileReopenSession: return "file/reopen-last-session";
     case Command::FileHeader: return "file/fits-header";
     case Command::FileSaveMap: return "file/save-map-as";
+    case Command::FileSaveMapWithMask: return "file/save-map-with-mask";
     case Command::FileExport: return "file/export";
     case Command::FileCloseTab: return "file/close-tab";
     case Command::FileExit: return "file/exit";

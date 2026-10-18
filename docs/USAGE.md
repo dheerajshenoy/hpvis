@@ -252,6 +252,9 @@ The **Masks** menu:
   lets you add other files, so a mask stored next to the map (or a result you
   computed) can be used without leaving the viewer.
 - **Clear All:** removes all masks.
+- **File > Save Map With Mask Column...:** writes a new FITS file with the
+  columns of the map's HDU plus a `MASK` column holding the product of the
+  enabled masks (weights between 0 and 1). The original file is not changed.
 - A **submenu for each mask** with **Enabled** (switch it on or off),
   **Invert** (use 1 − mask, for files that store 1 for "masked") and
   **Remove**.

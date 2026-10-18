@@ -400,3 +400,122 @@ View::saveMap(const QString &path, QString *error) const
     }
     return true;
 }
+
+bool
+View::saveMapWithMask(const QString &path, QString *error) const
+{
+    const Healpix_Map<float> *map = m_glWidget->healpixMap();
+    if (!map)
+    {
+        if (error)
+            *error = "there is no map";
+        return false;
+    }
+    const std::vector<float> weights = m_glWidget->maskWeights();
+    if (weights.empty() || weights.size() != size_t(map->Npix()))
+    {
+        if (error)
+            *error = "there is no enabled mask";
+        return false;
+    }
+    try
+    {
+        struct Col
+        {
+            std::string name, unit;
+            const Healpix_Map<float> *map;
+        };
+        std::vector<Col> cols;
+        std::vector<std::unique_ptr<Healpix_Map<float>>> owned;
+
+        if (m_computed && m_columns.size() > 1)
+        {
+            for (const ComputedColumn &c : m_columns)
+                cols.push_back({c.name.toStdString(), c.unit.toStdString(),
+                                c.map.get()});
+        }
+        else if (!m_computed && m_fitsInfo.kind == MapFileKind::Fits
+                 && m_fitsInfo.find(m_hdu))
+        {
+            // The other columns of the HDU, in the shown map's ordering
+            fitshandle src;
+            src.open(m_filePath.toStdString());
+            for (const FitsColumn &fc : m_fitsInfo.find(m_hdu)->columns)
+            {
+                Col c{fc.name.toStdString(), fc.unit.toStdString(), nullptr};
+                if (fc.index == m_column)
+                    c.map = map;
+                else
+                {
+                    src.goto_hdu(m_hdu);
+                    auto m = std::make_unique<Healpix_Map<float>>();
+                    read_Healpix_map_from_fits(src, *m, fc.index);
+                    if (m->Nside() != map->Nside())
+                        continue;
+                    if (m->Scheme() != map->Scheme())
+                        m->swap_scheme();
+                    c.map = m.get();
+                    owned.push_back(std::move(m));
+                }
+                cols.push_back(c);
+            }
+        }
+        if (cols.empty())
+            cols.push_back({"", m_unit.toStdString(), map});
+
+        Healpix_Map<float> mask(map->Nside(), map->Scheme(), SET_NSIDE);
+        for (size_t i = 0; i < weights.size(); ++i)
+            mask[int(i)] = weights[i];
+
+        // A column name that is free
+        std::string maskName = "MASK";
+        for (int n = 2;; ++n)
+        {
+            bool taken = false;
+            for (const Col &c : cols)
+                taken |= QString::fromStdString(c.name)
+                             .compare(QString::fromStdString(maskName),
+                                      Qt::CaseInsensitive) == 0;
+            if (!taken)
+                break;
+            maskName = "MASK" + std::to_string(n);
+        }
+        for (size_t i = 0; i < cols.size(); ++i)
+            if (cols[i].name.empty())
+                cols[i].name = "VALUE";
+
+        fitshandle out;
+        out.create("!" + path.toStdString()); // "!" overwrites
+        arr<std::string> names(cols.size() + 1);
+        for (size_t i = 0; i < cols.size(); ++i)
+            names[i] = cols[i].name;
+        names[cols.size()] = maskName;
+        prepare_Healpix_fitsmap(out, *map, PLANCK_FLOAT32, names);
+        for (size_t i = 0; i < cols.size(); ++i)
+        {
+            out.write_column(int(i) + 1, cols[i].map->Map());
+            if (!cols[i].unit.empty())
+            {
+                try
+                {
+                    out.set_key("TUNIT" + std::to_string(i + 1), cols[i].unit);
+                }
+                catch (const std::exception &)
+                {
+                    // the unit is only a label: keep the data
+                }
+            }
+        }
+        out.write_column(int(cols.size()) + 1, mask.Map());
+        out.set_key("COORDSYS",
+                    skyframe::fitsCode(m_glWidget->mapFrame()).toStdString(),
+                    "Coordinate system");
+    }
+    catch (const std::exception &e)
+    {
+        if (error)
+            *error = e.what();
+        return false;
+    }
+    return true;
+}

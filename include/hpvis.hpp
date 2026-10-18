@@ -149,6 +149,8 @@ private slots:
     void onRandomMapTriggered();
     QList<OpenMap> openMaps() const;
     void onSaveMapTriggered();
+    void onSaveMapWithMaskTriggered();
+    void saveMapDialog(bool withMask);
     void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
                          const QString &title, SkyFrame frame);
     void openComputedColumns(std::vector<ComputedColumn> columns,
@@ -189,6 +191,7 @@ private:
     RecentFiles m_recentFiles;
     AppSettings m_settings        = AppSettings::load();
     QAction *m_fileSaveMapAction  = nullptr;
+    QAction *m_fileSaveMapMaskAction = nullptr;
     QAction *m_fileExportAction   = nullptr;
     QAction *m_fileExitAction     = nullptr;
     QAction *m_fileCloseTabAction = nullptr;
