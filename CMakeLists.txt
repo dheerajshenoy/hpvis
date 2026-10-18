@@ -198,6 +198,8 @@ add_executable(${PROJECT_NAME}
     src/unitsdialog.cpp
     src/transformdialog.cpp
     src/datatransform.cpp
+    src/maskbuilder.cpp
+    src/maskbuilderdock.cpp
     src/randommap.cpp
     src/randommapdialog.cpp
     src/units.cpp
@@ -254,6 +256,8 @@ add_executable(${PROJECT_NAME}
     include/unitsdialog.hpp
     include/transformdialog.hpp
     include/datatransform.hpp
+    include/maskbuilder.hpp
+    include/maskbuilderdock.hpp
     include/randommap.hpp
     include/randommapdialog.hpp
     include/units.hpp

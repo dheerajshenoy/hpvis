@@ -36,6 +36,7 @@ class UsageDialog;
 class MapOperationDialog;
 class RotationDialog;
 class UnitsDialog;
+class MaskBuilderDock;
 class TransformDialog;
 class RandomMapDialog;
 
@@ -239,6 +240,7 @@ private:
     UsageDialog *m_usageDialog          = nullptr;
     FileExplorerDock *m_explorerDock    = nullptr;
     StatisticsDock *m_statsDock         = nullptr;
+    MaskBuilderDock *m_maskDock         = nullptr;
     PowerSpectrumDock *m_powerDock      = nullptr;
     StatusBar *m_statusBar              = nullptr;
 };

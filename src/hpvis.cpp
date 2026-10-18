@@ -18,6 +18,7 @@
 #include "randommapdialog.hpp"
 #include "rotationdialog.hpp"
 #include <QRegularExpression>
+#include "maskbuilderdock.hpp"
 #include "transformdialog.hpp"
 #include "unitsdialog.hpp"
 #include "settingsdialog.hpp"
@@ -303,6 +304,9 @@ HpVis::initUI()
     });
     m_statsDock = new StatisticsDock(this);
     m_statsDock->setOpenMapsProvider([this]() { return openMaps(); });
+    m_maskDock = new MaskBuilderDock(this);
+    connect(m_maskDock, &MaskBuilderDock::mapReady, this,
+            &HpVis::openComputedMap);
     m_powerDock = new PowerSpectrumDock(this);
     m_powerDock->setOpenMapsProvider([this]() { return openMaps(); });
     m_statusBar = new StatusBar();
@@ -316,6 +320,16 @@ HpVis::initUI()
     addDockWidget(Qt::LeftDockWidgetArea, m_explorerDock);
     addDockWidget(Qt::RightDockWidgetArea, m_statsDock);
     addDockWidget(Qt::RightDockWidgetArea, m_powerDock);
+    addDockWidget(Qt::RightDockWidgetArea, m_maskDock);
+    // The analysis docks share the right side as tabs
+    for (QDockWidget *dock : {static_cast<QDockWidget *>(m_statsDock),
+                              static_cast<QDockWidget *>(m_powerDock),
+                              static_cast<QDockWidget *>(m_maskDock)})
+        dock->setAllowedAreas(Qt::RightDockWidgetArea);
+    tabifyDockWidget(m_statsDock, m_powerDock);
+    tabifyDockWidget(m_powerDock, m_maskDock);
+    setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
+    m_maskDock->hide();
     m_statsDock->hide();
     m_powerDock->hide();
 
@@ -1011,6 +1025,8 @@ HpVis::initMenubar()
 
     m_toolsAnalysisMenu->addAction(
         tag(m_statsDock->toggleViewAction(), Command::ToolsStatistics));
+    m_toolsAnalysisMenu->addAction(
+        tag(m_maskDock->toggleViewAction(), Command::ToolsMaskBuilder));
 
     m_toolsMenu->addSeparator();
     m_toolsSettingsAction = tag(m_toolsMenu->addAction(
@@ -1408,6 +1424,7 @@ void
 HpVis::updateDocks()
 {
     m_statsDock->setView(m_view);
+    m_maskDock->setView(m_view);
     m_powerDock->setView(m_view);
 }
 
@@ -1594,6 +1611,7 @@ HpVis::onTabCloseRequested(int index)
     QWidget *widget = m_tabWidget->widget(index);
     m_powerDock->forget(qobject_cast<View *>(widget));
     m_statsDock->forget(qobject_cast<View *>(widget));
+    m_maskDock->forget(qobject_cast<View *>(widget));
     m_tabWidget->removeTab(index);
     delete widget;
 

@@ -102,6 +102,7 @@ enum class Command
     ToolsRandomMap,
     ToolsPowerSpectrum,
     ToolsStatistics,
+    ToolsMaskBuilder,
     ToolsSettings,
 
     // Help
@@ -228,6 +229,7 @@ storedName(Command c)
     case Command::ToolsRandomMap: return "tools/maps/generate-random-map";
     case Command::ToolsPowerSpectrum: return "tools/analysis/power-spectrum";
     case Command::ToolsStatistics: return "tools/analysis/statistics";
+    case Command::ToolsMaskBuilder: return "tools/analysis/mask-builder";
     case Command::ToolsSettings: return "tools/settings";
 
     case Command::HelpUsage: return "help/usage";

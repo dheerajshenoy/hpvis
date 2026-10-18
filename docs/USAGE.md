@@ -263,6 +263,35 @@ Enabled masks are multiplied together. They also affect the statistics, the
 histogram, the color range and, when asked, the power spectrum. A map of a
 different size drops the loaded masks.
 
+### Mask Builder
+
+**Tools > Analysis > Mask Builder** makes a mask for the current tab from a
+list of rules. Each tab has its own rules, and they are kept while the tab is
+open.
+
+- **Rules**, applied from the top (tick to use, **Up** / **Down** to reorder):
+  - **Threshold** keeps pixels with a value between a minimum and a maximum.
+  - **Galactic cut** removes the band |b| below a latitude. It works on maps
+    in any frame.
+  - **Disc** cuts out (or keeps only) the pixels within a radius of a point,
+    given in the map's own frame.
+- **Join** says how a rule combines with the result so far: AND, OR or
+  Subtract. The first rule starts the mask. For example: a galactic cut, then
+  Subtract a Disc around a bright source.
+- **Edge taper** is the FWHM of a Gaussian taper at the mask edges (0 = hard
+  edges). The mask has weights between 0 and 1 then, which leaks much less in a
+  power spectrum.
+- **Sky fraction** shows f_sky = Σw/N, and w2 and w4 (the same with w² and
+  w⁴), the numbers for the mask correction of the power spectrum. It updates
+  as you edit.
+- **Apply to map** puts the mask in the tab's mask list (replacing the one it
+  put there before); **Update the map as I edit** does it after every change.
+  **Remove** takes it out again, and **Open as map** opens it as a new tab,
+  ready for **File > Save Map As...**.
+
+The threshold rule judges the values of the tab's own map. Masks are stored
+with 8 bits, so a tapered mask has 255 levels.
+
 ## 7. Statistics
 
 Open it with **Tools > Analysis > Statistics**.

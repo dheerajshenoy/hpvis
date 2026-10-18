@@ -2,7 +2,7 @@
 
  High Priority
 
-- [ ] Interactive Mask builder (threshold, galactic cut, disc) with f_sky readout
+- [x] Interactive Mask builder (threshold, galactic cut, disc) with f_sky readout
 
 # Medium Priority
 
