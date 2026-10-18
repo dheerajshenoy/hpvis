@@ -476,6 +476,13 @@ the expression has no finite value there (a division by zero, for example).
   function* of the input is divided out and the output's multiplied in (read
   from a FITS table such as HEALPix's `pixel_window_n*.fits`, a `.npy` array or
   a text file).
+- **Columns** (shown when the HDU has more than one map column, e.g. T, Q and
+  U) lists them with a tick box each, all ticked at first. Only the ticked ones
+  are changed. The result is **one tab** with those columns, which you switch
+  with the Column selector in the toolbar like the columns of a file, and
+  **File > Save Map As...** writes them all in one FITS table (names and
+  units kept). With the harmonic method each column is filtered as a scalar
+  field; Q and U are not treated as a spin-2 pair.
 
 ### Beam Smoothing
 

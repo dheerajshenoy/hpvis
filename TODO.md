@@ -1,8 +1,6 @@
 # TODO
 
- High Priority
-
-- [x] Interactive Mask builder (threshold, galactic cut, disc) with f_sky readout
+# High Priority
 
 # Medium Priority
 
