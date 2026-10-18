@@ -1,6 +1,7 @@
 #pragma once
 
 #include "healpix_map.h"
+#include "mapcolumn.hpp"
 #include "resolution.hpp"
 #include "skyframe.hpp"
 
@@ -11,7 +12,9 @@
 
 class QCheckBox;
 class QComboBox;
+class QFormLayout;
 class QLabel;
+class QListWidget;
 class QLineEdit;
 class QProgressBar;
 class QPushButton;
@@ -36,6 +39,10 @@ public:
 signals:
     void mapReady(std::shared_ptr<Healpix_Map<float>> map, const QString &title,
                   SkyFrame frame);
+    // The same for the chosen columns of the HDU; `current` is the one shown
+    // first
+    void columnsReady(std::vector<ComputedColumn> columns, const QString &title,
+                      SkyFrame frame, int current);
 
 private:
     void compute();
@@ -51,6 +58,9 @@ private:
 
     QLabel *m_source             = nullptr;
     QComboBox *m_nsideCombo      = nullptr;
+    QFormLayout *m_form          = nullptr;
+    QWidget *m_columnsBox        = nullptr;
+    QListWidget *m_columns       = nullptr;
     QRadioButton *m_pixelRadio   = nullptr;
     QRadioButton *m_harmRadio    = nullptr;
     QCheckBox *m_pessimistic     = nullptr;

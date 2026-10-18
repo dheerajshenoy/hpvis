@@ -5,6 +5,7 @@
 #include "command.hpp"
 #include "healpix_cxx/healpix_map.h"
 #include "healpix_cxx/healpix_map_fitsio.h"
+#include "mapcolumn.hpp"
 #include "openglwidget.hpp"
 #include "openmap.hpp"
 #include "powerspectrumdock.hpp"
@@ -150,6 +151,9 @@ private slots:
     void onSaveMapTriggered();
     void openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
                          const QString &title, SkyFrame frame);
+    void openComputedColumns(std::vector<ComputedColumn> columns,
+                             const QString &title, SkyFrame frame, int current);
+    void addComputedView(View *view, const QString &title);
     void onLoadColormapTriggered();
     void onColormapRangeActionTriggered();
 

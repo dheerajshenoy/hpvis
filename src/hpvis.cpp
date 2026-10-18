@@ -2228,6 +2228,8 @@ HpVis::onDowngradeTriggered()
             = new DowngradeDialog([this]() { return m_view; }, this);
         connect(m_downgradeDialog, &DowngradeDialog::mapReady, this,
                 &HpVis::openComputedMap);
+        connect(m_downgradeDialog, &DowngradeDialog::columnsReady, this,
+                &HpVis::openComputedColumns);
     }
     m_downgradeDialog->refresh();
     m_downgradeDialog->show();
@@ -2355,7 +2357,23 @@ HpVis::openComputedMap(std::shared_ptr<Healpix_Map<float>> map,
     View *view = new View(this);
     view->hide();
     view->setComputedMap(std::move(*map), title, frame);
+    addComputedView(view, title);
+}
 
+// A computed map with several columns, in one tab
+void
+HpVis::openComputedColumns(std::vector<ComputedColumn> columns, const QString &title,
+                           SkyFrame frame, int current)
+{
+    View *view = new View(this);
+    view->hide();
+    view->setComputedColumns(std::move(columns), title, frame, current);
+    addComputedView(view, title);
+}
+
+void
+HpVis::addComputedView(View *view, const QString &title)
+{
     applyDefaults(view);
     m_tabWidget->addTab(view, title);
     m_tabWidget->setCurrentIndex(m_tabWidget->indexOf(view));

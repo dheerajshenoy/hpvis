@@ -3,6 +3,7 @@
 #include "colormap.hpp"
 #include "fitsinfo.hpp"
 #include "healpix_map.h"
+#include "mapcolumn.hpp"
 #include "openglwidget.hpp"
 #include "pixelordering.hpp"
 
@@ -50,6 +51,14 @@ public:
     // other (no file, HDU or column)
     void setComputedMap(Healpix_Map<float> &&map, const QString &title,
                         SkyFrame frame);
+    // The same with several columns (e.g. T, Q and U), shown one at a time
+    // through the column selector. `current` is the one shown first.
+    void setComputedColumns(std::vector<ComputedColumn> columns, const QString &title,
+                            SkyFrame frame, int current = 0);
+    const std::vector<ComputedColumn> &computedColumns() const
+    {
+        return m_columns;
+    }
     bool isComputed() const
     {
         return m_computed;
@@ -65,7 +74,8 @@ public:
         m_unit = unit;
     }
 
-    // Writes the map to a new FITS file (HDU 2, one float column)
+    // Writes the map to a new FITS file (HDU 2, one float column; a computed
+    // map with several columns writes them all)
     bool saveMap(const QString &path, QString *error) const;
 
     // Asynchronous: reads the file in the background and emits loadFinished
@@ -118,6 +128,7 @@ private:
     QString m_title; // of a computed map
     QString m_unit;  // of a computed map
     bool m_computed = false;
+    std::vector<ComputedColumn> m_columns; // of a computed map with several
     FitsInfo m_fitsInfo;
     int m_hdu      = 0;
     int m_column   = 0;

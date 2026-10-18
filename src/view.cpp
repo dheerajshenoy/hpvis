@@ -12,6 +12,7 @@
 #include <QFutureWatcher>
 #include <QMessageBox>
 #include <QtConcurrent>
+#include <algorithm>
 #include <cmath>
 #include <memory>
 
@@ -240,8 +241,24 @@ View::loadMap(const QString &filename, int hdu, int column,
 void
 View::loadHdu(int hdu, int column)
 {
-    if (!m_loading)
-        startLoad(hdu, column, QString(), false);
+    if (m_loading)
+        return;
+    if (m_computed && !m_columns.empty())
+    {
+        // The columns are in memory: just show another one
+        if (column < 1 || column > int(m_columns.size()))
+        {
+            emit hduLoaded(false, "no such column");
+            return;
+        }
+        const ComputedColumn &c = m_columns[size_t(column) - 1];
+        m_column           = column;
+        m_unit             = c.unit;
+        m_glWidget->setMap(Healpix_Map<float>(*c.map));
+        emit hduLoaded(true, QString());
+        return;
+    }
+    startLoad(hdu, column, QString(), false);
 }
 
 void
@@ -268,6 +285,7 @@ View::setComputedMap(Healpix_Map<float> &&map, const QString &title,
                      SkyFrame frame)
 {
     m_computed = true;
+    m_columns.clear();
     m_title    = title;
     m_unit.clear();
     m_filePath.clear();
@@ -276,6 +294,40 @@ View::setComputedMap(Healpix_Map<float> &&map, const QString &title,
     m_fitsInfo = FitsInfo();
     m_glWidget->setMapFrame(frame);
     m_glWidget->setMap(std::move(map));
+}
+
+void
+View::setComputedColumns(std::vector<ComputedColumn> columns, const QString &title,
+                         SkyFrame frame, int current)
+{
+    if (columns.empty())
+        return;
+    current = std::clamp(current, 0, int(columns.size()) - 1);
+    m_columns = std::move(columns);
+
+    // Describe the columns like an HDU of a file, so that the toolbar lists
+    // them
+    FitsHdu hdu;
+    hdu.index = 1;
+    for (size_t i = 0; i < m_columns.size(); ++i)
+    {
+        FitsColumn c;
+        c.index = int(i) + 1;
+        c.name  = m_columns[i].name;
+        c.unit  = m_columns[i].unit;
+        hdu.columns.append(c);
+    }
+    m_computed = true;
+    m_title    = title;
+    m_unit     = m_columns[size_t(current)].unit;
+    m_filePath.clear();
+    m_hdu    = 1;
+    m_column = current + 1;
+    m_fitsInfo = FitsInfo();
+    m_fitsInfo.hduCount = 2;
+    m_fitsInfo.hdus.append(hdu);
+    m_glWidget->setMapFrame(frame);
+    m_glWidget->setMap(Healpix_Map<float>(*m_columns[size_t(current)].map));
 }
 
 QString
@@ -310,7 +362,32 @@ View::saveMap(const QString &path, QString *error) const
     {
         fitshandle out;
         out.create("!" + path.toStdString()); // "!" overwrites
-        write_Healpix_map_to_fits(out, *map, PLANCK_FLOAT32);
+        if (m_computed && m_columns.size() > 1)
+        {
+            arr<std::string> names(m_columns.size());
+            for (size_t i = 0; i < m_columns.size(); ++i)
+                names[i] = m_columns[i].name.toStdString();
+            prepare_Healpix_fitsmap(out, *m_columns[0].map, PLANCK_FLOAT32,
+                                    names);
+            for (size_t i = 0; i < m_columns.size(); ++i)
+            {
+                out.write_column(int(i) + 1, m_columns[i].map->Map());
+                if (!m_columns[i].unit.isEmpty())
+                {
+                    try
+                    {
+                        out.set_key("TUNIT" + std::to_string(i + 1),
+                                    m_columns[i].unit.toStdString());
+                    }
+                    catch (const std::exception &)
+                    {
+                        // the unit is only a label: keep the data
+                    }
+                }
+            }
+        }
+        else
+            write_Healpix_map_to_fits(out, *map, PLANCK_FLOAT32);
         out.set_key("COORDSYS",
                     skyframe::fitsCode(m_glWidget->mapFrame()).toStdString(),
                     "Coordinate system");
