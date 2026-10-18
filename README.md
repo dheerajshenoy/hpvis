@@ -1,8 +1,10 @@
-# hpvis
+# HpVis
 
 A fast, GPU-accelerated viewer for [HEALPix](https://healpix.sourceforge.io/)
 maps. The projection and the HEALPix pixel lookup run per pixel in a fragment
 shader, so large maps (nside 2048 and above) stay responsive.
+
+Homepage: [https://dheerajshenoy.github.io/hpvis/](https://dheerajshenoy.github.io/hpvis/)
 
 ## Screenshots
 
@@ -266,7 +268,7 @@ file explorer's folder are stored with the preferences.
 
 ## License
 
-hpvis is licensed under the [GNU Affero General Public License, version 3](LICENSE).
+HpVis is licensed under the [GNU Affero General Public License, version 3](LICENSE).
 Help > About lists the libraries it uses and shows the license text.
 
 See [CHANGELOG.md](CHANGELOG.md) for the list of changes.
