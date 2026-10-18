@@ -296,6 +296,41 @@ public:
     // correct power spectra for the mask. Empty when no mask is enabled.
     std::vector<float> maskWeights() const;
 
+    // Painting a mask by hand. In paint mode a left drag masks (or unmasks)
+    // the pixels under the brush and a right drag does the opposite; the
+    // strokes go to a mask called "Painted mask" in the mask list.
+    enum class PaintTool
+    {
+        Mask,
+        Unmask
+    };
+    void setPaintMode(bool on);
+    inline bool paintMode() const
+    {
+        return m_paintMode;
+    }
+    void setPaintTool(PaintTool tool);
+    // Brush radius in degrees on the sky; hardness 0..1 (1 = hard edge, lower
+    // fades the brush towards its rim)
+    void setPaintBrush(double radiusDeg, double hardness);
+    void paintFill(uint8_t value); // 0 masks everything, 255 keeps everything
+    void paintInvert();
+    bool paintUndo();
+    bool paintRedo();
+    bool canPaintUndo() const
+    {
+        return !m_paintUndo.empty();
+    }
+    bool canPaintRedo() const
+    {
+        return !m_paintRedo.empty();
+    }
+    bool hasPaintLayer() const;
+    // Sum of the painted weights / Npix (1 before anything is painted)
+    double paintSkyFraction() const;
+    // The painted layer as a map (null when there is none)
+    std::shared_ptr<Healpix_Map<float>> paintLayerMap() const;
+
     inline int maskMode() const
     {
         return m_maskMode;
@@ -431,6 +466,7 @@ signals:
     void zoomChanged(float zoom);
     void rotationChanged(); // drag, reset or setRotationAngles
     void masksChanged();    // list or enabled flags changed
+    void paintChanged();    // paint mode, undo state or the painted layer
     void regionChanged();   // statistics region set, cleared or recomputed
     // Emitted when the implicit colormap range changes (e.g. mask applied)
     void colormapRangeChanged(float min, float max);
@@ -563,6 +599,37 @@ private:
     QPoint m_lastMousePos;
     bool m_draggingMinimap = false;
     QPointF m_cursorPos; // last pointer position in widget coords
+
+    // Painting
+    struct PaintUndo
+    {
+        std::vector<std::pair<int, uint8_t>> px; // pixel, value before
+        std::vector<uint8_t> full;               // the whole layer before
+        bool isFull = false;
+        size_t bytes() const
+        {
+            return px.size() * sizeof(std::pair<int, uint8_t>) + full.size();
+        }
+    };
+    int paintLayerIndex() const;
+    int ensurePaintLayer();
+    void paintBegin(const QPointF &pos, bool unmask);
+    void paintTo(const QPointF &pos);
+    void paintDab(const QPointF &pos);
+    void paintEnd();
+    void pushPaintUndo(PaintUndo &&u);
+    PaintUndo applyPaintUndo(const PaintUndo &u);
+    void paintBrushOverlay(QPainter &p);
+    void clearPaintHistory();
+    bool m_paintMode   = false;
+    bool m_painting    = false; // a stroke is in progress
+    bool m_paintUnmask = false; // the stroke unmasks
+    PaintTool m_paintTool = PaintTool::Mask;
+    double m_paintRadius   = 3.0; // degrees
+    double m_paintHardness = 0.5;
+    QPointF m_paintLast;
+    std::unordered_map<int, uint8_t> m_strokeOld; // pixel -> value before
+    std::vector<PaintUndo> m_paintUndo, m_paintRedo;
 
     struct MaskEntry
     {

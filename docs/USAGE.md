@@ -289,6 +289,31 @@ open.
   **Remove** takes it out again, and **Open as map** opens it as a new tab,
   ready for **File > Save Map As...**.
 
+#### Painting a mask by hand
+
+The **Paint** section of the Mask Builder draws a mask directly on the map.
+
+- Tick **Paint on the map**. A **left drag** uses the chosen tool (**Mask** hides
+  pixels, **Unmask** keeps them) and a **right drag** does the opposite. The
+  middle button still rotates and the wheel still zooms. **Esc** leaves paint
+  mode.
+- The brush has a **radius** in degrees on the sky (so it keeps its size on
+  the sky when you zoom) and a **hardness**: 100 is a hard edge, lower fades
+  the brush towards its rim. The outline on the map shows the radius, with a
+  dashed circle for the hard core.
+- The strokes make one mask in the tab, called **Painted mask**, that works
+  like any other mask (the statistics, the histogram and the power spectrum
+  use it, and it can be disabled, inverted or removed from the Masks menu).
+- **Mask all**, **Keep all** and **Invert** change the whole layer. **Undo** and
+  **Redo** (Ctrl+Z, Ctrl+Shift+Z while painting) step through the last 50
+  strokes, or fewer when they hold a lot of pixels.
+- **Open as map** opens the painted mask as a new tab, ready for **File > Save
+  Map As...**. The layer is lost when the tab closes.
+
+The painted layer is separate from the rules above: they do not combine with
+it. Their masks sit side by side in the mask list and are multiplied. At high
+nside the display updates a little slower while you paint.
+
 The threshold rule judges the values of the tab's own map. Masks are stored
 with 8 bits, so a tapered mask has 255 levels.
 

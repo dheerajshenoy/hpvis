@@ -9,11 +9,13 @@
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QFutureWatcher>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
 #include <QPushButton>
+#include <QSlider>
 #include <QSignalBlocker>
 #include <QTimer>
 #include <QToolButton>
@@ -145,6 +147,52 @@ MaskBuilderDock::MaskBuilderDock(QWidget *parent)
     row->addWidget(m_unapply);
     row->addWidget(m_openMap);
     layout->addLayout(row);
+
+    // Painting by hand
+    auto *paintBox = new QGroupBox("Paint");
+    auto *pl       = new QVBoxLayout(paintBox);
+    m_paintMode = new QCheckBox("Paint on the map");
+    m_paintMode->setToolTip("Left drag paints with the tool below, right drag "
+                            "does the opposite. Esc leaves paint mode, Ctrl+Z "
+                            "undoes a stroke. The strokes make a mask called "
+                            "\"Painted mask\" in this tab's mask list.");
+    pl->addWidget(m_paintMode);
+    auto *pf = new QFormLayout();
+    m_paintTool = new QComboBox();
+    m_paintTool->addItems({"Mask (hide pixels)", "Unmask (keep pixels)"});
+    m_brush = spin(0.01, 90.0, 2, "°");
+    m_brush->setValue(3.0);
+    m_brush->setToolTip("Brush radius on the sky");
+    m_hardness = new QSlider(Qt::Horizontal);
+    m_hardness->setRange(0, 100);
+    m_hardness->setValue(50);
+    m_hardness->setToolTip("100: hard edge. Lower fades the brush towards its "
+                           "rim, which gives a smooth mask edge.");
+    pf->addRow("Tool:", m_paintTool);
+    pf->addRow("Brush radius:", m_brush);
+    pf->addRow("Hardness:", m_hardness);
+    pl->addLayout(pf);
+    auto *pr1 = new QHBoxLayout();
+    m_maskAll = new QPushButton("Mask all");
+    m_keepAll = new QPushButton("Keep all");
+    m_invert  = new QPushButton("Invert");
+    pr1->addWidget(m_maskAll);
+    pr1->addWidget(m_keepAll);
+    pr1->addWidget(m_invert);
+    pl->addLayout(pr1);
+    auto *pr2 = new QHBoxLayout();
+    m_undo      = new QPushButton("Undo");
+    m_redo      = new QPushButton("Redo");
+    m_paintOpen = new QPushButton("Open as map");
+    m_paintOpen->setToolTip("Open the painted mask as a new tab, to save it "
+                            "as FITS");
+    pr2->addWidget(m_undo);
+    pr2->addWidget(m_redo);
+    pr2->addWidget(m_paintOpen);
+    pl->addLayout(pr2);
+    m_paintFsky = new QLabel("-");
+    pl->addWidget(m_paintFsky);
+    layout->addWidget(paintBox);
     layout->addStretch();
     setWidget(body);
 
@@ -194,7 +242,101 @@ MaskBuilderDock::MaskBuilderDock(QWidget *parent)
                 QString("%1 [mask]").arg(m_view->displayName()),
                 m_view->glWidget()->mapFrame());
     });
+    connect(m_paintMode, &QCheckBox::toggled, this, [this](bool on)
+    {
+        if (m_view)
+        {
+            m_view->glWidget()->setPaintMode(on);
+            m_paintView = on ? m_view : nullptr;
+        }
+    });
+    connect(m_paintTool, &QComboBox::currentIndexChanged, this,
+            [this](int) { pushBrush(); });
+    connect(m_brush, &QDoubleSpinBox::valueChanged, this,
+            [this](double) { pushBrush(); });
+    connect(m_hardness, &QSlider::valueChanged, this,
+            [this](int) { pushBrush(); });
+    auto onView = [this](auto fn)
+    {
+        return [this, fn]()
+        {
+            if (m_view)
+                fn(m_view->glWidget());
+        };
+    };
+    connect(m_maskAll, &QPushButton::clicked, this,
+            onView([](OpenGLWidget *g) { g->paintFill(0); }));
+    connect(m_keepAll, &QPushButton::clicked, this,
+            onView([](OpenGLWidget *g) { g->paintFill(255); }));
+    connect(m_invert, &QPushButton::clicked, this,
+            onView([](OpenGLWidget *g) { g->paintInvert(); }));
+    connect(m_undo, &QPushButton::clicked, this,
+            onView([](OpenGLWidget *g) { g->paintUndo(); }));
+    connect(m_redo, &QPushButton::clicked, this,
+            onView([](OpenGLWidget *g) { g->paintRedo(); }));
+    connect(m_paintOpen, &QPushButton::clicked, this, [this]()
+    {
+        if (!m_view)
+            return;
+        if (auto map = m_view->glWidget()->paintLayerMap())
+            emit mapReady(map, QString("%1 [painted mask]").arg(m_view->displayName()),
+                          m_view->glWidget()->mapFrame());
+    });
     setView(nullptr);
+}
+
+void
+MaskBuilderDock::pushBrush()
+{
+    if (!m_view)
+        return;
+    OpenGLWidget *gl = m_view->glWidget();
+    gl->setPaintTool(m_paintTool->currentIndex() == 0
+                         ? OpenGLWidget::PaintTool::Mask
+                         : OpenGLWidget::PaintTool::Unmask);
+    gl->setPaintBrush(m_brush->value(), m_hardness->value() / 100.0);
+}
+
+void
+MaskBuilderDock::updatePaintUi()
+{
+    OpenGLWidget *gl = m_view ? m_view->glWidget() : nullptr;
+    const bool ok    = gl && gl->healpixMap();
+    m_paintMode->setEnabled(ok);
+    {
+        const QSignalBlocker b(m_paintMode);
+        m_paintMode->setChecked(ok && gl->paintMode());
+    }
+    m_undo->setEnabled(ok && gl->canPaintUndo());
+    m_redo->setEnabled(ok && gl->canPaintRedo());
+    m_maskAll->setEnabled(ok);
+    m_keepAll->setEnabled(ok);
+    m_invert->setEnabled(ok);
+    m_paintOpen->setEnabled(ok && gl->hasPaintLayer());
+    m_paintFsky->setText(ok && gl->hasPaintLayer()
+                             ? QString("Painted mask f_sky %1")
+                                   .arg(gl->paintSkyFraction(), 0, 'f', 4)
+                             : QString("No painted mask yet"));
+}
+
+// Follows the paint state of the tab that is shown
+void
+MaskBuilderDock::attachPaint(View *view)
+{
+    disconnect(m_paintConn);
+    // Paint mode belongs to the tab it was switched on in
+    if (m_paintView && m_paintView != view)
+        m_paintView->glWidget()->setPaintMode(false);
+    m_paintView = nullptr;
+    if (view)
+    {
+        m_paintConn = connect(view->glWidget(), &OpenGLWidget::paintChanged,
+                              this, [this]() { updatePaintUi(); });
+        pushBrush();
+        if (view->glWidget()->paintMode())
+            m_paintView = view;
+    }
+    updatePaintUi();
 }
 
 MaskBuilderDock::State *
@@ -212,6 +354,7 @@ MaskBuilderDock::setView(View *view)
     if (view && view == m_view.data())
         return;
     m_view = view;
+    attachPaint(view);
     m_last.reset();
     ++m_generation; // a result for the previous tab is no longer wanted
     const bool ok = view && view->glWidget()->healpixMap();

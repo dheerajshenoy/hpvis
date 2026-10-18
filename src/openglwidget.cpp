@@ -262,6 +262,7 @@ OpenGLWidget::applyPixelOrdering(PixelOrdering ordering,
         });
         m.data = std::move(moved);
     }
+    clearPaintHistory(); // pixel numbers changed
     m_maskDirty = !m_masks.empty();
 
     m_pendingMap.Healpix_Base::SetNside(m_pendingMap.Nside(), newScheme);
@@ -619,6 +620,8 @@ OpenGLWidget::setMap(Healpix_Map<float> &&map)
     m_orderingRequested = m_pixelOrdering;
     ++m_orderingJob; // an ordering change still running is obsolete
     ++m_mapRevision;
+    if (sizeChanged)
+        clearPaintHistory();
     if (sizeChanged && !m_masks.empty())
     {
         m_masks.clear();
@@ -901,7 +904,7 @@ OpenGLWidget::paintGL()
     }
 
     if (!showMinimap && !m_isRegionSelecting && !m_graticuleEnabled
-        && !m_cellLabelsEnabled && !m_statsRegion.active)
+        && !m_cellLabelsEnabled && !m_statsRegion.active && !m_paintMode)
         return;
 
     QPainter p(this);
@@ -940,6 +943,8 @@ OpenGLWidget::paintGL()
         paintCellLabels(p);
 
     paintStatsRegion(p);
+    if (m_paintMode && !m_isRotating)
+        paintBrushOverlay(p);
 
     if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon
         && !m_polyPoints.isEmpty())
@@ -1210,6 +1215,8 @@ OpenGLWidget::removeMask(int index)
 {
     if (index < 0 || index >= maskCount())
         return;
+    if (m_masks[size_t(index)].path == "paint:layer")
+        clearPaintHistory();
     m_masks.erase(m_masks.begin() + index);
     applyMaskChange(true);
 }
@@ -1217,6 +1224,7 @@ OpenGLWidget::removeMask(int index)
 void
 OpenGLWidget::clearMasks()
 {
+    clearPaintHistory();
     m_masks.clear();
     applyMaskChange(true);
 }
@@ -2221,6 +2229,14 @@ OpenGLWidget::mousePressEvent(QMouseEvent *e)
     setFocus(Qt::MouseFocusReason);
     stopGlobeAnimation();
 
+    if (m_paintMode
+        && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton))
+    {
+        paintBegin(e->position(), e->button() == Qt::RightButton);
+        e->accept();
+        return;
+    }
+
     // Region Selection: Shift + Left drag, or the next drag after
     // View > Zoom > Zoom To Region, zooms. Ctrl + Shift + Left drag, or the
     // next drag after View > Statistics Region, picks the region the
@@ -2318,6 +2334,14 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
     }
 
     m_cursorPos = e->position();
+    if (m_painting)
+    {
+        paintTo(e->position());
+        emitCursorData();
+        return;
+    }
+    if (m_paintMode)
+        update(); // the brush outline follows the pointer
     if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon
         && !m_polyPoints.isEmpty())
         update(); // the edge to the pointer
@@ -2345,6 +2369,14 @@ OpenGLWidget::mouseMoveEvent(QMouseEvent *e)
 void
 OpenGLWidget::mouseReleaseEvent(QMouseEvent *e)
 {
+    if (m_painting
+        && (e->button() == Qt::LeftButton || e->button() == Qt::RightButton))
+    {
+        paintEnd();
+        e->accept();
+        return;
+    }
+
     if (m_isRegionSelecting && e->button() == Qt::LeftButton)
     {
         m_isRegionSelecting = false;
@@ -2432,6 +2464,25 @@ OpenGLWidget::keyPressEvent(QKeyEvent *e)
         = !m_regionFinishKey.isEmpty() && pressed == m_regionFinishKey;
     const bool cancel
         = !m_regionCancelKey.isEmpty() && pressed == m_regionCancelKey;
+
+    if (m_paintMode)
+    {
+        if (e->key() == Qt::Key_Escape)
+        {
+            setPaintMode(false);
+            return;
+        }
+        if (e->matches(QKeySequence::Undo))
+        {
+            paintUndo();
+            return;
+        }
+        if (e->matches(QKeySequence::Redo))
+        {
+            paintRedo();
+            return;
+        }
+    }
 
     if (m_statsRegionArmed && m_statsShape == RegionShape::Polygon)
     {
@@ -3647,4 +3698,369 @@ OpenGLWidget::setProjection(Projection projection)
     if (!globeAnimates())
         stopGlobeAnimation();
     update();
+}
+
+// ---------------------------------------------------------------------------
+// Painting a mask by hand
+
+static constexpr size_t kMaxPaintUndo      = 50;
+static constexpr size_t kMaxPaintUndoBytes = size_t(256) << 20;
+
+void
+OpenGLWidget::clearPaintHistory()
+{
+    m_paintUndo.clear();
+    m_paintRedo.clear();
+    m_strokeOld.clear();
+    m_painting = false;
+    emit paintChanged();
+}
+
+int
+OpenGLWidget::paintLayerIndex() const
+{
+    for (size_t i = 0; i < m_masks.size(); ++i)
+        if (m_masks[i].path == "paint:layer")
+            return int(i);
+    return -1;
+}
+
+bool
+OpenGLWidget::hasPaintLayer() const
+{
+    return paintLayerIndex() >= 0;
+}
+
+// The painted layer, made when first needed (all pixels kept); -1 when the
+// map is missing or the mask list is full
+int
+OpenGLWidget::ensurePaintLayer()
+{
+    const int k = paintLayerIndex();
+    if (k >= 0)
+        return k;
+    if (m_pendingMap.Npix() == 0)
+        return -1;
+    if (maskCount() >= kMaxMasks)
+    {
+        QMessageBox::warning(this, "Paint",
+                             QString("At most %1 masks can be loaded.")
+                                 .arg(kMaxMasks));
+        return -1;
+    }
+    MaskEntry entry;
+    entry.name = "Painted mask";
+    entry.path = "paint:layer";
+    entry.data.assign(size_t(m_pendingMap.Npix()), 255);
+    m_masks.push_back(std::move(entry));
+    applyMaskChange(true);
+    return int(m_masks.size()) - 1;
+}
+
+void
+OpenGLWidget::setPaintMode(bool on)
+{
+    if (on && m_pendingMap.Npix() == 0)
+        on = false;
+    if (m_paintMode == on)
+        return;
+    if (!on && m_painting)
+        paintEnd();
+    m_paintMode = on;
+    if (on)
+    {
+        m_statsRegionArmed = false;
+        m_zoomRegionArmed  = false;
+        m_polyPoints.clear();
+    }
+    setCursor(Qt::CrossCursor);
+    update();
+    emit paintChanged();
+}
+
+void
+OpenGLWidget::setPaintTool(PaintTool tool)
+{
+    m_paintTool = tool;
+    update();
+}
+
+void
+OpenGLWidget::setPaintBrush(double radiusDeg, double hardness)
+{
+    m_paintRadius   = std::clamp(radiusDeg, 0.001, 90.0);
+    m_paintHardness = std::clamp(hardness, 0.0, 1.0);
+    update();
+}
+
+void
+OpenGLWidget::pushPaintUndo(PaintUndo &&u)
+{
+    m_paintRedo.clear();
+    m_paintUndo.push_back(std::move(u));
+    size_t total = 0;
+    for (const PaintUndo &r : m_paintUndo)
+        total += r.bytes();
+    while (m_paintUndo.size() > 1
+           && (m_paintUndo.size() > kMaxPaintUndo || total > kMaxPaintUndoBytes))
+    {
+        total -= m_paintUndo.front().bytes();
+        m_paintUndo.erase(m_paintUndo.begin());
+    }
+}
+
+// Puts the layer back as `u` says and returns the record that undoes that
+OpenGLWidget::PaintUndo
+OpenGLWidget::applyPaintUndo(const PaintUndo &u)
+{
+    PaintUndo inverse;
+    const int k = paintLayerIndex();
+    if (k < 0)
+        return inverse;
+    std::vector<uint8_t> &d = m_masks[size_t(k)].data;
+    if (u.isFull)
+    {
+        inverse.isFull = true;
+        inverse.full   = d;
+        d              = u.full;
+    }
+    else
+    {
+        inverse.px.reserve(u.px.size());
+        for (const auto &[pix, old] : u.px)
+        {
+            inverse.px.push_back({pix, d[size_t(pix)]});
+            d[size_t(pix)] = old;
+        }
+    }
+    return inverse;
+}
+
+bool
+OpenGLWidget::paintUndo()
+{
+    if (m_paintUndo.empty() || m_painting)
+        return false;
+    PaintUndo inverse = applyPaintUndo(m_paintUndo.back());
+    m_paintUndo.pop_back();
+    m_paintRedo.push_back(std::move(inverse));
+    applyMaskChange(true);
+    emit paintChanged();
+    return true;
+}
+
+bool
+OpenGLWidget::paintRedo()
+{
+    if (m_paintRedo.empty() || m_painting)
+        return false;
+    PaintUndo inverse = applyPaintUndo(m_paintRedo.back());
+    m_paintRedo.pop_back();
+    m_paintUndo.push_back(std::move(inverse));
+    applyMaskChange(true);
+    emit paintChanged();
+    return true;
+}
+
+void
+OpenGLWidget::paintFill(uint8_t value)
+{
+    const int k = ensurePaintLayer();
+    if (k < 0 || m_painting)
+        return;
+    std::vector<uint8_t> &d = m_masks[size_t(k)].data;
+    PaintUndo u;
+    u.isFull = true;
+    u.full   = d;
+    std::fill(d.begin(), d.end(), value);
+    pushPaintUndo(std::move(u));
+    applyMaskChange(true);
+    emit paintChanged();
+}
+
+void
+OpenGLWidget::paintInvert()
+{
+    const int k = ensurePaintLayer();
+    if (k < 0 || m_painting)
+        return;
+    std::vector<uint8_t> &d = m_masks[size_t(k)].data;
+    PaintUndo u;
+    u.isFull = true;
+    u.full   = d;
+    for (uint8_t &v : d)
+        v = uint8_t(255 - v);
+    pushPaintUndo(std::move(u));
+    applyMaskChange(true);
+    emit paintChanged();
+}
+
+double
+OpenGLWidget::paintSkyFraction() const
+{
+    const int k = paintLayerIndex();
+    if (k < 0)
+        return 1.0;
+    const std::vector<uint8_t> &d = m_masks[size_t(k)].data;
+    double sum                    = 0.0;
+    for (uint8_t v : d)
+        sum += v;
+    return d.empty() ? 1.0 : sum / (255.0 * double(d.size()));
+}
+
+std::shared_ptr<Healpix_Map<float>>
+OpenGLWidget::paintLayerMap() const
+{
+    const int k = paintLayerIndex();
+    if (k < 0)
+        return nullptr;
+    const std::vector<uint8_t> &d = m_masks[size_t(k)].data;
+    auto map = std::make_shared<Healpix_Map<float>>(
+        m_pendingMap.Nside(), m_pendingMap.Scheme(), SET_NSIDE);
+    for (size_t i = 0; i < d.size(); ++i)
+        (*map)[long(i)] = d[i] * (1.0f / 255.0f);
+    return map;
+}
+
+void
+OpenGLWidget::paintBegin(const QPointF &pos, bool unmask)
+{
+    if (ensurePaintLayer() < 0)
+        return;
+    // The tool picks what the left button does; the right does the opposite
+    m_paintUnmask = (m_paintTool == PaintTool::Unmask) != unmask;
+    m_painting    = true;
+    m_strokeOld.clear();
+    m_paintLast = pos;
+    paintDab(pos);
+}
+
+// Dabs along the line from the last position, close enough that a fast drag
+// leaves no gaps
+void
+OpenGLWidget::paintTo(const QPointF &pos)
+{
+    const QPointF d = pos - m_paintLast;
+    const double len = std::hypot(d.x(), d.y());
+    const double step = 3.0; // screen pixels
+    const int n       = int(len / step);
+    for (int i = 1; i <= n; ++i)
+        paintDab(m_paintLast + d * (i * step / len));
+    if (n > 0)
+        m_paintLast = m_paintLast + d * (n * step / len);
+    paintDab(pos);
+    update();
+}
+
+void
+OpenGLWidget::paintDab(const QPointF &pos)
+{
+    const int k = paintLayerIndex();
+    if (k < 0)
+        return;
+    QVector3D dir;
+    const QVector2D p = toNdc(pos) / m_camera->zoom + m_camera->panOffset;
+    if (!mapDirectionAt(p, m_projection, m_viewOutside, m_rotation,
+                        skyframe::rotation(displayFrame(), m_mapFrame), dir))
+        return;
+    const vec3 c(dir.x(), dir.y(), dir.z());
+
+    const Healpix_Base base(
+        static_cast<int>(m_nside),
+        m_pixelOrdering == PixelOrdering::NESTED ? NEST : RING, SET_NSIDE);
+    const double radius = m_paintRadius * M_PI / 180.0;
+    rangeset<int> rs;
+    base.query_disc(pointing(vec3(c)), radius, rs);
+
+    std::vector<uint8_t> &data = m_masks[size_t(k)].data;
+    const double inner         = radius * m_paintHardness;
+    for (size_t r = 0; r < rs.nranges(); ++r)
+        for (int pix = rs.ivbegin(r); pix < rs.ivend(r); ++pix)
+        {
+            // 1 inside the hard core, then a smooth fall to 0 at the rim
+            double w = 1.0;
+            if (inner < radius)
+            {
+                const double ang
+                    = std::acos(std::clamp(dotprod(base.pix2vec(pix), c) /
+                                               std::max(c.Length(), 1e-12),
+                                           -1.0, 1.0));
+                if (ang > inner)
+                {
+                    const double t = (ang - inner) / (radius - inner);
+                    w = t >= 1.0 ? 0.0 : 0.5 * (1.0 + std::cos(M_PI * t));
+                }
+            }
+            if (w <= 0.0)
+                continue;
+            uint8_t &v = data[size_t(pix)];
+            // Masking pulls a pixel down, unmasking pushes it up; overlapping
+            // dabs of one stroke never go past what the brush asks for
+            const uint8_t target
+                = m_paintUnmask ? uint8_t(std::lround(255.0 * w))
+                                : uint8_t(std::lround(255.0 * (1.0 - w)));
+            const uint8_t now = m_paintUnmask ? std::max(v, target)
+                                              : std::min(v, target);
+            if (now == v)
+                continue;
+            m_strokeOld.emplace(pix, v); // the value before the stroke
+            v = now;
+        }
+    m_maskDirty = true;
+    update();
+}
+
+void
+OpenGLWidget::paintEnd()
+{
+    if (!m_painting)
+        return;
+    m_painting = false;
+    if (!m_strokeOld.empty())
+    {
+        PaintUndo u;
+        u.px.assign(m_strokeOld.begin(), m_strokeOld.end());
+        pushPaintUndo(std::move(u));
+        m_strokeOld.clear();
+        applyMaskChange(true);
+    }
+    emit paintChanged();
+}
+
+// The brush: a circle of the radius on the sky (measured around the pointer),
+// with the hard core inside
+void
+OpenGLWidget::paintBrushOverlay(QPainter &p)
+{
+    const auto toMap = skyframe::rotation(displayFrame(), m_mapFrame);
+    auto direction   = [&](const QPointF &pos, QVector3D &dir)
+    {
+        const QVector2D plane
+            = toNdc(pos) / m_camera->zoom + m_camera->panOffset;
+        return mapDirectionAt(plane, m_projection, m_viewOutside, m_rotation,
+                              toMap, dir);
+    };
+    QVector3D a, b;
+    if (!direction(m_cursorPos, a) || !direction(m_cursorPos + QPointF(8, 0), b))
+        return;
+    const double degPerPx
+        = std::acos(std::clamp(double(QVector3D::dotProduct(a.normalized(),
+                                                            b.normalized())),
+                               -1.0, 1.0))
+          * 180.0 / M_PI / 8.0;
+    if (!(degPerPx > 0.0))
+        return;
+    const double r = m_paintRadius / degPerPx;
+    const QColor c = m_paintTool == PaintTool::Mask ? QColor(255, 90, 90)
+                                                    : QColor(90, 220, 120);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(c, 1.5));
+    p.drawEllipse(m_cursorPos, r, r);
+    if (m_paintHardness < 1.0)
+    {
+        p.setPen(QPen(c, 1.0, Qt::DashLine));
+        p.drawEllipse(m_cursorPos, r * m_paintHardness, r * m_paintHardness);
+    }
+    p.drawLine(m_cursorPos + QPointF(-3, 0), m_cursorPos + QPointF(3, 0));
+    p.drawLine(m_cursorPos + QPointF(0, -3), m_cursorPos + QPointF(0, 3));
 }

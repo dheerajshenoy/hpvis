@@ -15,6 +15,7 @@ class QComboBox;
 class QDoubleSpinBox;
 class QFormLayout;
 class QLabel;
+class QSlider;
 class QListWidget;
 class QPushButton;
 class QTimer;
@@ -60,6 +61,9 @@ private:
     void applyToMap();
     void removeFromMap();
     void showResult(const maskbuilder::Result &r);
+    void pushBrush();
+    void updatePaintUi();
+    void attachPaint(View *view);
 
     QPointer<View> m_view;
     QHash<const View *, State> m_states;
@@ -89,4 +93,19 @@ private:
     QPushButton *m_unapply     = nullptr;
     QPushButton *m_openMap     = nullptr;
     QTimer *m_timer            = nullptr;
+
+    // Painting
+    QCheckBox *m_paintMode     = nullptr;
+    QComboBox *m_paintTool     = nullptr;
+    QDoubleSpinBox *m_brush    = nullptr;
+    QSlider *m_hardness        = nullptr;
+    QPushButton *m_maskAll     = nullptr;
+    QPushButton *m_keepAll     = nullptr;
+    QPushButton *m_invert      = nullptr;
+    QPushButton *m_undo        = nullptr;
+    QPushButton *m_redo        = nullptr;
+    QPushButton *m_paintOpen   = nullptr;
+    QLabel *m_paintFsky        = nullptr;
+    QMetaObject::Connection m_paintConn;
+    QPointer<View> m_paintView; // the view whose paint mode this dock set
 };
