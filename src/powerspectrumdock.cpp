@@ -401,6 +401,21 @@ computeMasked(const PowerSpectrumInput &in, Stokes &st, int wanted,
             w.swap_scheme();
         mi.weights = std::move(w);
     }
+    if (pol && in.weightsPol)
+    {
+        const Healpix_Map<float> &map = *in.map;
+        Healpix_Map<double> w(map.Nside(), map.Scheme(), SET_NSIDE);
+        const std::vector<float> &weights = *in.weightsPol;
+        parallel::forRange(map.Npix(), [&](long begin, long end)
+        {
+            for (long i = begin; i < end; ++i)
+                w[i] = isSeen(map[i]) ? double(weights[size_t(i)]) : 0.0;
+        });
+        if (w.Scheme() == NEST)
+            w.swap_scheme();
+        mi.weightsPol         = std::move(w);
+        mi.separatePolWeights = true;
+    }
 
     master::Hooks hooks;
     hooks.total = [&job](int n)
@@ -574,6 +589,19 @@ PowerSpectrumDock::initUI()
         r1->addWidget(m_apodCombo);
         r1->addWidget(m_apodScale);
         r1->addStretch();
+        m_tMaskCombo   = new QComboBox();
+        m_polMaskCombo = new QComboBox();
+        m_tMaskCombo->setToolTip(
+            "The mask that weights the temperature: all the enabled masks,\n"
+            "or one mask of the Masks menu on its own.");
+        m_polMaskCombo->setToolTip(
+            "The mask that weights Q and U (E and B), for a polarization\n"
+            "mask that differs from the temperature one. TE uses both.");
+        auto *rm = new QHBoxLayout();
+        rm->addWidget(new QLabel("T mask:"));
+        rm->addWidget(m_tMaskCombo, 1);
+        rm->addWidget(new QLabel("Pol mask:"));
+        rm->addWidget(m_polMaskCombo, 1);
         auto *r2 = new QHBoxLayout();
         r2->addWidget(m_bandwidthCombo);
         r2->addWidget(m_purifyECheck);
@@ -581,6 +609,7 @@ PowerSpectrumDock::initUI()
         r2->addStretch();
         m_maskHint = new QLabel();
         m_maskHint->setWordWrap(true);
+        optionsLayout->addLayout(rm);
         optionsLayout->addLayout(r1);
         optionsLayout->addLayout(r2);
         optionsLayout->addWidget(m_maskHint);
@@ -626,6 +655,10 @@ PowerSpectrumDock::initUI()
     connect(m_apodScale, &QDoubleSpinBox::editingFinished, this, onMaskOption);
     connect(m_bandwidthCombo, &QComboBox::currentIndexChanged, this,
             onMaskOption);
+    connect(m_tMaskCombo, &QComboBox::currentIndexChanged, this, onMaskOption);
+    connect(m_polMaskCombo, &QComboBox::currentIndexChanged, this,
+            onMaskOption);
+    fillMaskCombos();
     connect(m_purifyECheck, &QCheckBox::toggled, this, onMaskOption);
     connect(m_purifyBCheck, &QCheckBox::toggled, this, onMaskOption);
 
@@ -902,7 +935,38 @@ PowerSpectrumDock::currentCorrection() const
     c.bandwidth        = m_bandwidthCombo->currentData().toInt();
     c.purifyE          = m_purifyECheck->isChecked();
     c.purifyB          = m_purifyBCheck->isChecked();
+    c.tMask   = m_tMaskCombo->currentData().isValid()
+                    ? m_tMaskCombo->currentData().toInt() : -1;
+    c.polMask = m_polMaskCombo->currentData().isValid()
+                    ? m_polMaskCombo->currentData().toInt() : -2;
     return c;
+}
+
+// Lists the current tab's masks in both pickers, keeping the choices
+void
+PowerSpectrumDock::fillMaskCombos()
+{
+    const OpenGLWidget *gl = m_view ? m_view->glWidget() : nullptr;
+    const int count        = gl ? gl->maskCount() : 0;
+    const int t = m_tMaskCombo->currentData().isValid()
+                      ? m_tMaskCombo->currentData().toInt() : -1;
+    const int p = m_polMaskCombo->currentData().isValid()
+                      ? m_polMaskCombo->currentData().toInt() : -2;
+    const QSignalBlocker bt(m_tMaskCombo), bp(m_polMaskCombo);
+    m_tMaskCombo->clear();
+    m_polMaskCombo->clear();
+    m_tMaskCombo->addItem("Enabled masks", -1);
+    m_polMaskCombo->addItem("Same as T", -2);
+    m_polMaskCombo->addItem("Enabled masks", -1);
+    for (int i = 0; i < count; ++i)
+    {
+        m_tMaskCombo->addItem(gl->maskName(i), i);
+        m_polMaskCombo->addItem(gl->maskName(i), i);
+    }
+    const int ti = m_tMaskCombo->findData(t);
+    const int pi = m_polMaskCombo->findData(p);
+    m_tMaskCombo->setCurrentIndex(ti >= 0 ? ti : 0);
+    m_polMaskCombo->setCurrentIndex(pi >= 0 ? pi : 0);
 }
 
 void
@@ -967,6 +1031,8 @@ PowerSpectrumDock::refresh()
         for (int i = 0; i < view->glWidget()->maskCount(); ++i)
             masksNow |= view->glWidget()->maskEnabled(i);
 
+    fillMaskCombos();
+    m_polMaskCombo->setEnabled(m_view && m_view->glWidget()->maskCount() > 0);
     // Bin theory only concerns mask-corrected spectra
     m_binTheoryCheck->setVisible(m_maskGroup->isChecked());
 
@@ -1053,7 +1119,8 @@ PowerSpectrumDock::refresh()
     else
     {
         const MaskCorrection now = currentCorrection();
-        const bool wantCorrected = now.enabled && masksNow;
+        const bool wantCorrected
+            = now.enabled && (masksNow || now.tMask >= 0);
         if (it->corrected != wantCorrected
             || (it->corrected && !(it->correction == now)))
             notes << "The mask correction settings changed since this was "
@@ -1139,13 +1206,24 @@ PowerSpectrumDock::compute()
     for (int i = 0; i < gl->maskCount(); ++i)
         input.maskActive |= gl->maskEnabled(i);
     input.correction = currentCorrection();
-    if (input.correction.enabled && input.maskActive)
+    if (input.correction.enabled
+        && (input.maskActive || input.correction.tMask >= 0))
     {
-        auto weights = std::make_shared<std::vector<float>>(gl->maskWeights());
+        auto weights = std::make_shared<std::vector<float>>(
+            gl->maskWeights(input.correction.tMask));
         if (weights->empty())
             input.correction.enabled = false;
         else
+        {
             input.weights = std::move(weights);
+            if (input.correction.polMask != -2)
+            {
+                auto pol = std::make_shared<std::vector<float>>(
+                    gl->maskWeights(input.correction.polMask));
+                if (!pol->empty())
+                    input.weightsPol = std::move(pol);
+            }
+        }
     }
     else
         input.correction.enabled = false;

@@ -398,6 +398,12 @@ averaged into **bandpowers**. The result is drawn at the effective multipole of
 each band. The dock reports the sky fraction f_sky and the condition of the
 coupling matrix.
 
+- **T mask / Pol mask:** which masks weight the temperature and which weight Q
+  and U. "Enabled masks" is the product of the enabled masks (the default for T);
+  you can also pick one mask of the Masks menu on its own. "Same as T" (the
+  default for Pol) uses the temperature weights. With different masks TT is
+  corrected with the T mask, EE/BB (and purification) with the Pol mask and TE
+  with both. Each mask is apodized separately.
 - **Apodization:** a sharp mask edge leaks power between scales, so the edge
   can be smoothed. **C1** and **C2** use a cosine ramp of the given width;
   **Smooth** uses a Gaussian. The scale is in degrees. It is slow for large maps

@@ -50,6 +50,11 @@ struct MaskCorrection
     int bandwidth    = 16;   // multipoles per bandpower
     bool purifyE     = false;
     bool purifyB     = false;
+    // Which masks weight the temperature: -1 the enabled masks, i the mask
+    // number i of the tab alone
+    int tMask        = -1;
+    // The same for Q and U; -2 uses the temperature's weights
+    int polMask      = -2;
 
     bool operator==(const MaskCorrection &) const = default;
 };
@@ -64,6 +69,9 @@ struct PowerSpectrumInput
     // The weight of every pixel (the enabled masks), in the map's pixel
     // order; empty when no mask is applied
     std::shared_ptr<const std::vector<float>> weights;
+    // The weight of Q and U when the polarization has its own mask; null when
+    // it uses `weights`
+    std::shared_ptr<const std::vector<float>> weightsPol;
     MaskCorrection correction;
 };
 
@@ -209,6 +217,9 @@ private:
     QString m_beamFile;                       // the beam file ("" = Gaussian)
     std::shared_ptr<const PixelWindow> m_beamLoaded; // its beam, when read
     QLabel *m_maskHint          = nullptr;
+    QComboBox *m_tMaskCombo     = nullptr; // masks that weight T
+    QComboBox *m_polMaskCombo   = nullptr; // ... and Q, U
+    void fillMaskCombos();
     QLabel *m_infoLabel         = nullptr;
     QComboBox *m_quantityCombo  = nullptr; // what the y axis shows
     QCheckBox *m_logXCheck      = nullptr;

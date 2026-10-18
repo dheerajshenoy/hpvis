@@ -461,7 +461,7 @@ OpenGLWidget::keepMask() const
 }
 
 std::vector<float>
-OpenGLWidget::maskWeights() const
+OpenGLWidget::maskWeights(int only) const
 {
     const long npix = m_pendingMap.Npix();
     struct Active
@@ -470,9 +470,13 @@ OpenGLWidget::maskWeights() const
         bool inverted;
     };
     std::vector<Active> active;
-    for (const MaskEntry &m : m_masks)
-        if (m.enabled && m.data.size() == size_t(npix))
+    for (size_t i = 0; i < m_masks.size(); ++i)
+    {
+        const MaskEntry &m = m_masks[i];
+        if ((only < 0 ? m.enabled : int(i) == only)
+            && m.data.size() == size_t(npix))
             active.push_back({m.data.data(), m.inverted});
+    }
     if (active.empty())
         return {};
 

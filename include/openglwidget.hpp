@@ -295,7 +295,9 @@ public:
     // The same as a weight between 0 (masked) and 1 (kept) for every pixel:
     // the product of the enabled masks, without the 0.5 threshold. Used to
     // correct power spectra for the mask. Empty when no mask is enabled.
-    std::vector<float> maskWeights() const;
+    // With `only` >= 0 it is the weight of that one mask alone (whether or not
+    // it is enabled; an inverted mask gives 1 - w)
+    std::vector<float> maskWeights(int only = -1) const;
 
     // Painting a mask by hand. In paint mode a left drag masks (or unmasks)
     // the pixels under the brush and a right drag does the opposite; the

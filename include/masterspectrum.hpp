@@ -44,6 +44,10 @@ struct Input
     Healpix_Map<double> T, Q, U;
     bool polarized = false;
     Healpix_Map<double> weights;
+    // The weight of Q and U when the polarization has a mask of its own
+    // (empty: the same weights as the temperature). T uses `weights`.
+    Healpix_Map<double> weightsPol;
+    bool separatePolWeights = false;
 };
 
 // The response of the bandpowers to the true spectra: bandpowers = windows x
@@ -63,7 +67,8 @@ struct Result
     // Bandpowers C_b (empty for spectra that were not computed)
     std::vector<double> TT, EE, BB, TE, TB, EB;
 
-    double fsky  = 0.0; // mean of the squared weights
+    double fsky  = 0.0; // mean of the squared weights (of the T mask)
+    double fskyPol = 0.0; // the same for the polarization mask
     int lmax     = 0;
     int bandwidth = 0;
     bool purifyE = false; // purification that was really applied
@@ -86,7 +91,7 @@ struct Hooks
 
 // Number of stages compute() reports
 int
-stageCount(const Options &options, bool polarized);
+stageCount(const Options &options, bool polarized, bool separatePol = false);
 
 // Throws std::runtime_error with a readable message on failure
 Result

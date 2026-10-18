@@ -444,12 +444,13 @@ checkApodization(long npix, Apodization type, double scaleDeg)
 } // namespace
 
 int
-stageCount(const Options &o, bool polarized)
+stageCount(const Options &o, bool polarized, bool separatePol)
 {
     const bool apodize = o.apodization != Apodization::None;
     const bool pure    = polarized && (o.purifyE || o.purifyB);
     return (apodize ? 1 : 0)    // apodization
            + 1                  // transform of the mask
+           + (polarized && separatePol ? 1 : 0) // ... and of the pol. mask
            + 1                  // T
            + (polarized ? 1 : 0)  // Q, U
            + (pure ? 2 : 0)     // purification
@@ -476,29 +477,44 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     const long nside  = input.T.Nside();
     const long npix   = input.T.Npix();
 
-    hooks.total(stageCount(options, pol));
-
     // --- The weights ---
     // Apodizing makes a new map; without it the input weights are used as is
-    Healpix_Map<double> apodized;
-    const Healpix_Map<double> *weights = &input.weights;
+    const bool sepPol = pol && input.separatePolWeights;
+    hooks.total(stageCount(options, pol, sepPol));
+    Healpix_Map<double> apodized, apodizedPol;
+    const Healpix_Map<double> *weights    = &input.weights;
+    const Healpix_Map<double> *weightsPol = &input.weights;
+    if (sepPol)
+        weightsPol = &input.weightsPol;
     if (options.apodization != Apodization::None)
     {
-        hooks.stage("Apodizing the mask");
+        hooks.stage(sepPol ? "Apodizing the masks" : "Apodizing the mask");
         checkApodization(npix, options.apodization,
                          options.apodizationScale);
-        apodized = Healpix_Map<double>(nside, RING, SET_NSIDE);
         char type[8];
         std::strcpy(type, options.apodization == Apodization::C1   ? "C1"
                           : options.apodization == Apodization::C2 ? "C2"
                                                                    : "Smooth");
-        nmt_apodize_mask(nside, const_cast<double *>(input.weights.Map().begin()),
-                         const_cast<double *>(apodized.Map().begin()),
-                         options.apodizationScale, type);
-        weights = &apodized;
+        auto apodize = [&](const Healpix_Map<double> &in,
+                           Healpix_Map<double> &out)
+        {
+            out = Healpix_Map<double>(nside, RING, SET_NSIDE);
+            nmt_apodize_mask(nside, const_cast<double *>(in.Map().begin()),
+                             const_cast<double *>(out.Map().begin()),
+                             options.apodizationScale, type);
+        };
+        apodize(input.weights, apodized);
+        weights    = &apodized;
+        weightsPol = &apodized;
+        if (sepPol)
+        {
+            apodize(input.weightsPol, apodizedPol);
+            weightsPol = &apodizedPol;
+        }
         hooks.done();
     }
-    const Healpix_Map<double> &w = *weights;
+    const Healpix_Map<double> &w  = *weights;
+    const Healpix_Map<double> &wP = *weightsPol;
 
     Result result;
     result.lmax      = lmax;
@@ -506,30 +522,53 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     result.ell       = bands.ell;
     result.purifyE   = pureE;
     result.purifyB   = pureB;
+    auto skyFraction = [&](const Healpix_Map<double> &m)
     {
         double s2 = 0.0;
         for (long p = 0; p < npix; ++p)
-            s2 += w[p] * w[p];
-        result.fsky = s2 / double(npix);
-        if (result.fsky <= 0.0)
-            throw std::runtime_error("The mask removes the whole sky");
-    }
+            s2 += m[p] * m[p];
+        return s2 / double(npix);
+    };
+    result.fsky = skyFraction(w);
+    if (result.fsky <= 0.0)
+        throw std::runtime_error("The mask removes the whole sky");
+    result.fskyPol = sepPol ? skyFraction(wP) : result.fsky;
+    if (pol && result.fskyPol <= 0.0)
+        throw std::runtime_error(
+            "The polarization mask removes the whole sky");
 
-    // --- The mask's own spectrum ---
+    // --- The masks' own spectra ---
+    // TT couples through the spectrum of the T mask, EE and BB through that
+    // of the polarization mask and TE through their cross-spectrum
     hooks.stage("Transform of the mask");
-    std::vector<double> pclMask;
-    AlmD maskAlm(lmax, lmax);
+    AlmD maskAlm(lmax, lmax);   // of the T mask
+    AlmD maskAlmP(lmax, lmax);  // of the polarization mask
+    auto pcl = [&](const AlmD &a, const AlmD &b)
     {
-        scalarToAlm(w, maskAlm, kMaskIterations);
-        pclMask = alm2cl(maskAlm, maskAlm, lmax);
+        std::vector<double> c = alm2cl(a, b, lmax);
         for (int l = 0; l <= lmax; ++l)
-            pclMask[size_t(l)] *= (2.0 * l + 1.0) / (4.0 * M_PI);
-    }
+            c[size_t(l)] *= (2.0 * l + 1.0) / (4.0 * M_PI);
+        return c;
+    };
+    scalarToAlm(w, maskAlm, kMaskIterations);
     hooks.done();
+    if (sepPol)
+    {
+        hooks.stage("Transform of the polarization mask");
+        scalarToAlm(wP, maskAlmP, kMaskIterations);
+        hooks.done();
+    }
+    const AlmD &polAlm = sepPol ? maskAlmP : maskAlm;
+    std::vector<double> pclMask   = pcl(maskAlm, maskAlm);
+    std::vector<double> pclMaskTP = sepPol ? pcl(maskAlm, maskAlmP)
+                                                 : pclMask;
+    std::vector<double> pclMaskPP = sepPol ? pcl(maskAlmP, maskAlmP)
+                                                 : pclMask;
 
     // --- The weighted fields ---
     // map * w in a single pass (no copy of the input first)
-    auto weighted = [&](const Healpix_Map<double> &map)
+    auto weighted = [&](const Healpix_Map<double> &map,
+                        const Healpix_Map<double> &w)
     {
         Healpix_Map<double> out(map.Nside(), map.Scheme(), SET_NSIDE);
         parallel::forRange(npix, [&](long b, long e)
@@ -543,7 +582,7 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     hooks.stage("Transform of the temperature");
     AlmD aT(lmax, lmax);
     {
-        const Healpix_Map<double> t = weighted(input.T);
+        const Healpix_Map<double> t = weighted(input.T, w);
         scalarToAlm(t, aT, options.iterations);
     }
     hooks.done();
@@ -553,13 +592,13 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
     {
         hooks.stage("Transform of Q and U");
         {
-            const Healpix_Map<double> q = weighted(input.Q),
-                                      u = weighted(input.U);
+            const Healpix_Map<double> q = weighted(input.Q, wP),
+                                      u = weighted(input.U, wP);
             spinToAlm(q, u, aE, aB, 2, options.iterations);
         }
         hooks.done();
         if (pure)
-            purify(input.Q, input.U, maskAlm, lmax, options.iterations, pureE,
+            purify(input.Q, input.U, polAlm, lmax, options.iterations, pureE,
                    pureB, aE, aB, hooks);
     }
 
@@ -586,7 +625,7 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
             hooks.stage("Coupling matrix (TE)");
             const std::vector<double> clTE = alm2cl(aT, aE, lmax);
             const std::vector<double> clTB = alm2cl(aT, aB, lmax);
-            Coefficients coeffs(lmax, pclMask, 0, 2, pure);
+            Coefficients coeffs(lmax, pclMaskTP, 0, 2, pure);
             // With purification the sets are indexed by the number of
             // purified fields: the second field is the polarization
             const int e = pureE ? 1 : 0;
@@ -610,7 +649,7 @@ compute(const Input &input, const Options &options, const Hooks &hooks)
             const std::vector<double> clEE = alm2cl(aE, aE, lmax);
             const std::vector<double> clEB = alm2cl(aE, aB, lmax);
             const std::vector<double> clBB = alm2cl(aB, aB, lmax);
-            Coefficients coeffs(lmax, pclMask, 2, 2, pure);
+            Coefficients coeffs(lmax, pclMaskPP, 2, 2, pure);
             const int e = pureE ? 1 : 0;
             const int b = pureB ? 1 : 0;
             const auto pp = coeffs.c->xi_pp[0];
