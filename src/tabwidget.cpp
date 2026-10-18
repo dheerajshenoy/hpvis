@@ -189,11 +189,11 @@ TabWidget::paintEvent(QPaintEvent *event)
         painter.fillRect(rect(), palette().color(QPalette::Window));
         painter.setPen(palette().color(QPalette::Disabled, QPalette::Text));
 
-        constexpr const char *logoText = "hpvis";
+        constexpr const char *logoText = "HpVis";
 
         // Setup logo font - load from resources
         const int fontId = QFontDatabase::addApplicationFont(
-            ":/resources/fonts/Major-Mono-Display.ttf");
+            ":/resources/fonts/NotoSerif-Black.ttf");
 
         const QString fontFamily
             = QFontDatabase::applicationFontFamilies(fontId).value(0,
@@ -202,7 +202,7 @@ TabWidget::paintEvent(QPaintEvent *event)
         if (!fontFamily.isEmpty())
             logoFont.setFamily(fontFamily);
         logoFont.setPointSize(50);
-        logoFont.setBold(true);
+        logoFont.setWeight(QFont::Black); // 900
 
         QFontMetrics logoFm(logoFont);
         const int logoHeight = logoFm.height();

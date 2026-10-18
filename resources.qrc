@@ -36,7 +36,7 @@
         <file>docs/USAGE.md</file>
 
         <!-- Fonts -->
-        <file>resources/fonts/Major-Mono-Display.ttf</file>
+        <file>resources/fonts/NotoSerif-Black.ttf</file>
 
         <!-- Theoretical CMB spectra (Planck Legacy Archive) -->
         <file>resources/theory/planck2018_bestfit.txt</file>

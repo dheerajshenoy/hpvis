@@ -1,19 +1,20 @@
 #include "aboutbanner.hpp"
 
+#include <QConicalGradient>
 #include <QFont>
 #include <QFontDatabase>
-#include <QConicalGradient>
+#include <QFontMetrics>
 #include <QPainter>
 #include <QRadialGradient>
 #include <QTimer>
 
 namespace
 {
-constexpr int kBannerHeight = 110;
-constexpr int kFrameMs      = 33;     // about 30 frames per second
-constexpr qreal kTurnSecs   = 14.0;   // time for the rainbow to turn once
+constexpr int kBannerHeight = 140;
+constexpr int kFrameMs      = 33;   // about 30 frames per second
+constexpr qreal kTurnSecs   = 14.0; // time for the rainbow to turn once
 
-// The family of the logo font (Major Mono Display, from the resources). It is
+// The family of the logo font (Noto Serif Black, from the resources). It is
 // loaded once; empty when it cannot be loaded, which leaves the default font.
 QString
 logoFamily()
@@ -21,7 +22,7 @@ logoFamily()
     static const QString family = []()
     {
         const int id = QFontDatabase::addApplicationFont(
-            ":/resources/fonts/Major-Mono-Display.ttf");
+            ":/resources/fonts/NotoSerif-Black.ttf");
         return QFontDatabase::applicationFontFamilies(id).value(0, QString());
     }();
     return family;
@@ -82,14 +83,14 @@ AboutBanner::paintEvent(QPaintEvent *)
     // Base: a rainbow that is not linear but conical, the hues going around a
     // point near the banner's centre; it turns slowly. The last stop is the
     // first one, so there is no seam.
-    QConicalGradient rainbow(r.center() + QPointF(r.width() * 0.15, r.height() * 0.15),
-                             m_angle);
+    QConicalGradient rainbow(
+        r.center() + QPointF(r.width() * 0.15, r.height() * 0.15), m_angle);
     constexpr int kStops = 7;
     for (int i = 0; i <= kStops; ++i)
     {
         const qreal pos = qreal(i) / kStops;
-        rainbow.setColorAt(pos, QColor::fromHsvF(pos < 1.0 ? pos : 0.0, 0.7,
-                                                 0.85));
+        rainbow.setColorAt(pos,
+                           QColor::fromHsvF(pos < 1.0 ? pos : 0.0, 0.7, 0.85));
     }
     p.fillRect(r, rainbow);
 
@@ -104,9 +105,41 @@ AboutBanner::paintEvent(QPaintEvent *)
     if (!logoFamily().isEmpty())
         f.setFamily(logoFamily());
     f.setPointSize(30);
-    f.setBold(false); // the font has a single weight
+    f.setWeight(QFont::Black); // 900
     p.setFont(f);
+
+    // The tagline, in small spaced capitals at the bottom left
+    QFont tf = font();
+    tf.setPointSize(9);
+    tf.setLetterSpacing(QFont::AbsoluteSpacing, 2.0);
+    const QFontMetrics tfm(tf);
+    const int x               = 18;
+    const int taglineBaseline = int(r.bottom()) - 14 - tfm.descent();
+
+    // "Hp" in white, "Vis" in orange, drawn one after the other, above it
+    const QFontMetrics fm(f);
+    const QString hp   = QStringLiteral("Hp");
+    const QString vis  = QStringLiteral("Vis");
+    const int baseline = taglineBaseline - tfm.ascent() - 4 - fm.descent();
     p.setPen(Qt::white);
-    p.drawText(r.adjusted(18, 0, -18, -12), Qt::AlignLeft | Qt::AlignBottom,
-               QStringLiteral("hpvis"));
+    p.drawText(x, baseline, hp);
+    p.setPen(QColor(255, 140, 0));
+    p.drawText(x + fm.horizontalAdvance(hp), baseline, vis);
+
+    // "HEALPIX" in bold, the rest regular, drawn one after the other
+    QFont tfBold = tf;
+    tfBold.setBold(true);
+    const QString before = QStringLiteral("A MODERN ");
+    const QString bold   = QStringLiteral("HEALPIX");
+    const QString after  = QStringLiteral(" VIEWER");
+    int tx               = x;
+    p.setPen(QColor(246, 236, 224));
+    p.setFont(tf);
+    p.drawText(tx, taglineBaseline, before);
+    tx += tfm.horizontalAdvance(before);
+    p.setFont(tfBold);
+    p.drawText(tx, taglineBaseline, bold);
+    tx += QFontMetrics(tfBold).horizontalAdvance(bold);
+    p.setFont(tf);
+    p.drawText(tx, taglineBaseline, after);
 }
