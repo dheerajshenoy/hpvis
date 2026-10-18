@@ -296,6 +296,8 @@ struct CalcResult
     bool corrected = false;
     int lmax       = 0;
     double fsky    = 0.0;
+    double fskyPol = 0.0;
+    bool polMasked = false;
     double condition = 1.0;
     QStringList notes;
     std::shared_ptr<const master::Result> master;
@@ -431,6 +433,11 @@ computeMasked(const PowerSpectrumInput &in, Stokes &st, int wanted,
     r.corrected = true;
     r.lmax      = lmax;
     r.fsky      = result->fsky;
+    r.fskyPol   = result->fskyPol;
+    r.polMasked = mi.separatePolWeights;
+    if (mi.separatePolWeights && c.apodization == 0)
+        r.notes << "The polarization mask has its own weights but is not "
+                   "apodized: a sharp edge leaks power between scales.";
     r.condition = result->conditionNumber;
     r.master    = std::move(result);
     return r;
@@ -1048,11 +1055,13 @@ PowerSpectrumDock::refresh()
     const bool canPurify = m_apodCombo->currentData().toInt() != 0;
     m_purifyECheck->setEnabled(canPurify);
     m_purifyBCheck->setEnabled(canPurify);
-    m_maskHint->setText(masksNow ? QString()
+    const bool maskChosen
+        = masksNow || m_tMaskCombo->currentData().toInt() >= 0;
+    m_maskHint->setText(maskChosen ? QString()
                                  : "No mask is enabled on this map (Masks "
                                    "menu), so there is nothing to correct "
                                    "for.");
-    m_maskHint->setVisible(!masksNow);
+    m_maskHint->setVisible(!maskChosen);
     m_infoLabel->setVisible(false);
 
     m_progressBar->setVisible(busy);
@@ -1136,7 +1145,11 @@ PowerSpectrumDock::refresh()
                                            "Smooth"};
         info += QString::fromUtf8(", \u0394\u2113 = %1, f_sky = %2")
                     .arg(it->correction.bandwidth)
-                    .arg(it->fsky, 0, 'f', 3);
+                    .arg(it->polMasked
+                             ? QString("T %1, Pol %2")
+                                   .arg(it->fsky, 0, 'f', 3)
+                                   .arg(it->fskyPol, 0, 'f', 3)
+                             : QString::number(it->fsky, 'f', 3));
         info += QString(", %1").arg(apod[it->correction.apodization]);
         if (it->correction.apodization != 0)
             info += QString::fromUtf8(" %1\u00b0")
@@ -1290,6 +1303,8 @@ PowerSpectrumDock::compute()
         res.corrected  = r.corrected;
         res.correction = input.correction;
         res.fsky       = r.fsky;
+        res.fskyPol    = r.fskyPol;
+        res.polMasked  = r.polMasked;
         res.condition  = r.condition;
         res.notes      = r.notes;
         res.master     = r.master;
@@ -2339,6 +2354,8 @@ PowerSpectrumDock::exportCsv(const QString &givenPath)
         out << "# bandpowers corrected for the mask (MASTER), lmax = "
             << it->lmax << ", nside = " << it->nside << ", bandwidth = "
             << it->correction.bandwidth << ", f_sky = " << it->fsky
+            << (it->polMasked ? ", f_sky (pol) = " + QString::number(it->fskyPol)
+                              : QString())
             << ", apodization = " << it->correction.apodization << " ("
             << it->correction.apodizationScale << " deg)"
             << ", purified E = "

@@ -124,6 +124,8 @@ private:
         bool corrected  = false;
         MaskCorrection correction;
         double fsky     = 0.0;
+        double fskyPol  = 0.0;   // of the polarization mask
+        bool polMasked  = false; // Q and U had a mask of their own
         double condition = 1.0;
         QStringList notes; // what was ignored or limited
         // Bandpower windows, to bin a theory spectrum the same way
