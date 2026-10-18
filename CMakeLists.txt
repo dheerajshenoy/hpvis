@@ -196,6 +196,8 @@ add_executable(${PROJECT_NAME}
     src/downgradedialog.cpp
     src/rotationdialog.cpp
     src/unitsdialog.cpp
+    src/transformdialog.cpp
+    src/datatransform.cpp
     src/randommap.cpp
     src/randommapdialog.cpp
     src/units.cpp
@@ -250,6 +252,8 @@ add_executable(${PROJECT_NAME}
     include/downgradedialog.hpp
     include/rotationdialog.hpp
     include/unitsdialog.hpp
+    include/transformdialog.hpp
+    include/datatransform.hpp
     include/randommap.hpp
     include/randommapdialog.hpp
     include/units.hpp

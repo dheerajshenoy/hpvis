@@ -98,6 +98,7 @@ enum class Command
     ToolsMultipoleFilter,
     ToolsHarmonic,
     ToolsUnits,
+    ToolsTransform,
     ToolsRandomMap,
     ToolsPowerSpectrum,
     ToolsStatistics,
@@ -223,6 +224,7 @@ storedName(Command c)
     case Command::ToolsMultipoleFilter: return "tools/multipole-filter";
     case Command::ToolsHarmonic: return "tools/derivatives-and-e-b-maps";
     case Command::ToolsUnits: return "tools/maps/convert-units";
+    case Command::ToolsTransform: return "tools/maps/data-transform";
     case Command::ToolsRandomMap: return "tools/maps/generate-random-map";
     case Command::ToolsPowerSpectrum: return "tools/analysis/power-spectrum";
     case Command::ToolsStatistics: return "tools/analysis/statistics";

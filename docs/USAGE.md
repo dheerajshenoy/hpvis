@@ -527,6 +527,30 @@ between two units and opens the result as a new tab.
   and μK of the same kind needs no frequency.
 - UNSEEN and NaN pixels stay as they are. The new tab remembers its unit.
 
+### Data Transform
+
+**Tools > Maps > Data Transform...** changes the values of the current map
+with a nonlinear function and opens the result as a new tab. This is not the
+color **Scale** (linear, log, asinh), which only changes how values are
+colored: a transformed map has different values in the statistics, the
+histogram and the exports. The original tab is left as it is, and the spectra
+and filters keep using whatever map you point them at, so a nonlinear
+transform never ends up in a C_l by accident.
+
+- **Logarithm** log10(u), **Inverse hyperbolic sine** asinh(u),
+  **Arctangent** atan(u), **Hyperbolic tangent** tanh(u),
+  **Power law** sign(u)·|u|^p and **Exponential** exp(u), with
+  u = (x − μ) / σ. μ is the value that maps to zero and σ the scale where the
+  function starts to bend. The dialog starts with μ = 0 and σ = the standard
+  deviation of the map; **Use map mean and std** sets μ to the mean too.
+- **Histogram equalization** replaces each value by its rank among the valid
+  pixels, from 0 to 1, so every value range holds the same number of pixels.
+  Equal values share one result.
+- **Normalize (mean 0, std 1)** and **Normalize (0 to 1)** use the valid pixels.
+- UNSEEN and NaN pixels stay UNSEEN. So do pixels where the result is not
+  finite (the log of a value at or below μ, an exponential that overflows); the
+  dialog says how many.
+
 ### Generate Random Map
 
 **Tools > Maps > Generate Random Map...** makes a map from scratch.

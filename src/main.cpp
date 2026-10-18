@@ -15,7 +15,7 @@
 #include <iostream>
 #include <limits>
 
-void
+static void
 addArguments(argparse::ArgumentParser &parser)
 {
     parser.add_argument("files").remaining().metavar("FILE").help(

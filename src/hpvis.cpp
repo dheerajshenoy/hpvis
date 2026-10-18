@@ -17,6 +17,7 @@
 #include "powerspectrumdock.hpp"
 #include "randommapdialog.hpp"
 #include "rotationdialog.hpp"
+#include "transformdialog.hpp"
 #include "unitsdialog.hpp"
 #include "settingsdialog.hpp"
 #include "statisticsdock.hpp"
@@ -991,6 +992,9 @@ HpVis::initMenubar()
     mapsMenu->addSeparator();
     tag(mapsMenu->addAction("Convert &Units...", this,
                             &HpVis::onUnitsTriggered), Command::ToolsUnits);
+    tag(mapsMenu->addAction("&Data Transform...", this,
+                            &HpVis::onTransformTriggered),
+        Command::ToolsTransform);
     tag(mapsMenu->addAction("&Generate Random Map...", this,
                             &HpVis::onRandomMapTriggered),
         Command::ToolsRandomMap);
@@ -2261,6 +2265,25 @@ HpVis::onHarmonicTriggered()
     m_harmonicDialog->show();
     m_harmonicDialog->raise();
     m_harmonicDialog->activateWindow();
+}
+
+// The Data Transform dialog: works on the current tab
+void
+HpVis::onTransformTriggered()
+{
+    if (!m_transformDialog)
+    {
+        m_transformDialog
+            = new TransformDialog([this]() { return m_view; }, this);
+        connect(m_transformDialog, &TransformDialog::mapReady, this,
+                [this](std::shared_ptr<Healpix_Map<float>> map,
+                       const QString &title, SkyFrame frame)
+        { openComputedMap(map, title, frame); });
+    }
+    m_transformDialog->refresh();
+    m_transformDialog->show();
+    m_transformDialog->raise();
+    m_transformDialog->activateWindow();
 }
 
 // The Convert Units dialog: works on the current tab

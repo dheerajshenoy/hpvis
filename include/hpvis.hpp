@@ -36,6 +36,7 @@ class UsageDialog;
 class MapOperationDialog;
 class RotationDialog;
 class UnitsDialog;
+class TransformDialog;
 class RandomMapDialog;
 
 class HpVis : public QMainWindow
@@ -142,6 +143,7 @@ private slots:
     void onMultipoleFilterTriggered();
     void onHarmonicTriggered();
     void onUnitsTriggered();
+    void onTransformTriggered();
     void onRandomMapTriggered();
     QList<OpenMap> openMaps() const;
     void onSaveMapTriggered();
@@ -226,6 +228,7 @@ private:
     MapOperationDialog *m_operateDialog = nullptr;
     RotationDialog *m_rotationDialog    = nullptr;
     UnitsDialog *m_unitsDialog          = nullptr;
+    TransformDialog *m_transformDialog  = nullptr;
     RandomMapDialog *m_randomDialog     = nullptr;
     bool m_recenterOnRightClick         = true;
     bool m_lockRollOnRecenter           = false;
