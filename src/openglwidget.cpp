@@ -775,6 +775,9 @@ OpenGLWidget::paintGL()
     m_shaderProgram.setUniformValue("lut_rows", m_lutRows);
     m_shaderProgram.setUniformValue("seg_layers", m_segLayers);
     m_shaderProgram.setUniformValue("level_shift", m_levelShift);
+    m_shaderProgram.setUniformValue("map_levels", mapTexLevels(m_mapTexFormat));
+    m_shaderProgram.setUniformValue("map_lo", m_texLo);
+    m_shaderProgram.setUniformValue("map_hi", m_texHi);
     m_shaderProgram.setUniformValue("streaming", m_streaming);
     glActiveTexture(GL_TEXTURE0);
     m_shaderProgram.setUniformValue("viewport_size",
@@ -1615,15 +1618,38 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
         return;
     }
 
+    // Texture format: from the settings, and the range of the seen values
+    // for the normalized ones
+    m_mapTexFormat = AppSettings::load().mapTexFormat;
+    m_texLo = m_texHi = 0.0f;
+    if (mapTexNormalized(m_mapTexFormat))
+    {
+        float lo = std::numeric_limits<float>::max(), hi = -lo;
+        for (long i = 0; i < m_npix; ++i)
+            if (isSeen(mapDataPtr[i]))
+            {
+                lo = std::min(lo, mapDataPtr[i]);
+                hi = std::max(hi, mapDataPtr[i]);
+            }
+        if (lo <= hi)
+        {
+            m_texLo = lo;
+            m_texHi = hi;
+        }
+    }
+    const MapTexInfo texInfo = mapTexInfo(m_mapTexFormat);
+
     const int tex = int(m_texNside);
     m_segLayers   = segmentLayers(tex);
     const Healpix_Base base(ns, map.Scheme(), SET_NSIDE);
     std::vector<float> buf(size_t(tex) * tex); // one face at a time
+    std::vector<uint8_t> encoded;
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     for (int seg = 0; seg < 12 / m_segLayers; ++seg)
     {
-        if (!allocSegment(m_mapTextures[seg], GL_R32F, GL_RED, GL_FLOAT))
+        if (!allocSegment(m_mapTextures[seg], texInfo.internalFormat,
+                          texInfo.format, texInfo.type))
         {
             deleteMapTextures();
             glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
@@ -1632,7 +1658,8 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
                 QString("nside %1 needs %2 MB of video memory. Lower the "
                         "streaming limit in the settings.")
                     .arg(tex)
-                    .arg(12.0 * tex * tex * 4 / 1048576.0, 0, 'f', 0));
+                    .arg(12.0 * tex * tex * texInfo.bytes / 1048576.0, 0,
+                         'f', 0));
             return;
         }
         for (int l = 0; l < m_segLayers; ++l)
@@ -1659,8 +1686,10 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
                 }
                 buf[texel] = valid ? float(sum / valid) : UNSEEN;
             });
+            encodeMapTexels(buf.data(), buf.size(), m_mapTexFormat, m_texLo,
+                            m_texHi, encoded);
             glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, l, tex, tex, 1,
-                            GL_RED, GL_FLOAT, buf.data());
+                            texInfo.format, texInfo.type, encoded.data());
         }
     }
     // Restore the default: Qt's text renderer relies on it
@@ -1674,7 +1703,7 @@ OpenGLWidget::uploadMapToGPU(const Healpix_Map<float> &map)
     {
         m_tiles = std::make_unique<TileCache>();
         // 256 tiles = 256 MB; fewer if the GPU cannot spare that
-        if (m_tiles->create(ns, 256))
+        if (m_tiles->create(ns, 256, m_mapTexFormat, m_texLo, m_texHi))
             m_streaming = true;
         else
         {

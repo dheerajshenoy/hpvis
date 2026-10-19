@@ -1,5 +1,7 @@
 #pragma once
 
+#include "maptexformat.hpp"
+
 #include <QOpenGLExtraFunctions>
 #include <cstdint>
 #include <healpix_map.h>
@@ -13,8 +15,9 @@
 // tiles live in one array texture (the atlas, a layer per tile), and a small
 // page table texture (tiles per side x tiles per side x 12 faces) tells the
 // shader which layer holds a tile, or -1 when it is not resident (the shader
-// then falls back to the always-resident coarse map). Both textures are R32F
-// so they can share the sampler type of the other map textures.
+// then falls back to the always-resident coarse map). The atlas uses the
+// map texture format (the page table is always R32F); both are float samplers
+// like the other map textures.
 class TileCache : protected QOpenGLExtraFunctions
 {
   public:
@@ -38,9 +41,11 @@ class TileCache : protected QOpenGLExtraFunctions
     TileCache() = default;
     ~TileCache();
 
-    // Needs a current GL context. Tries `capacity` tiles (1 MB each), then
+    // Needs a current GL context. Tries `capacity` tiles (1 MB each at 32 bits), then
     // fewer; false when not even a few fit.
-    bool create(long nside, int capacity);
+    // lo / hi: the map's value range, for the normalized formats.
+    bool create(long nside, int capacity, MapTexFormat format, float lo,
+                float hi);
     void destroy(); // needs a current GL context
 
     int tilesPerSide() const { return m_tilesPerSide; }
@@ -67,5 +72,9 @@ class TileCache : protected QOpenGLExtraFunctions
     std::vector<int> m_slotKey;        // tile in each slot, -1 = free
     std::vector<uint64_t> m_slotStamp; // frame the slot was last wanted
     std::unordered_map<int, int> m_slotOfKey;
+    MapTexFormat m_format = MapTexFormat::Float32;
+    float m_lo            = 0.0f;
+    float m_hi            = 0.0f;
     std::vector<float> m_tile;         // upload staging
+    std::vector<uint8_t> m_encoded;    // m_tile in the texture's format
 };

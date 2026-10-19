@@ -571,6 +571,11 @@ private:
     // m_texNside = nside >> m_levelShift and the tile cache the visible part
     // of the full-resolution map. Without it m_texNside == nside.
     int m_streamNside   = 4096;
+    // Texel type of the map textures, and the value range the normalized
+    // formats span (set when the map is uploaded)
+    MapTexFormat m_mapTexFormat = MapTexFormat::Float32;
+    float m_texLo               = 0.0f;
+    float m_texHi               = 0.0f;
     long m_texNside     = 0;
     int m_levelShift    = 0;
     bool m_streaming    = false;

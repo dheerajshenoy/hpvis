@@ -13,7 +13,8 @@ TileCache::~TileCache()
 }
 
 bool
-TileCache::create(long nside, int capacity)
+TileCache::create(long nside, int capacity, MapTexFormat format, float lo,
+                  float hi)
 {
     destroy();
     initializeOpenGLFunctions();
@@ -22,16 +23,20 @@ TileCache::create(long nside, int capacity)
     glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &maxLayers);
     capacity = std::min(capacity, int(maxLayers));
 
+    m_format       = format;
+    m_lo           = lo;
+    m_hi           = hi;
     m_nside        = nside;
     m_tilesPerSide = int(nside / kTileSize);
 
     glGenTextures(1, &m_atlas);
     glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas);
+    const MapTexInfo info = mapTexInfo(format);
     for (; capacity >= 16; capacity /= 2)
     {
         glGetError(); // clear
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R32F, kTileSize, kTileSize,
-                     capacity, 0, GL_RED, GL_FLOAT, nullptr);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, info.internalFormat, kTileSize,
+                     kTileSize, capacity, 0, info.format, info.type, nullptr);
         if (glGetError() == GL_NO_ERROR)
             break;
     }
@@ -101,8 +106,14 @@ TileCache::upload(const Healpix_Map<float> &map, int key, int slot)
     });
 
     glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas);
+    const MapTexInfo info = mapTexInfo(m_format);
+    encodeMapTexels(m_tile.data(), m_tile.size(), m_format, m_lo, m_hi,
+                    m_encoded);
+    // Rows of 1- and 2-byte texels are not 4-byte aligned
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, slot, kTileSize, kTileSize,
-                    1, GL_RED, GL_FLOAT, m_tile.data());
+                    1, info.format, info.type, m_encoded.data());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
     // Point the page table at the new tile (and away from the evicted one)
     glBindTexture(GL_TEXTURE_2D_ARRAY, m_pages);

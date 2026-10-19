@@ -2,6 +2,7 @@
 
 #include "cosmoparams.hpp"
 #include "colormap.hpp"
+#include "maptexformat.hpp"
 #include "projection.hpp"
 #include "skyframe.hpp"
 
@@ -24,6 +25,9 @@ struct AppSettings
     int streamingNside   = 4096;
     // Render into a 16-bit float framebuffer (no banding); needs a restart
     bool hdrRendering    = true;
+    // Texel type of the map textures on the GPU; applies to maps opened
+    // after the change
+    MapTexFormat mapTexFormat = MapTexFormat::Float32;
 
     // New maps
     Colormap colormap       = Colormap::VIRIDIS;

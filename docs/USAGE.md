@@ -780,6 +780,9 @@ hpvis --stats map.fits
   8192 needs 3.2 GB of video memory. The full map is also held in memory
   (3.2 GB at nside 8192). Above the *stream* limit (Settings > General, default
   4096) only a coarse copy plus the visible tiles are on the card.
+- **Older or small GPUs:** set *Map texture format* (Settings > General) to
+  16-bit float or a normalized format to halve (or quarter) the video memory.
+  The format applies to maps opened afterwards.
 - **While streaming,** zooming in shows the coarse map for a moment until the
   tiles arrive, and masks are applied at the coarse resolution.
 - **"Out of GPU memory"** message: lower the streaming limit in the settings.

@@ -88,6 +88,7 @@ private:
     // General
     QSpinBox *m_recentMaxSpin       = nullptr;
     QComboBox *m_streamCombo        = nullptr;
+    QComboBox *m_texFormatCombo     = nullptr;
     QCheckBox *m_rememberDirCheck   = nullptr;
     QCheckBox *m_restoreSessionCheck = nullptr;
     QCheckBox *m_showToolbarCheck   = nullptr;

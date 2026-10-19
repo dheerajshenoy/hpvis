@@ -11,6 +11,9 @@ uniform int seg_layers;
 // coarse map, nside >> level_shift, and full-resolution tiles come from the
 // atlas, found through the page table (layer of a tile, -1 = not resident)
 uniform int level_shift;
+uniform int map_levels;  // 0 = values stored as is, else normalized (255 / 65535)
+uniform float map_lo;    // value of code 1 of a normalized texture
+uniform float map_hi;    // value of the last code
 uniform bool streaming;
 uniform sampler2DArray tileAtlas;
 uniform sampler2DArray tilePages;

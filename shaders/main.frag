@@ -127,6 +127,14 @@ void main() {
             mapVal = texelFetch(tileAtlas, ivec3(texel.xy & 511, int(layer)), 0).r;
     }
 
+    if (map_levels > 0) {
+        // Normalized texel: code 0 = unseen, 1..map_levels = map_lo..map_hi
+        float code = floor(mapVal * float(map_levels) + 0.5);
+        mapVal = code < 0.5 ? -2.0e30
+                            : map_lo + (code - 1.0) / float(map_levels - 1)
+                                           * (map_hi - map_lo);
+    }
+
     vec3 color;
 
     // HEALPix UNSEEN is -1.6375e30 (finite, not NaN); also catch NaN/Inf.

@@ -2,6 +2,12 @@
 
 ## 0.1.1
 
+### Map texture format
+- Settings > General > *Map texture format* chooses how map values are stored
+  on the GPU: 32-bit float (default, exact), 16-bit float, 16-bit normalized or
+  8-bit normalized. The smaller ones cut video memory and run on older GPUs, at
+  the cost of color precision. Applies to maps opened afterwards.
+
 ### Beam correction
 - The power spectrum dock can divide the spectra by a beam window B_ℓ² (a
   Gaussian of a given FWHM, or a beam file) or multiply the theory by it.

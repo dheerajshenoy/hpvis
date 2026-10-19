@@ -30,6 +30,11 @@ AppSettings::load()
     a.hdrRendering
         = s.value("general/hdrRendering", d.hdrRendering).toBool();
 
+    const int mtf = s.value("general/mapTexFormat", int(d.mapTexFormat)).toInt();
+    a.mapTexFormat = (mtf >= 0 && mtf <= int(MapTexFormat::Norm8))
+                         ? MapTexFormat(mtf)
+                         : d.mapTexFormat;
+
     const int ori     = s.value("view/orientation", int(d.orientation)).toInt();
     a.orientation     = (ori >= 0 && ori <= int(Orientation::Equatorial))
                             ? Orientation(ori)
@@ -145,6 +150,7 @@ AppSettings::save() const
     s.setValue("general/showStatusBar", showStatusBar);
     s.setValue("general/streamingNside", streamingNside);
     s.setValue("general/hdrRendering", hdrRendering);
+    s.setValue("general/mapTexFormat", int(mapTexFormat));
 
     s.setValue("view/projection", int(projection));
     s.setValue("view/fromOutside", viewFromOutside);

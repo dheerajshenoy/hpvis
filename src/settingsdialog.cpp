@@ -143,6 +143,7 @@ SettingsDialog::initConnections()
     };
     connect(m_recentMaxSpin, &QSpinBox::valueChanged, this, changed);
     connect(m_streamCombo, &QComboBox::currentIndexChanged, this, changed);
+    connect(m_texFormatCombo, &QComboBox::currentIndexChanged, this, changed);
     connect(m_theoryPresetCombo, &QComboBox::currentIndexChanged, this,
             [this, changed]()
     {
@@ -355,6 +356,7 @@ SettingsDialog::currentSettings() const
     a.showToolbar        = m_showToolbarCheck->isChecked();
     a.showStatusBar      = m_showStatusBarCheck->isChecked();
     a.streamingNside     = m_streamCombo->currentData().toInt();
+    a.mapTexFormat = MapTexFormat(m_texFormatCombo->currentData().toInt());
     a.projection         = Projection(m_projectionCombo->currentIndex());
     a.viewFromOutside    = m_perspectiveCombo->currentIndex() == 1;
     a.orientation        = Orientation(m_orientationCombo->currentIndex());
@@ -419,6 +421,8 @@ SettingsDialog::loadSettings()
     m_showStatusBarCheck->setChecked(a.showStatusBar);
     const int stream = m_streamCombo->findData(a.streamingNside);
     m_streamCombo->setCurrentIndex(stream >= 0 ? stream : 3);
+    m_texFormatCombo->setCurrentIndex(
+        std::max(0, m_texFormatCombo->findData(int(a.mapTexFormat))));
     m_projectionCombo->setCurrentIndex(int(a.projection));
     m_perspectiveCombo->setCurrentIndex(a.viewFromOutside ? 1 : 0);
     m_orientationCombo->setCurrentIndex(int(a.orientation));
@@ -545,6 +549,24 @@ SettingsDialog::createGeneralSettingsPage()
         "use to a few hundred MB whatever the nside. Masks are shown at the "
         "coarse resolution while streaming. Applies to open maps too.");
     bigForm->addRow("Stream maps above nside:", m_streamCombo);
+
+    m_texFormatCombo = new QComboBox();
+    m_texFormatCombo->addItem("32-bit float (exact)",
+                              int(MapTexFormat::Float32));
+    m_texFormatCombo->addItem("16-bit float (half memory)",
+                              int(MapTexFormat::Float16));
+    m_texFormatCombo->addItem("16-bit normalized (half memory)",
+                              int(MapTexFormat::Norm16));
+    m_texFormatCombo->addItem("8-bit normalized (quarter memory)",
+                              int(MapTexFormat::Norm8));
+    m_texFormatCombo->setToolTip(
+        "How map values are stored on the GPU. Smaller formats use less "
+        "video memory and work on older hardware, at the cost of precision "
+        "(the colors only; statistics and exports use the full data). "
+        "16-bit float keeps about 3 digits and shows |values| above 65504 as "
+        "unseen. The normalized formats spread 65534 / 254 levels between "
+        "the map's minimum and maximum. Applies to maps opened afterwards.");
+    bigForm->addRow("Map texture format:", m_texFormatCombo);
     outer->addWidget(bigBox);
 
     auto *renderBox  = new QGroupBox("Rendering");
