@@ -2,6 +2,8 @@
 
 # High Priority
 
+- [ ] Generated maps do not inherit the colormap from which they were generated
+
 # Medium Priority
 
 - [ ] Point-source / peak finder (local maxima above N sigma, listed with positions; optional matched filter or wavelet)
